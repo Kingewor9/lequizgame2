@@ -25,6 +25,11 @@ def create_app(config_name=None):
     # Register blueprints
     register_blueprints(app)
     
+    # Seed default tasks safely
+    with app.app_context():
+      from app.routes.coins import seed_tasks
+    seed_tasks()
+    
     # Error handlers
     @app.errorhandler(404)
     def not_found(error):
