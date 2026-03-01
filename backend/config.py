@@ -25,7 +25,8 @@ class TestingConfig(Config):
     """Testing configuration"""
     DEBUG = True
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    MONGODB_URI = 'mongodb://localhost:27017/footy_iq_test'
+    MONGODB_DB = 'footy_iq_test'
 
 
 class ProductionConfig(Config):
