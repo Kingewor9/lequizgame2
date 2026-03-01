@@ -20,15 +20,10 @@ def create_app(config_name=None):
     # Initialize extensions (including MongoDB)
     init_extensions(app)
     jwt = JWTManager(app)
-    CORS(app, supports_credentials=True)
+    CORS(app, origins=[os.environ.get('FRONTEND_URL', 'http://localhost:5173')], supports_credentials=True)
     
     # Register blueprints
     register_blueprints(app)
-    
-    # Seed default tasks safely
-    with app.app_context():
-      from app.routes.coins import seed_tasks
-    seed_tasks()
     
     # Error handlers
     @app.errorhandler(404)
@@ -50,49 +45,42 @@ def create_app(config_name=None):
     
     # Database initialization
     with app.app_context():
-        # Initialize default footy coin tasks if not exist
         initialize_default_tasks()
     
     return app
 
 
 def initialize_default_tasks():
-    """Initialize default footy coin tasks"""
+    """Initialize default footy coin tasks if they don't exist yet."""
     from app.models import FootyCoinTask
     from app.utils import generate_id
-    
-    # Check if tasks already exist
-    if FootyCoinTask.objects.count() > 0:
-        return
-    
-    tasks = [
+
+    defaults = [
         {
             'type': 'watch_ads',
-            'title': 'Watch Ads',
-            'description': 'Watch advertisement to earn Footy Coins',
-            'reward_coins': 100,
+            'title': 'Earn 50 Footy Coins',
+            'description': 'Watch a short ad without skipping to claim your reward. Repeatable!',
+            'reward_coins': 50,
         },
         {
             'type': 'free_claim',
-            'title': 'Claim Free Coins',
-            'description': 'Claim your free 250 Footy Coins bonus',
+            'title': 'Welcome Bonus',
+            'description': 'Claim your one-time welcome gift of 250 Footy Coins.',
             'reward_coins': 250,
         },
         {
             'type': 'join_telegram',
-            'title': 'Join Telegram Channel',
-            'description': 'Join our official Telegram channel',
+            'title': 'Join Our Telegram Channel',
+            'description': 'Join @footyriddles on Telegram and earn 150 Footy Coins.',
             'reward_coins': 150,
         },
     ]
-    
-    for task_data in tasks:
-        task = FootyCoinTask(
-            id=generate_id(),
-            type=task_data['type'],
-            title=task_data['title'],
-            description=task_data['description'],
-            reward_coins=task_data['reward_coins'],
-            is_active=True
-        )
-        task.save()
+
+    for task_data in defaults:
+        exists = FootyCoinTask.objects(type=task_data['type']).first()
+        if not exists:
+            FootyCoinTask(
+                id=generate_id(),
+                is_active=True,
+                **task_data
+            ).save()
