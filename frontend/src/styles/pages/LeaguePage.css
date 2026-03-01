@@ -1,0 +1,246 @@
+.league-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.league-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 70px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  background-color: #111;
+  border-bottom: 1px solid #333;
+}
+
+.action-buttons button {
+  flex: 1;
+  padding: 12px;
+  font-size: 0.95rem;
+}
+
+.my-leagues {
+  padding: 16px;
+}
+
+.my-leagues h2 {
+  font-size: 1.2rem;
+  margin-bottom: 12px;
+}
+
+.no-leagues-message {
+  padding: 32px 16px;
+  text-align: center;
+  background-color: #111;
+  border: 2px dashed #333;
+  border-radius: 12px;
+  margin: 16px;
+}
+
+.no-leagues-message p {
+  color: #999;
+  margin: 8px 0;
+  font-size: 0.95rem;
+}
+
+.search-section {
+  padding: 16px;
+}
+
+.search-section h2 {
+  font-size: 1.2rem;
+  margin-bottom: 12px;
+}
+
+.search-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search-bar input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: 2px solid #333;
+  background-color: #111;
+  color: #fff;
+}
+
+.search-bar input:focus {
+  border-color: #fff;
+}
+
+.btn-search {
+  padding: 12px 16px;
+  background-color: #fff;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.public-leagues {
+  padding: 16px;
+}
+
+.public-leagues h3 {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+}
+
+.public-league-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.league-info {
+  flex: 1;
+}
+
+.league-info h4 {
+  margin: 0 0 4px 0;
+  font-size: 1rem;
+}
+
+.league-info .description {
+  font-size: 0.85rem;
+  color: #999;
+  margin: 4px 0;
+  line-height: 1.4;
+}
+
+.league-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: #999;
+}
+
+.member-count {
+  display: inline-block;
+}
+
+.btn-join-league {
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.no-leagues-text {
+  color: #999;
+  text-align: center;
+  padding: 20px;
+  font-size: 0.9rem;
+}
+
+/* Modal Forms */
+.league-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group textarea,
+.form-group select {
+  padding: 12px;
+  border: 2px solid #333;
+  border-radius: 8px;
+  background-color: #111;
+  color: #fff;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  border-color: #fff;
+  outline: none;
+}
+
+.form-group.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-group.checkbox input {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.form-group.checkbox label {
+  margin: 0;
+  font-weight: 400;
+}
+
+.form-hint {
+  color: #999;
+  font-size: 0.85rem;
+  margin: -8px 0 8px 0;
+  line-height: 1.4;
+}
+
+.league-form button {
+  padding: 12px;
+  margin-top: 8px;
+}
+
+@media (max-width: 480px) {
+  .action-buttons {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .my-leagues {
+    padding: 12px;
+  }
+
+  .search-section {
+    padding: 12px;
+  }
+
+  .public-leagues {
+    padding: 12px;
+  }
+
+  .public-league-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .btn-join-league {
+    width: 100%;
+  }
+
+  .no-leagues-message {
+    padding: 24px 16px;
+    margin: 12px;
+  }
+}

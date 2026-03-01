@@ -1,0 +1,81 @@
+.league-card {
+  background-color: #111;
+  border: 2px solid #333;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  animation: slideUp 0.3s ease;
+}
+
+.league-card.user-league {
+  border-color: #fff;
+  border-width: 2px;
+}
+
+.league-header {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #333;
+}
+
+.league-header h3 {
+  font-size: 1.1rem;
+  margin: 0 0 4px 0;
+}
+
+.league-description {
+  font-size: 0.85rem;
+  color: #999;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.league-stats,
+.league-info {
+  margin-bottom: 16px;
+}
+
+.stat-item,
+.info-item {
+  padding: 6px 0;
+  font-size: 0.9rem;
+}
+
+.stat-label,
+.info-label {
+  color: #999;
+}
+
+.stat-value,
+.info-value {
+  font-weight: 600;
+  color: #fff;
+}
+
+.league-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn-join {
+  flex: 1;
+}
+
+.btn-view {
+  flex: 1;
+}
+
+@media (max-width: 480px) {
+  .league-card {
+    padding: 12px;
+  }
+
+  .league-header h3 {
+    font-size: 1rem;
+  }
+
+  .league-description {
+    font-size: 0.8rem;
+  }
+}

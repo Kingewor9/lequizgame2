@@ -1,0 +1,165 @@
+.quiz-question {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px;
+}
+
+.question-header {
+  margin-bottom: 24px;
+}
+
+.question-counter {
+  display: block;
+  font-size: 0.85rem;
+  color: #999;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background-color: #333;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #fff;
+  transition: width 0.3s ease;
+}
+
+.question-text {
+  font-size: 1.3rem;
+  margin-bottom: 24px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.options-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex: 1;
+}
+
+.option-button {
+  background-color: #111;
+  border: 2px solid #333;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  color: #fff;
+  text-align: left;
+  font-size: 0.95rem;
+}
+
+.option-button:not(:disabled):hover {
+  border-color: #fff;
+  background-color: #1a1a1a;
+}
+
+.option-button.selected {
+  border-color: #fff;
+  background-color: #1a1a1a;
+}
+
+.option-button.correct {
+  border-color: #51cf66;
+  background-color: rgba(81, 207, 102, 0.1);
+}
+
+.option-button.incorrect {
+  border-color: #ff6b6b;
+  background-color: rgba(255, 107, 107, 0.1);
+}
+
+.option-button.answered {
+  cursor: not-allowed;
+}
+
+.option-text {
+  flex: 1;
+  padding-right: 12px;
+}
+
+.option-indicator {
+  font-size: 1.2rem;
+  font-weight: bold;
+  min-width: 24px;
+  text-align: center;
+}
+
+.option-button.correct .option-indicator {
+  color: #51cf66;
+}
+
+.option-button.incorrect .option-indicator {
+  color: #ff6b6b;
+}
+
+.correct-answer {
+  color: #51cf66;
+}
+
+.feedback-message {
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  animation: slideUp 0.3s ease;
+}
+
+.feedback-message.success {
+  background-color: rgba(81, 207, 102, 0.1);
+  border: 1px solid #51cf66;
+  color: #51cf66;
+}
+
+.feedback-message.error {
+  background-color: rgba(255, 107, 107, 0.1);
+  border: 1px solid #ff6b6b;
+  color: #ff6b6b;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .quiz-question {
+    padding: 12px;
+  }
+
+  .question-text {
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+  }
+
+  .option-button {
+    padding: 14px;
+    font-size: 0.9rem;
+  }
+
+  .options-container {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+}

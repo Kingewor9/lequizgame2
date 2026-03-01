@@ -1,0 +1,63 @@
+.tournament-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.tournament-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coming-soon-banner {
+  text-align: center;
+  padding: 40px 20px;
+  max-width: 400px;
+}
+
+.banner-icon {
+  font-size: 4rem;
+  margin-bottom: 16px;
+}
+
+.coming-soon-banner h1 {
+  font-size: 2rem;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.coming-soon-banner p {
+  color: #999;
+  font-size: 1rem;
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+.banner-subtitle {
+  color: #666;
+  font-size: 0.9rem;
+  margin-top: 12px !important;
+}
+
+@media (max-width: 480px) {
+  .coming-soon-banner {
+    padding: 30px 16px;
+  }
+
+  .banner-icon {
+    font-size: 3rem;
+  }
+
+  .coming-soon-banner h1 {
+    font-size: 1.5rem;
+  }
+
+  .coming-soon-banner p {
+    font-size: 0.9rem;
+  }
+}
