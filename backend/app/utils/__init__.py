@@ -150,3 +150,5 @@ def calculate_accuracy(correct: int, total: int) -> int:
     if total == 0:
         return 0
     return int((correct / total) * 100)
+# Allas __init__.py
+calculate_quiz_accuracy = calculate_accuracy
