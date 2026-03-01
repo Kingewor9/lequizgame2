@@ -12,6 +12,7 @@ export const FootyCoinPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
   const [taskInProgress, setTaskInProgress] = useState<string | null>(null);
+  const [pendingTelegramTask, setPendingTelegramTask] = useState<string | null>(null);
 
   // Fetch tasks
   useEffect(() => {
@@ -20,7 +21,7 @@ export const FootyCoinPage: React.FC = () => {
         setIsLoading(true);
         const response = await apiService.get('/footy-coins/tasks');
         if (response.success && response.data) {
-          setTasks(response.data as FootyCoinTask[]);//Take note of this change
+          setTasks(response.data as FootyCoinTask[]);
         }
       } catch (error) {
         console.error('Error fetching tasks:', error);
@@ -37,8 +38,7 @@ export const FootyCoinPage: React.FC = () => {
       setTaskInProgress(taskId);
 
       if (taskType === 'watch_ads') {
-        // Open ad viewer (would be a modal or external service)
-        const confirmed = window.confirm('Watch an ad to earn 100 Footy Coins?');
+        const confirmed = window.confirm('Watch a short ad to earn 50 Footy Coins?');
         if (!confirmed) {
           setTaskInProgress(null);
           return;
@@ -46,39 +46,55 @@ export const FootyCoinPage: React.FC = () => {
 
         const response = await apiService.post(`/footy-coins/tasks/${taskId}/complete`, {});
         if (response.success) {
-          setAlert({ message: 'Earned 100 Footy Coins!', type: 'success' });
+          setAlert({ message: '🎉 Earned 50 Footy Coins for watching the ad!', type: 'success' });
           await refreshUser();
           setTasks((prev) =>
             prev.map((t) =>
               t.id === taskId ? { ...t, is_completed: true, completed_at: new Date().toISOString() } : t
             )
           );
+        } else {
+          setAlert({ message: response.error || 'Failed to complete task', type: 'error' });
         }
+
       } else if (taskType === 'free_claim') {
         const response = await apiService.post(`/footy-coins/tasks/${taskId}/complete`, {});
         if (response.success) {
-          setAlert({ message: 'Claimed 250 Footy Coins!', type: 'success' });
+          setAlert({ message: '🎉 Welcome bonus claimed! 250 Footy Coins added to your balance.', type: 'success' });
           await refreshUser();
           setTasks((prev) =>
             prev.map((t) =>
               t.id === taskId ? { ...t, is_completed: true, completed_at: new Date().toISOString() } : t
             )
           );
+        } else {
+          setAlert({ message: response.error || 'Failed to claim bonus', type: 'error' });
         }
+
       } else if (taskType === 'join_telegram') {
-        // Open Telegram link
-        window.open('https://t.me/footyiq', '_blank');
-        const response = await apiService.post(`/footy-coins/tasks/${taskId}/complete`, {});
+        // Open the channel, then show a Verify button
+        window.open('https://t.me/footyriddles', '_blank');
+        setPendingTelegramTask(taskId);
+        setAlert({ message: 'Join @footyriddles, then tap "Verify" to claim your coins!', type: 'info' });
+        setTaskInProgress(null);
+        return;
+
+      } else if (taskType === 'verify_telegram') {
+        const response = await apiService.post(`/footy-coins/tasks/${taskId}/verify-telegram`, {});
         if (response.success) {
-          setAlert({ message: 'Earned 150 Footy Coins! Welcome to the channel.', type: 'success' });
+          setAlert({ message: '✅ Verified! 150 Footy Coins added to your balance.', type: 'success' });
           await refreshUser();
+          setPendingTelegramTask(null);
           setTasks((prev) =>
             prev.map((t) =>
               t.id === taskId ? { ...t, is_completed: true, completed_at: new Date().toISOString() } : t
             )
           );
+        } else {
+          setAlert({ message: response.error || 'Could not verify membership. Please join the channel first.', type: 'error' });
         }
       }
+
     } catch (error) {
       console.error('Error completing task:', error);
       setAlert({ message: 'Failed to complete task', type: 'error' });
@@ -91,18 +107,23 @@ export const FootyCoinPage: React.FC = () => {
     return <Loading message="Loading Footy Coins..." />;
   }
 
-  const getTaskButtonText = (taskType: string, isCompleted: boolean): string => {
-    if (isCompleted) return 'Completed';
-    switch (taskType) {
-      case 'watch_ads':
-        return 'Watch';
-      case 'free_claim':
-        return 'Claim';
-      case 'join_telegram':
-        return 'Join';
-      default:
-        return 'Go';
+  const getTaskButtonText = (task: FootyCoinTask): string => {
+    if (task.is_completed) return 'Completed';
+    if (task.type === 'join_telegram' && pendingTelegramTask === task.id) return 'Verify';
+    switch (task.type) {
+      case 'watch_ads':   return 'Watch';
+      case 'free_claim':  return 'Claim';
+      case 'join_telegram': return 'Join';
+      default:            return 'Go';
     }
+  };
+
+  // Determine the effective action type (flip to verify once channel has been opened)
+  const getEffectiveType = (task: FootyCoinTask): string => {
+    if (task.type === 'join_telegram' && pendingTelegramTask === task.id) {
+      return 'verify_telegram';
+    }
+    return task.type;
   };
 
   return (
@@ -148,11 +169,11 @@ export const FootyCoinPage: React.FC = () => {
                   </div>
 
                   <button
-                    className={`btn-task ${task.is_completed ? 'completed' : ''}`}
-                    onClick={() => handleTaskAction(task.id, task.type)}
+                    className={`btn-task ${task.is_completed ? 'completed' : ''} ${pendingTelegramTask === task.id ? 'verify' : ''}`}
+                    onClick={() => handleTaskAction(task.id, getEffectiveType(task))}
                     disabled={task.is_completed || taskInProgress === task.id}
                   >
-                    {taskInProgress === task.id ? 'Processing...' : getTaskButtonText(task.type, task.is_completed)}
+                    {taskInProgress === task.id ? 'Processing...' : getTaskButtonText(task)}
                   </button>
                 </div>
               ))
