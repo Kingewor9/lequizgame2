@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-from app import create_app, db
+from app import create_app
 from app.models import User, Quiz, Question, Option, QuizResponse, League, UserLeague, FootyCoinTask, UserFootyCoinTask, FootyCoinTransaction
 
 app = create_app(os.environ.get('FLASK_ENV', 'development'))
@@ -10,7 +10,6 @@ app = create_app(os.environ.get('FLASK_ENV', 'development'))
 def make_shell_context():
     """Create shell context for flask shell"""
     return {
-        'db': db,
         'User': User,
         'Quiz': Quiz,
         'Question': Question,
