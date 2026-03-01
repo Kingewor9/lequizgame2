@@ -1,130 +1,232 @@
-import React, { useState, useEffect } from 'react';
+// Type declaration for Adsgram SDK
+declare global {
+  interface Window {
+    Adsgram: any;
+  }
+}
+
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { FootyCoinTask } from '../types';
 import { apiService } from '../services/apiService';
 import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
 import '../styles/pages/FootyCoinPage.css';
 
+// ── Hardcoded task definitions ─────────────────────────────────────────────
+const TASKS = [
+  {
+    id: 'watch_ads',
+    type: 'watch_ads',
+    title: 'Earn 50 Footy Coins',
+    description: 'Watch a short ad without skipping to claim your reward. Can be repeated!',
+    reward_coins: 50,
+    icon: '⚡',
+  },
+  {
+    id: 'free_claim',
+    type: 'free_claim',
+    title: 'Welcome Bonus',
+    description: 'Claim your one-time welcome gift of 250 Footy Coins.',
+    reward_coins: 250,
+    icon: '🎁',
+  },
+  {
+    id: 'join_telegram',
+    type: 'join_telegram',
+    title: 'Join Our Telegram Channel',
+    description: 'Join @footyriddles on Telegram and earn 150 Footy Coins.',
+    reward_coins: 150,
+    icon: '✈️',
+  },
+];
+
 export const FootyCoinPage: React.FC = () => {
   const { user, refreshUser } = useAuth();
-  const [tasks, setTasks] = useState<FootyCoinTask[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
   const [taskInProgress, setTaskInProgress] = useState<string | null>(null);
-  const [pendingTelegramTask, setPendingTelegramTask] = useState<string | null>(null);
+  const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
+  const [pendingTelegramVerify, setPendingTelegramVerify] = useState(false);
+  const [isAdLoading, setIsAdLoading] = useState(false);
 
-  // Fetch tasks
+  // Track which task IDs exist on the backend (for one-time tasks)
+  const [backendTaskIds, setBackendTaskIds] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  const adControllerRef = useRef<any>(null);
+
+  // Initialize Adsgram
   useEffect(() => {
-    const fetchTasks = async () => {
+    if (window.Adsgram) {
+      const blockId = import.meta.env.VITE_ADSGRAM_BLOCK_ID;
+      if (blockId) {
+        adControllerRef.current = window.Adsgram.init({
+          blockId,
+          debug: import.meta.env.DEV,
+        });
+      }
+    }
+  }, []);
+
+  // Fetch completion status from backend (which tasks has this user already done)
+  useEffect(() => {
+    const fetchStatus = async () => {
       try {
         setIsLoading(true);
         const response = await apiService.get('/footy-coins/tasks');
         if (response.success && response.data) {
-          setTasks(response.data as FootyCoinTask[]);
+          const data = response.data as any[];
+          const ids: Record<string, string> = {};
+          const done = new Set<string>();
+
+          data.forEach((t) => {
+            // Map backend type → local task id
+            ids[t.type] = t.id;
+            if (t.is_completed) done.add(t.type);
+          });
+
+          setBackendTaskIds(ids);
+          setCompletedTasks(done);
         }
-      } catch (error) {
-        console.error('Error fetching tasks:', error);
+      } catch (err) {
+        console.error('Could not fetch task status:', err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchTasks();
+    fetchStatus();
   }, []);
 
-  const handleTaskAction = async (taskId: string, taskType: string) => {
-    try {
-      setTaskInProgress(taskId);
+  // ── Watch Ad ──────────────────────────────────────────────────────────────
+  const handleWatchAd = async () => {
+    if (!adControllerRef.current) {
+      setAlert({ message: 'Ad system not ready. Please refresh.', type: 'error' });
+      return;
+    }
 
-      if (taskType === 'watch_ads') {
-        const confirmed = window.confirm('Watch a short ad to earn 50 Footy Coins?');
-        if (!confirmed) {
+    setIsAdLoading(true);
+
+    adControllerRef.current
+      .show()
+      .then(async () => {
+        setTaskInProgress('watch_ads');
+        try {
+          const response = await apiService.post('/footy-coins/tasks/ad/complete', {});
+          if (response.success) {
+            setAlert({ message: '🎉 Earned 50 Footy Coins for watching the ad!', type: 'success' });
+            await refreshUser();
+          } else {
+            setAlert({ message: response.error || 'Failed to claim ad reward', type: 'error' });
+          }
+        } catch {
+          setAlert({ message: 'Failed to claim ad reward', type: 'error' });
+        } finally {
           setTaskInProgress(null);
-          return;
         }
+      })
+      .catch(() => {
+        setAlert({ message: 'You must watch the full ad to earn coins.', type: 'error' });
+      })
+      .finally(() => setIsAdLoading(false));
+  };
 
-        const response = await apiService.post(`/footy-coins/tasks/${taskId}/complete`, {});
-        if (response.success) {
-          setAlert({ message: '🎉 Earned 50 Footy Coins for watching the ad!', type: 'success' });
-          await refreshUser();
-          setTasks((prev) =>
-            prev.map((t) =>
-              t.id === taskId ? { ...t, is_completed: true, completed_at: new Date().toISOString() } : t
-            )
-          );
-        } else {
-          setAlert({ message: response.error || 'Failed to complete task', type: 'error' });
-        }
+  // ── Welcome Bonus ─────────────────────────────────────────────────────────
+  const handleFreeClaim = async () => {
+    const taskId = backendTaskIds['free_claim'];
+    if (!taskId) {
+      setAlert({ message: 'Task not available. Please try again later.', type: 'error' });
+      return;
+    }
 
-      } else if (taskType === 'free_claim') {
-        const response = await apiService.post(`/footy-coins/tasks/${taskId}/complete`, {});
-        if (response.success) {
-          setAlert({ message: '🎉 Welcome bonus claimed! 250 Footy Coins added to your balance.', type: 'success' });
-          await refreshUser();
-          setTasks((prev) =>
-            prev.map((t) =>
-              t.id === taskId ? { ...t, is_completed: true, completed_at: new Date().toISOString() } : t
-            )
-          );
-        } else {
-          setAlert({ message: response.error || 'Failed to claim bonus', type: 'error' });
-        }
-
-      } else if (taskType === 'join_telegram') {
-        // Open the channel, then show a Verify button
-        window.open('https://t.me/footyriddles', '_blank');
-        setPendingTelegramTask(taskId);
-        setAlert({ message: 'Join @footyriddles, then tap "Verify" to claim your coins!', type: 'info' });
-        setTaskInProgress(null);
-        return;
-
-      } else if (taskType === 'verify_telegram') {
-        const response = await apiService.post(`/footy-coins/tasks/${taskId}/verify-telegram`, {});
-        if (response.success) {
-          setAlert({ message: '✅ Verified! 150 Footy Coins added to your balance.', type: 'success' });
-          await refreshUser();
-          setPendingTelegramTask(null);
-          setTasks((prev) =>
-            prev.map((t) =>
-              t.id === taskId ? { ...t, is_completed: true, completed_at: new Date().toISOString() } : t
-            )
-          );
-        } else {
-          setAlert({ message: response.error || 'Could not verify membership. Please join the channel first.', type: 'error' });
-        }
+    setTaskInProgress('free_claim');
+    try {
+      const response = await apiService.post(`/footy-coins/tasks/${taskId}/complete`, {});
+      if (response.success) {
+        setAlert({ message: '🎉 Welcome bonus claimed! 250 Footy Coins added.', type: 'success' });
+        await refreshUser();
+        setCompletedTasks((prev) => new Set(prev).add('free_claim'));
+      } else {
+        setAlert({ message: response.error || 'Failed to claim bonus', type: 'error' });
       }
-
-    } catch (error) {
-      console.error('Error completing task:', error);
-      setAlert({ message: 'Failed to complete task', type: 'error' });
+    } catch {
+      setAlert({ message: 'Failed to claim bonus', type: 'error' });
     } finally {
       setTaskInProgress(null);
+    }
+  };
+
+  // ── Join Telegram ─────────────────────────────────────────────────────────
+  const handleJoinTelegram = () => {
+    window.open('https://t.me/footyriddles', '_blank');
+    setPendingTelegramVerify(true);
+    setAlert({ message: 'Join @footyriddles, then tap "Verify" to claim your coins!', type: 'info' });
+  };
+
+  const handleVerifyTelegram = async () => {
+    const taskId = backendTaskIds['join_telegram'];
+    if (!taskId) {
+      setAlert({ message: 'Task not available. Please try again later.', type: 'error' });
+      return;
+    }
+
+    setTaskInProgress('join_telegram');
+    try {
+      const response = await apiService.post(`/footy-coins/tasks/${taskId}/verify-telegram`, {});
+      if (response.success) {
+        setAlert({ message: '✅ Verified! 150 Footy Coins added to your balance.', type: 'success' });
+        await refreshUser();
+        setPendingTelegramVerify(false);
+        setCompletedTasks((prev) => new Set(prev).add('join_telegram'));
+      } else {
+        setAlert({ message: response.error || 'Could not verify. Please join the channel first.', type: 'error' });
+      }
+    } catch {
+      setAlert({ message: 'Verification failed. Try again.', type: 'error' });
+    } finally {
+      setTaskInProgress(null);
+    }
+  };
+
+  // ── Button helpers ────────────────────────────────────────────────────────
+  const getButtonLabel = (type: string): string => {
+    if (type === 'watch_ads') {
+      if (isAdLoading) return 'Loading Ad...';
+      if (taskInProgress === 'ad_reward') return 'Processing...';
+      return 'Watch & Earn';
+    }
+    if (completedTasks.has(type)) return 'Completed';
+    if (taskInProgress === type) return 'Processing...';
+    if (type === 'join_telegram' && pendingTelegramVerify) return 'Verify';
+    if (type === 'free_claim') return 'Claim';
+    if (type === 'join_telegram') return 'Join';
+    return 'Go';
+  };
+
+  const isButtonDisabled = (type: string): boolean => {
+    if (type === 'watch_ads') return isAdLoading || taskInProgress === 'ad_reward';
+    return completedTasks.has(type) || taskInProgress === type;
+  };
+
+  const getButtonClass = (type: string): string => {
+    const base = 'btn-task';
+    if (type === 'watch_ads') return `${base} btn-task--ad`;
+    if (completedTasks.has(type)) return `${base} btn-task--done`;
+    if (type === 'join_telegram' && pendingTelegramVerify) return `${base} btn-task--verify`;
+    return base;
+  };
+
+  const handleClick = (type: string) => {
+    if (type === 'watch_ads') return handleWatchAd();
+    if (type === 'free_claim') return handleFreeClaim();
+    if (type === 'join_telegram') {
+      if (pendingTelegramVerify) return handleVerifyTelegram();
+      return handleJoinTelegram();
     }
   };
 
   if (isLoading) {
     return <Loading message="Loading Footy Coins..." />;
   }
-
-  const getTaskButtonText = (task: FootyCoinTask): string => {
-    if (task.is_completed) return 'Completed';
-    if (task.type === 'join_telegram' && pendingTelegramTask === task.id) return 'Verify';
-    switch (task.type) {
-      case 'watch_ads':   return 'Watch';
-      case 'free_claim':  return 'Claim';
-      case 'join_telegram': return 'Join';
-      default:            return 'Go';
-    }
-  };
-
-  // Determine the effective action type (flip to verify once channel has been opened)
-  const getEffectiveType = (task: FootyCoinTask): string => {
-    if (task.type === 'join_telegram' && pendingTelegramTask === task.id) {
-      return 'verify_telegram';
-    }
-    return task.type;
-  };
 
   return (
     <div className="footy-coin-page">
@@ -137,7 +239,7 @@ export const FootyCoinPage: React.FC = () => {
       )}
 
       <div className="coin-content">
-        {/* Coin Balance Section */}
+        {/* Balance Card */}
         <section className="coin-balance-section">
           <div className="balance-card">
             <h2>Your Footy Coins</h2>
@@ -149,37 +251,37 @@ export const FootyCoinPage: React.FC = () => {
           </div>
         </section>
 
-        {/* Earn Footy Coins Section */}
+        {/* Earn Section */}
         <section className="earn-coins-section">
           <h2>Earn Footy Coins</h2>
+          <p className="earn-subtitle">Complete tasks below to earn free Footy Coins</p>
 
           <div className="tasks-container">
-            {tasks.length > 0 ? (
-              tasks.map((task) => (
-                <div
-                  key={task.id}
-                  className={`task-card card ${task.is_completed ? 'completed' : ''}`}
-                >
-                  <div className="task-header">
-                    <div>
-                      <h3>{task.title}</h3>
-                      {task.description && <p className="task-description">{task.description}</p>}
-                    </div>
-                    <span className="coin-reward">+{task.reward_coins} 💰</span>
+            {TASKS.map((task) => (
+              <div
+                key={task.id}
+                className={`task-card card ${
+                  completedTasks.has(task.type) && task.type !== 'watch_ads' ? 'completed' : ''
+                }`}
+              >
+                <div className="task-left">
+                  <div className="task-icon-badge">{task.icon}</div>
+                  <div className="task-info">
+                    <h3 className="task-title">{task.title}</h3>
+                    <p className="task-description">{task.description}</p>
+                    <span className="task-reward">+{task.reward_coins} 💰</span>
                   </div>
-
-                  <button
-                    className={`btn-task ${task.is_completed ? 'completed' : ''} ${pendingTelegramTask === task.id ? 'verify' : ''}`}
-                    onClick={() => handleTaskAction(task.id, getEffectiveType(task))}
-                    disabled={task.is_completed || taskInProgress === task.id}
-                  >
-                    {taskInProgress === task.id ? 'Processing...' : getTaskButtonText(task)}
-                  </button>
                 </div>
-              ))
-            ) : (
-              <p className="no-tasks">No tasks available at the moment</p>
-            )}
+
+                <button
+                  className={getButtonClass(task.type)}
+                  onClick={() => handleClick(task.type)}
+                  disabled={isButtonDisabled(task.type)}
+                >
+                  {getButtonLabel(task.type)}
+                </button>
+              </div>
+            ))}
           </div>
         </section>
       </div>
