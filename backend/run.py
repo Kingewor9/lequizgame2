@@ -2,6 +2,8 @@
 import os
 from app import create_app
 from app.models import User, Quiz, Question, Option, QuizResponse, League, UserLeague, FootyCoinTask, UserFootyCoinTask, FootyCoinTransaction
+from app.routes.coins import seed_tasks
+seed_tasks()  # Seed the default footy coin tasks on startup
 
 app = create_app(os.environ.get('FLASK_ENV', 'development'))
 
