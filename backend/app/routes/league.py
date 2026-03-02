@@ -30,15 +30,35 @@ def user_league_dict(ul, league):
 def create_league():
     """Create a new league. POST /api/leagues"""
     try:
+        from datetime import datetime, timedelta
+
         user_id = get_jwt_identity()
         data = request.get_json()
 
-        name = data.get('name', '').strip()
+        name        = data.get('name', '').strip()
         description = data.get('description', '').strip()
-        is_private = data.get('is_private', False)
+        is_private  = data.get('is_private', False)
+        total_weeks = int(data.get('total_game_weeks', 4))
+
+        # Parse start date sent from frontend (ISO format: YYYY-MM-DD)
+        start_date_str = data.get('start_date', '')
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        else:
+            start_date = datetime.utcnow()
+
+        # Calculate end date from start + total weeks
+        end_date_str = data.get('end_date', '')
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+        else:
+            end_date = start_date + timedelta(weeks=total_weeks)
 
         if not name:
             return jsonify(format_error('League name is required')), 400
+
+        if total_weeks < 1 or total_weeks > 6:
+            return jsonify(format_error('Total weeks must be between 1 and 6')), 400
 
         league = League(
             id=generate_id(),
@@ -47,7 +67,11 @@ def create_league():
             is_private=is_private,
             code=generate_league_code() if is_private else None,
             creator_id=user_id,
-            total_members=1
+            total_members=1,
+            total_game_weeks=total_weeks,
+            current_game_week=1,
+            start_date=start_date,
+            end_date=end_date,
         )
         league.save()
 
@@ -68,7 +92,6 @@ def create_league():
 
     except Exception as e:
         return jsonify(format_error(f'Error creating league: {str(e)}')), 500
-
 
 @league_bp.route('/user', methods=['GET'])
 @jwt_required()
@@ -263,23 +286,23 @@ def get_league_detail(league_id):
                 final_winner_photo = top['photo_url']
 
         return jsonify(format_success(data={
-            'id': league.id,
-            'name': league.name,
-            'description': league.description or '',
-            'is_private': league.is_private,
-            'code': league.code if my_membership.is_owner else None,
-            'total_members': league.total_members,
-            'current_game_week': getattr(league, 'current_game_week', 1),
-            'total_game_weeks': getattr(league, 'total_game_weeks', 9),
-            'start_date': league.start_date.isoformat() if league.start_date else datetime.utcnow().isoformat(),
-            'end_date': league.end_date.isoformat() if league.end_date else datetime.utcnow().isoformat(),
-            'is_owner': my_membership.is_owner,
-            'final_winner': final_winner,
-            'final_winner_photo': final_winner_photo,
-            'members': members,
-            'recent_results': recent_results,
-        })), 200
-
+    'id': league.id,
+    'name': league.name,
+    'description': league.description or '',
+    'is_private': league.is_private,
+    'code': league.code if my_membership.is_owner else None,
+    'total_members': league.total_members,
+    'current_game_week': league.current_game_week,      # no more getattr needed
+    'total_game_weeks': league.total_game_weeks,         # no more getattr needed
+    'start_date': league.start_date.isoformat() if league.start_date else None,
+    'end_date': league.end_date.isoformat() if league.end_date else None,
+    'is_owner': my_membership.is_owner,
+    'final_winner': final_winner,
+    'final_winner_photo': final_winner_photo,
+    'members': members,
+    'recent_results': recent_results,
+})), 200
+        
     except Exception as e:
         return jsonify(format_error(f'Error fetching league detail: {str(e)}')), 500
 
