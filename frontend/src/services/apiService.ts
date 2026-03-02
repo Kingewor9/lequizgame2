@@ -1,6 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { ApiResponse } from '../types';
-//ApiErrorResponse removed from imports as it is not used in this file
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -16,7 +15,16 @@ class ApiService {
       timeout: 10000,
     });
 
-    // Add response interceptor
+    // Attach JWT token to every request
+    this.client.interceptors.request.use((config) => {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+
+    // Log response errors
     this.client.interceptors.response.use(
       (response) => response,
       (error: AxiosError) => {
