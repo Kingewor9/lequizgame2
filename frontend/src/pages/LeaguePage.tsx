@@ -9,33 +9,45 @@ import { LeagueDetailPage } from './LeagueDetailPage';
 import '../styles/pages/LeaguePage.css';
 
 export const LeaguePage: React.FC = () => {
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
   const [userLeagues, setUserLeagues] = useState<UserLeague[]>([]);
   const [publicLeagues, setPublicLeagues] = useState<League[]>([]);
   const [searchResults, setSearchResults] = useState<League[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
-
-  // ── Detail page navigation ────────────────────────────────────────────────
-  // When this is set, we render LeagueDetailPage instead of the list
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
-
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
-
-  // Create form
   const [leagueName, setLeagueName] = useState('');
   const [leagueDescription, setLeagueDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
-
-  // Join form
   const [joinCode, setJoinCode] = useState('');
-
-  // Search
   const [searchQuery, setSearchQuery] = useState('');
 
-  // ── If a league is selected, show its detail page ─────────────────────────
+  // ALL hooks must be declared before any conditional returns
+  useEffect(() => {
+    const fetchLeagues = async () => {
+      try {
+        setIsLoading(true);
+        const [myRes, publicRes] = await Promise.all([
+          apiService.get('/leagues/user'),
+          apiService.get('/leagues/public?limit=3'),
+        ]);
+        if (myRes.success && myRes.data) setUserLeagues(myRes.data as UserLeague[]);
+        if (publicRes.success && publicRes.data) setPublicLeagues(publicRes.data as League[]);
+      } catch (error) {
+        console.error('Error fetching leagues:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchLeagues();
+  }, []);
+
+  // ── Conditional renders AFTER all hooks ──────────────────────────────────
+
+  // Show detail page when a league is selected
   if (selectedLeagueId) {
     return (
       <LeagueDetailPage
@@ -45,47 +57,21 @@ export const LeaguePage: React.FC = () => {
     );
   }
 
-  // ── Initial data load ─────────────────────────────────────────────────────
-  useEffect(() => {
-    const fetchLeagues = async () => {
-      try {
-        setIsLoading(true);
+  if (isLoading) return <Loading message="Loading leagues..." />;
 
-        const [myRes, publicRes] = await Promise.all([
-          apiService.get('/leagues/user'),
-          apiService.get('/leagues/public?limit=3'),
-        ]);
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
-        if (myRes.success && myRes.data) {
-          setUserLeagues(myRes.data as UserLeague[]);
-        }
-        if (publicRes.success && publicRes.data) {
-          setPublicLeagues(publicRes.data as League[]);
-        }
-      } catch (error) {
-        console.error('Error fetching leagues:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchLeagues();
-  }, []);
-
-  // ── Create league ─────────────────────────────────────────────────────────
   const handleCreateLeague = async () => {
     if (!leagueName.trim()) {
       setAlert({ message: 'Please enter a league name', type: 'error' });
       return;
     }
-
     try {
       const response = await apiService.post('/leagues', {
         name: leagueName,
         description: leagueDescription,
         is_private: isPrivate,
       });
-
       if (response.success && response.data) {
         setUserLeagues((prev) => [...prev, response.data as UserLeague]);
         setAlert({ message: 'League created successfully!', type: 'success' });
@@ -101,18 +87,13 @@ export const LeaguePage: React.FC = () => {
     }
   };
 
-  // ── Join private league with code ─────────────────────────────────────────
   const handleJoinPrivateLeague = async () => {
     if (joinCode.trim().length !== 6) {
       setAlert({ message: 'Please enter a valid 6-character code', type: 'error' });
       return;
     }
-
     try {
-      const response = await apiService.post('/leagues/join', {
-        code: joinCode.toUpperCase(),
-      });
-
+      const response = await apiService.post('/leagues/join', { code: joinCode.toUpperCase() });
       if (response.success && response.data) {
         setUserLeagues((prev) => [...prev, response.data as UserLeague]);
         setAlert({ message: 'Joined league successfully!', type: 'success' });
@@ -126,20 +107,13 @@ export const LeaguePage: React.FC = () => {
     }
   };
 
-  // ── Join public league directly ───────────────────────────────────────────
   const handleJoinPublicLeague = async (leagueId: string, fromSearch = false) => {
     try {
       const response = await apiService.post(`/leagues/${leagueId}/join-public`, {});
-
       if (response.success && response.data) {
         setUserLeagues((prev) => [...prev, response.data as UserLeague]);
-
-        if (fromSearch) {
-          setSearchResults((prev) => prev.filter((l) => l.id !== leagueId));
-        } else {
-          setPublicLeagues((prev) => prev.filter((l) => l.id !== leagueId));
-        }
-
+        if (fromSearch) setSearchResults((prev) => prev.filter((l) => l.id !== leagueId));
+        else setPublicLeagues((prev) => prev.filter((l) => l.id !== leagueId));
         setAlert({ message: 'Joined league successfully!', type: 'success' });
       } else {
         setAlert({ message: response.error || 'Failed to join league', type: 'error' });
@@ -149,20 +123,15 @@ export const LeaguePage: React.FC = () => {
     }
   };
 
-  // ── Search public leagues ─────────────────────────────────────────────────
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
       setAlert({ message: 'Please enter a search term', type: 'error' });
       return;
     }
-
     try {
       setIsSearching(true);
       setHasSearched(true);
-      const response = await apiService.get(
-        `/leagues/search?q=${encodeURIComponent(searchQuery)}`
-      );
-
+      const response = await apiService.get(`/leagues/search?q=${encodeURIComponent(searchQuery)}`);
       if (response.success && response.data) {
         setSearchResults(response.data as League[]);
         if ((response.data as League[]).length === 0) {
@@ -182,10 +151,6 @@ export const LeaguePage: React.FC = () => {
     setHasSearched(false);
   };
 
-  if (isLoading) {
-    return <Loading message="Loading leagues..." />;
-  }
-
   const displayedPublicLeagues = hasSearched ? searchResults : publicLeagues;
   const joinedLeagueIds = new Set(userLeagues.map((ul) => ul.league_id));
   const joinableLeagues = displayedPublicLeagues.filter((l) => !joinedLeagueIds.has(l.id));
@@ -197,8 +162,6 @@ export const LeaguePage: React.FC = () => {
       )}
 
       <div className="league-content">
-
-        {/* Section 1: Create / Join */}
         <section className="action-buttons">
           <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
             ➕ Create League
@@ -208,7 +171,6 @@ export const LeaguePage: React.FC = () => {
           </button>
         </section>
 
-        {/* Section 2: My Leagues */}
         <section className="my-leagues-section">
           <h2>My Leagues</h2>
           {userLeagues.length > 0 ? (
@@ -221,7 +183,6 @@ export const LeaguePage: React.FC = () => {
                   userRank={league.rank}
                   userPoints={league.points}
                   isUserLeague={true}
-                  // Tapping View opens the detail page for that league
                   onViewClick={() => setSelectedLeagueId(league.league_id)}
                 />
               ))}
@@ -234,10 +195,8 @@ export const LeaguePage: React.FC = () => {
           )}
         </section>
 
-        {/* Section 3 & 4: Discover Leagues */}
         <section className="discover-section">
           <h2>Discover Leagues</h2>
-
           <div className="search-bar">
             <input
               type="text"
@@ -260,13 +219,9 @@ export const LeaguePage: React.FC = () => {
           </div>
 
           <div className="public-leagues-header">
-            <h3>
-              {hasSearched ? `Results for "${searchQuery}"` : 'Top Public Leagues'}
-            </h3>
+            <h3>{hasSearched ? `Results for "${searchQuery}"` : 'Top Public Leagues'}</h3>
             {hasSearched && (
-              <button className="btn-link" onClick={clearSearch}>
-                Back to top leagues
-              </button>
+              <button className="btn-link" onClick={clearSearch}>Back to top leagues</button>
             )}
           </div>
 
@@ -276,9 +231,7 @@ export const LeaguePage: React.FC = () => {
                 <div key={league.id} className="public-league-card card">
                   <div className="league-info">
                     <h4>{league.name}</h4>
-                    {league.description && (
-                      <p className="description">{league.description}</p>
-                    )}
+                    {league.description && <p className="description">{league.description}</p>}
                     <span className="member-count">👥 {league.total_members} members</span>
                   </div>
                   <button
@@ -298,93 +251,41 @@ export const LeaguePage: React.FC = () => {
         </section>
       </div>
 
-      {/* Create League Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        title="Create a New League"
-      >
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Create a New League">
         <form className="league-form" onSubmit={(e) => { e.preventDefault(); handleCreateLeague(); }}>
           <div className="form-group">
             <label htmlFor="league-name">League Name *</label>
-            <input
-              id="league-name"
-              type="text"
-              placeholder="Enter league name"
-              value={leagueName}
-              onChange={(e) => setLeagueName(e.target.value)}
-              maxLength={50}
-            />
+            <input id="league-name" type="text" placeholder="Enter league name"
+              value={leagueName} onChange={(e) => setLeagueName(e.target.value)} maxLength={50} />
           </div>
-
           <div className="form-group">
             <label htmlFor="league-description">Description (Optional)</label>
-            <textarea
-              id="league-description"
-              placeholder="What is this league about?"
-              value={leagueDescription}
-              onChange={(e) => setLeagueDescription(e.target.value)}
-              maxLength={200}
-              rows={3}
-            />
+            <textarea id="league-description" placeholder="What is this league about?"
+              value={leagueDescription} onChange={(e) => setLeagueDescription(e.target.value)}
+              maxLength={200} rows={3} />
           </div>
-
           <div className="form-group checkbox">
-            <input
-              id="private-league"
-              type="checkbox"
-              checked={isPrivate}
-              onChange={(e) => setIsPrivate(e.target.checked)}
-            />
+            <input id="private-league" type="checkbox" checked={isPrivate}
+              onChange={(e) => setIsPrivate(e.target.checked)} />
             <label htmlFor="private-league">Make this league private</label>
           </div>
-
-          {isPrivate && (
-            <p className="form-hint">
-              🔒 A 6-character invite code will be generated. Only people with the code can join.
-            </p>
-          )}
-          {!isPrivate && (
-            <p className="form-hint">
-              🌍 This league will appear in the public list for anyone to join.
-            </p>
-          )}
-
-          <button type="submit" className="btn-primary btn-full">
-            Create League
-          </button>
+          {isPrivate && <p className="form-hint">🔒 A 6-character invite code will be generated.</p>}
+          {!isPrivate && <p className="form-hint">🌍 Anyone can find and join this league.</p>}
+          <button type="submit" className="btn-primary btn-full">Create League</button>
         </form>
       </Modal>
 
-      {/* Join Private League Modal */}
-      <Modal
-        isOpen={showJoinModal}
-        onClose={() => setShowJoinModal(false)}
-        title="Join a Private League"
-      >
+      <Modal isOpen={showJoinModal} onClose={() => setShowJoinModal(false)} title="Join a Private League">
         <form className="league-form" onSubmit={(e) => { e.preventDefault(); handleJoinPrivateLeague(); }}>
           <div className="form-group">
             <label htmlFor="join-code">6-Character League Code</label>
-            <input
-              id="join-code"
-              type="text"
-              placeholder="e.g. AB12CD"
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              maxLength={6}
-              className="code-input"
-            />
+            <input id="join-code" type="text" placeholder="e.g. AB12CD"
+              value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              maxLength={6} className="code-input" />
           </div>
-
-          <p className="form-hint">
-            🔑 Ask the league creator for their invite code.
-          </p>
-
-          <button
-            type="submit"
-            className="btn-primary btn-full"
-            disabled={joinCode.trim().length !== 6}
-          >
+          <p className="form-hint">🔑 Ask the league creator for their invite code.</p>
+          <button type="submit" className="btn-primary btn-full"
+            disabled={joinCode.trim().length !== 6}>
             Join League
           </button>
         </form>
