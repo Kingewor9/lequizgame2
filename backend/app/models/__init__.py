@@ -20,7 +20,6 @@ class User(Document):
     username = StringField(unique=True, sparse=True)
     photo_url = StringField(max_length=500)
 
-    # Game stats
     overall_score = IntField(default=0)
     global_rank = IntField(default=0)
     global_total_players = IntField(default=0)
@@ -93,8 +92,6 @@ class Quiz(Document):
     points_per_question = IntField(default=10)
     total_points = IntField(required=True)
     cost_in_footy_coins = IntField(default=0)
-
-    # Status
     is_active = BooleanField(default=True)
     questions = ListField(EmbeddedDocumentField(Question))
 
@@ -174,6 +171,7 @@ class QuizResponse(Document):
 
 class League(Document):
     """League model"""
+    # ── Only ONE meta block ──────────────────────────────────────────────────
     meta = {
         'collection': 'leagues',
         'indexes': ['code', 'is_private', 'creator_id']
@@ -181,18 +179,18 @@ class League(Document):
 
     id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
     name = StringField(max_length=255, required=True)
-    description = StringField()
+    description = StringField(default='')
     is_private = BooleanField(default=False)
     code = StringField(unique=True, sparse=True)
     creator_id = StringField(required=True)
 
-    total_members = IntField(default=0)
-    total_game_weeks   = IntField(default=4)
-    current_game_week  = IntField(default=1)
-    start_date         = DateTimeField(default=datetime.utcnow)
-    end_date           = DateTimeField(default=datetime.utcnow)
+    total_members = IntField(default=1)
+    total_game_weeks = IntField(default=4)
+    current_game_week = IntField(default=1)
+    start_date = DateTimeField(default=datetime.utcnow)
+    end_date = DateTimeField(default=datetime.utcnow)
 
-    meta = {'collection': 'leagues'}
+    created_at = DateTimeField(default=datetime.utcnow)
 
     def to_dict(self):
         return {
@@ -222,6 +220,7 @@ class UserLeague(Document):
     league_id = StringField(required=True)
 
     rank = IntField(default=0)
+    prev_rank = IntField(default=0)  # tracks previous rank for arrow indicators
     points = IntField(default=0)
     is_owner = BooleanField(default=False)
 
@@ -235,6 +234,7 @@ class UserLeague(Document):
             'league_id': self.league_id,
             'league': league.to_dict() if league else None,
             'rank': self.rank,
+            'prev_rank': self.prev_rank,
             'points': self.points,
             'is_owner': self.is_owner,
             'joined_at': self.joined_at.isoformat(),
@@ -250,8 +250,7 @@ class FootyCoinTransaction(Document):
 
     id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = StringField(required=True)
-
-    type = StringField()  # 'earned', 'spent', 'reward'
+    type = StringField()
     amount = IntField(required=True)
     reason = StringField()
 
@@ -275,7 +274,7 @@ class FootyCoinTask(Document):
     }
 
     id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
-    type = StringField()  # 'watch_ads', 'free_claim', 'join_telegram'
+    type = StringField()
     title = StringField(max_length=255, required=True)
     description = StringField()
     reward_coins = IntField(default=100)
