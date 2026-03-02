@@ -187,9 +187,12 @@ class League(Document):
     creator_id = StringField(required=True)
 
     total_members = IntField(default=0)
+    total_game_weeks   = IntField(default=4)
+    current_game_week  = IntField(default=1)
+    start_date         = DateTimeField(default=datetime.utcnow)
+    end_date           = DateTimeField(default=datetime.utcnow)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    meta = {'collection': 'leagues'}
 
     def to_dict(self):
         return {
@@ -200,8 +203,10 @@ class League(Document):
             'code': self.code,
             'creator_id': self.creator_id,
             'total_members': self.total_members,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat(),
+            'total_game_weeks': self.total_game_weeks,
+            'current_game_week': self.current_game_week,
+            'start_date': self.start_date.isoformat() if self.start_date else None,
+            'end_date': self.end_date.isoformat() if self.end_date else None,
         }
 
 
