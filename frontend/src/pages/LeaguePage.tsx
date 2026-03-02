@@ -19,13 +19,43 @@ export const LeaguePage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
+
+  // Create form states
   const [leagueName, setLeagueName] = useState('');
   const [leagueDescription, setLeagueDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
+  const [totalWeeks, setTotalWeeks] = useState<number>(4);
+  const [startDate, setStartDate] = useState('');
+
+  // Join form
   const [joinCode, setJoinCode] = useState('');
+
+  // Search
   const [searchQuery, setSearchQuery] = useState('');
 
-  // ALL hooks must be declared before any conditional returns
+  // ── Auto-calculate end date ───────────────────────────────────────────────
+  const getEndDate = (): string => {
+    if (!startDate) return '';
+    const start = new Date(startDate);
+    start.setDate(start.getDate() + totalWeeks * 7);
+    return start.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  };
+
+  const getEndDateISO = (): string => {
+    if (!startDate) return '';
+    const start = new Date(startDate);
+    start.setDate(start.getDate() + totalWeeks * 7);
+    return start.toISOString().split('T')[0];
+  };
+
+  // ── Today's date as min for date picker ───────────────────────────────────
+  const todayISO = new Date().toISOString().split('T')[0];
+
+  // ── Data load ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchLeagues = async () => {
       try {
@@ -46,8 +76,6 @@ export const LeaguePage: React.FC = () => {
   }, []);
 
   // ── Conditional renders AFTER all hooks ──────────────────────────────────
-
-  // Show detail page when a league is selected
   if (selectedLeagueId) {
     return (
       <LeagueDetailPage
@@ -60,25 +88,39 @@ export const LeaguePage: React.FC = () => {
   if (isLoading) return <Loading message="Loading leagues..." />;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
+  const resetCreateForm = () => {
+    setLeagueName('');
+    setLeagueDescription('');
+    setIsPrivate(false);
+    setTotalWeeks(4);
+    setStartDate('');
+  };
 
   const handleCreateLeague = async () => {
     if (!leagueName.trim()) {
       setAlert({ message: 'Please enter a league name', type: 'error' });
       return;
     }
+    if (!startDate) {
+      setAlert({ message: 'Please select a start date', type: 'error' });
+      return;
+    }
+
     try {
       const response = await apiService.post('/leagues', {
         name: leagueName,
         description: leagueDescription,
         is_private: isPrivate,
+        total_game_weeks: totalWeeks,
+        start_date: startDate,
+        end_date: getEndDateISO(),
       });
+
       if (response.success && response.data) {
         setUserLeagues((prev) => [...prev, response.data as UserLeague]);
         setAlert({ message: 'League created successfully!', type: 'success' });
         setShowCreateModal(false);
-        setLeagueName('');
-        setLeagueDescription('');
-        setIsPrivate(false);
+        resetCreateForm();
       } else {
         setAlert({ message: response.error || 'Failed to create league', type: 'error' });
       }
@@ -154,6 +196,8 @@ export const LeaguePage: React.FC = () => {
   const displayedPublicLeagues = hasSearched ? searchResults : publicLeagues;
   const joinedLeagueIds = new Set(userLeagues.map((ul) => ul.league_id));
   const joinableLeagues = displayedPublicLeagues.filter((l) => !joinedLeagueIds.has(l.id));
+
+  const endDate = getEndDate();
 
   return (
     <div className="league-page">
@@ -251,41 +295,124 @@ export const LeaguePage: React.FC = () => {
         </section>
       </div>
 
-      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Create a New League">
+      {/* ── Create League Modal ── */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => { setShowCreateModal(false); resetCreateForm(); }}
+        title="Create a New League"
+      >
         <form className="league-form" onSubmit={(e) => { e.preventDefault(); handleCreateLeague(); }}>
+
           <div className="form-group">
             <label htmlFor="league-name">League Name *</label>
-            <input id="league-name" type="text" placeholder="Enter league name"
-              value={leagueName} onChange={(e) => setLeagueName(e.target.value)} maxLength={50} />
+            <input
+              id="league-name"
+              type="text"
+              placeholder="Enter league name"
+              value={leagueName}
+              onChange={(e) => setLeagueName(e.target.value)}
+              maxLength={50}
+            />
           </div>
+
           <div className="form-group">
             <label htmlFor="league-description">Description (Optional)</label>
-            <textarea id="league-description" placeholder="What is this league about?"
-              value={leagueDescription} onChange={(e) => setLeagueDescription(e.target.value)}
-              maxLength={200} rows={3} />
+            <textarea
+              id="league-description"
+              placeholder="What is this league about?"
+              value={leagueDescription}
+              onChange={(e) => setLeagueDescription(e.target.value)}
+              maxLength={200}
+              rows={3}
+            />
           </div>
+
+          {/* Number of Weeks */}
+          <div className="form-group">
+            <label htmlFor="total-weeks">Number of Weeks</label>
+            <select
+              id="total-weeks"
+              value={totalWeeks}
+              onChange={(e) => setTotalWeeks(Number(e.target.value))}
+              className="form-select"
+            >
+              {[1, 2, 3, 4, 5, 6].map((w) => (
+                <option key={w} value={w}>
+                  {w} {w === 1 ? 'Week' : 'Weeks'}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Start Date */}
+          <div className="form-group">
+            <label htmlFor="start-date">Start Date *</label>
+            <input
+              id="start-date"
+              type="date"
+              value={startDate}
+              min={todayISO}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="form-date"
+            />
+          </div>
+
+          {/* Auto End Date — read only */}
+          <div className="form-group">
+            <label>End Date</label>
+            <div className={`end-date-display ${endDate ? 'end-date-display--set' : ''}`}>
+              {endDate || 'Select a start date and number of weeks'}
+            </div>
+          </div>
+
           <div className="form-group checkbox">
-            <input id="private-league" type="checkbox" checked={isPrivate}
-              onChange={(e) => setIsPrivate(e.target.checked)} />
+            <input
+              id="private-league"
+              type="checkbox"
+              checked={isPrivate}
+              onChange={(e) => setIsPrivate(e.target.checked)}
+            />
             <label htmlFor="private-league">Make this league private</label>
           </div>
-          {isPrivate && <p className="form-hint">🔒 A 6-character invite code will be generated.</p>}
-          {!isPrivate && <p className="form-hint">🌍 Anyone can find and join this league.</p>}
-          <button type="submit" className="btn-primary btn-full">Create League</button>
+
+          {isPrivate && (
+            <p className="form-hint">🔒 A 6-character invite code will be generated.</p>
+          )}
+          {!isPrivate && (
+            <p className="form-hint">🌍 Anyone can find and join this league.</p>
+          )}
+
+          <button type="submit" className="btn-primary btn-full">
+            Create League
+          </button>
         </form>
       </Modal>
 
-      <Modal isOpen={showJoinModal} onClose={() => setShowJoinModal(false)} title="Join a Private League">
+      {/* ── Join Private League Modal ── */}
+      <Modal
+        isOpen={showJoinModal}
+        onClose={() => setShowJoinModal(false)}
+        title="Join a Private League"
+      >
         <form className="league-form" onSubmit={(e) => { e.preventDefault(); handleJoinPrivateLeague(); }}>
           <div className="form-group">
             <label htmlFor="join-code">6-Character League Code</label>
-            <input id="join-code" type="text" placeholder="e.g. AB12CD"
-              value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              maxLength={6} className="code-input" />
+            <input
+              id="join-code"
+              type="text"
+              placeholder="e.g. AB12CD"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              maxLength={6}
+              className="code-input"
+            />
           </div>
           <p className="form-hint">🔑 Ask the league creator for their invite code.</p>
-          <button type="submit" className="btn-primary btn-full"
-            disabled={joinCode.trim().length !== 6}>
+          <button
+            type="submit"
+            className="btn-primary btn-full"
+            disabled={joinCode.trim().length !== 6}
+          >
             Join League
           </button>
         </form>
