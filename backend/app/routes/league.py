@@ -209,3 +209,142 @@ def join_public_league(league_id):
 
     except Exception as e:
         return jsonify(format_error(f'Error joining public league: {str(e)}')), 500
+
+@league_bp.route('/<league_id>/detail', methods=['GET'])
+@jwt_required()
+def get_league_detail(league_id):
+    """Full league detail for the detail page. GET /api/leagues/<id>/detail"""
+    try:
+        user_id = get_jwt_identity()
+
+        league = League.objects(id=league_id).first()
+        if not league:
+            return jsonify(format_error('League not found')), 404
+
+        # Check user is a member
+        my_membership = UserLeague.objects(user_id=user_id, league_id=league_id).first()
+        if not my_membership:
+            return jsonify(format_error('You are not a member of this league')), 403
+
+        # Build members list with rank movement
+        user_leagues = list(UserLeague.objects(league_id=league_id))
+        members = []
+        for ul in user_leagues:
+            member_user = User.objects(id=ul.user_id).first()
+            if member_user:
+                members.append({
+                    'user_id': ul.user_id,
+                    'name': f"{member_user.first_name} {member_user.last_name or ''}".strip(),
+                    'username': member_user.username or '',
+                    'photo_url': member_user.photo_url or None,
+                    'rank': ul.rank,
+                    'prev_rank': getattr(ul, 'prev_rank', ul.rank),  # fallback to same if no prev
+                    'points': ul.points,
+                    'is_owner': ul.is_owner,
+                })
+
+        # Recent results — top scorer per game week (simplified: from QuizResponse)
+        recent_results = []
+        try:
+            # Get unique game weeks recorded in this league's quiz responses
+            # This is a simplified version — adapt to your quiz/gameweek model
+            pass
+        except Exception:
+            pass
+
+        # Final winner — whoever has rank 1 after league end
+        final_winner = None
+        final_winner_photo = None
+        league_ended = datetime.utcnow() > league.end_date if league.end_date else False
+        if league_ended:
+            top = next((m for m in members if m['rank'] == 1), None)
+            if top:
+                final_winner = top['name']
+                final_winner_photo = top['photo_url']
+
+        return jsonify(format_success(data={
+            'id': league.id,
+            'name': league.name,
+            'description': league.description or '',
+            'is_private': league.is_private,
+            'code': league.code if my_membership.is_owner else None,
+            'total_members': league.total_members,
+            'current_game_week': getattr(league, 'current_game_week', 1),
+            'total_game_weeks': getattr(league, 'total_game_weeks', 9),
+            'start_date': league.start_date.isoformat() if league.start_date else datetime.utcnow().isoformat(),
+            'end_date': league.end_date.isoformat() if league.end_date else datetime.utcnow().isoformat(),
+            'is_owner': my_membership.is_owner,
+            'final_winner': final_winner,
+            'final_winner_photo': final_winner_photo,
+            'members': members,
+            'recent_results': recent_results,
+        })), 200
+
+    except Exception as e:
+        return jsonify(format_error(f'Error fetching league detail: {str(e)}')), 500
+
+
+@league_bp.route('/<league_id>/members/<member_id>', methods=['DELETE'])
+@jwt_required()
+def remove_member(league_id, member_id):
+    """Remove a member from the league (owner only)."""
+    try:
+        user_id = get_jwt_identity()
+
+        my_membership = UserLeague.objects(user_id=user_id, league_id=league_id).first()
+        if not my_membership or not my_membership.is_owner:
+            return jsonify(format_error('Only the league owner can remove members')), 403
+
+        if member_id == user_id:
+            return jsonify(format_error('You cannot remove yourself')), 400
+
+        target = UserLeague.objects(user_id=member_id, league_id=league_id).first()
+        if not target:
+            return jsonify(format_error('Member not found')), 404
+
+        target.delete()
+
+        league = League.objects(id=league_id).first()
+        if league and league.total_members > 0:
+            league.total_members -= 1
+            league.save()
+
+        return jsonify(format_success(message='Member removed')), 200
+
+    except Exception as e:
+        return jsonify(format_error(f'Error removing member: {str(e)}')), 500
+
+
+@league_bp.route('/<league_id>/restart', methods=['POST'])
+@jwt_required()
+def restart_league(league_id):
+    """Reset league standings (owner only, only after league ends)."""
+    try:
+        user_id = get_jwt_identity()
+
+        league = League.objects(id=league_id).first()
+        if not league:
+            return jsonify(format_error('League not found')), 404
+
+        my_membership = UserLeague.objects(user_id=user_id, league_id=league_id).first()
+        if not my_membership or not my_membership.is_owner:
+            return jsonify(format_error('Only the league owner can restart it')), 403
+
+        if league.end_date and datetime.utcnow() < league.end_date:
+            return jsonify(format_error('League has not ended yet')), 400
+
+        # Reset all member points and ranks
+        members = UserLeague.objects(league_id=league_id)
+        for i, member in enumerate(members, 1):
+            member.points = 0
+            member.rank = i
+            member.save()
+
+        # Reset league game week
+        league.current_game_week = 1
+        league.save()
+
+        return jsonify(format_success(message='League restarted successfully')), 200
+
+    except Exception as e:
+        return jsonify(format_error(f'Error restarting league: {str(e)}')), 500
