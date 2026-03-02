@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, TelegramUser } from '../types';
 import { apiService } from '../services/apiService';
-//TelegramWebInitData removed from imports as it is not used in this file
 
 interface AuthContextType {
   user: User | null;
@@ -24,19 +23,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const initializeTelegramAuth = async () => {
       try {
-        // Get Telegram Web App
         const tg = (window as any).Telegram?.WebApp;
-        
+
         if (!tg) {
           setError('Telegram Web App not available');
           setIsLoading(false);
           return;
         }
 
-        // Expand the app to full height
         tg.expand();
-        
-        // Get init data
+
         const initData = tg.initData;
         if (!initData) {
           setError('No init data from Telegram');
@@ -44,10 +40,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return;
         }
 
-        // Parse init data
         const params = new URLSearchParams(initData);
         const userData = params.get('user');
-        
+
         if (!userData) {
           setError('No user data from Telegram');
           setIsLoading(false);
@@ -57,7 +52,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const parsedUser: TelegramUser = JSON.parse(userData);
         setTelegramUser(parsedUser);
 
-        // Send to backend for authentication
         const response = await apiService.post('/auth/telegram-login', {
           telegram_id: parsedUser.id,
           first_name: parsedUser.first_name,
@@ -68,9 +62,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
 
         if (response.success && response.data) {
-          setUser(response.data as User);//Take note of this change
+          const data = response.data as any;
+
+          // Save JWT token so apiService attaches it to all future requests
+          if (data.access_token) {
+            localStorage.setItem('access_token', data.access_token);
+          }
+
+          setUser(data as User);
           localStorage.setItem('telegram_id', parsedUser.id.toString());
-          localStorage.setItem('user_data', JSON.stringify(response.data));
+          localStorage.setItem('user_data', JSON.stringify(data));
           setError(null);
         } else {
           setError(response.error || 'Authentication failed');
@@ -89,6 +90,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     setUser(null);
     setTelegramUser(null);
+    // Clear all stored auth data including JWT token
+    localStorage.removeItem('access_token');
     localStorage.removeItem('telegram_id');
     localStorage.removeItem('user_data');
   };
@@ -96,10 +99,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const refreshUser = async () => {
     try {
       if (!telegramUser) return;
-      
+
       const response = await apiService.get(`/users/${telegramUser.id}`);
       if (response.success && response.data) {
-        setUser(response.data as User);//Take note of this change
+        setUser(response.data as User);
         localStorage.setItem('user_data', JSON.stringify(response.data));
       }
     } catch (err) {
