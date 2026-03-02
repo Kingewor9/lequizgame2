@@ -5,6 +5,7 @@ import { Modal } from '../components/Modal';
 import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
 import { LeagueCard } from '../components/LeagueCard';
+import { LeagueDetailPage } from './LeagueDetailPage';
 import '../styles/pages/LeaguePage.css';
 
 export const LeaguePage: React.FC = () => {
@@ -14,6 +15,10 @@ export const LeaguePage: React.FC = () => {
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
+
+  // ── Detail page navigation ────────────────────────────────────────────────
+  // When this is set, we render LeagueDetailPage instead of the list
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -30,7 +35,17 @@ export const LeaguePage: React.FC = () => {
   // Search
   const [searchQuery, setSearchQuery] = useState('');
 
-  // ── Initial data load ────────────────────────────────────────────────────
+  // ── If a league is selected, show its detail page ─────────────────────────
+  if (selectedLeagueId) {
+    return (
+      <LeagueDetailPage
+        leagueId={selectedLeagueId}
+        onBack={() => setSelectedLeagueId(null)}
+      />
+    );
+  }
+
+  // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
     const fetchLeagues = async () => {
       try {
@@ -171,10 +186,7 @@ export const LeaguePage: React.FC = () => {
     return <Loading message="Loading leagues..." />;
   }
 
-  // Determine which public leagues to show — search results or default top 3
   const displayedPublicLeagues = hasSearched ? searchResults : publicLeagues;
-
-  // Filter out leagues the user already belongs to
   const joinedLeagueIds = new Set(userLeagues.map((ul) => ul.league_id));
   const joinableLeagues = displayedPublicLeagues.filter((l) => !joinedLeagueIds.has(l.id));
 
@@ -186,7 +198,7 @@ export const LeaguePage: React.FC = () => {
 
       <div className="league-content">
 
-        {/* ── Section 1: Create / Join actions ── */}
+        {/* Section 1: Create / Join */}
         <section className="action-buttons">
           <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
             ➕ Create League
@@ -196,7 +208,7 @@ export const LeaguePage: React.FC = () => {
           </button>
         </section>
 
-        {/* ── Section 2: My Leagues ── */}
+        {/* Section 2: My Leagues */}
         <section className="my-leagues-section">
           <h2>My Leagues</h2>
           {userLeagues.length > 0 ? (
@@ -209,7 +221,8 @@ export const LeaguePage: React.FC = () => {
                   userRank={league.rank}
                   userPoints={league.points}
                   isUserLeague={true}
-                  onViewClick={() => {}}
+                  // Tapping View opens the detail page for that league
+                  onViewClick={() => setSelectedLeagueId(league.league_id)}
                 />
               ))}
             </div>
@@ -221,11 +234,10 @@ export const LeaguePage: React.FC = () => {
           )}
         </section>
 
-        {/* ── Section 3 & 4: Discover Leagues (search + results) ── */}
+        {/* Section 3 & 4: Discover Leagues */}
         <section className="discover-section">
           <h2>Discover Leagues</h2>
 
-          {/* Search bar */}
           <div className="search-bar">
             <input
               type="text"
@@ -235,9 +247,7 @@ export const LeaguePage: React.FC = () => {
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
             />
             {hasSearched ? (
-              <button className="btn-search btn-clear" onClick={clearSearch}>
-                ✕
-              </button>
+              <button className="btn-search btn-clear" onClick={clearSearch}>✕</button>
             ) : (
               <button
                 className="btn-search"
@@ -249,12 +259,9 @@ export const LeaguePage: React.FC = () => {
             )}
           </div>
 
-          {/* League list — top 3 by default, search results when searched */}
           <div className="public-leagues-header">
             <h3>
-              {hasSearched
-                ? `Search results for "${searchQuery}"`
-                : 'Top Public Leagues'}
+              {hasSearched ? `Results for "${searchQuery}"` : 'Top Public Leagues'}
             </h3>
             {hasSearched && (
               <button className="btn-link" onClick={clearSearch}>
@@ -291,16 +298,13 @@ export const LeaguePage: React.FC = () => {
         </section>
       </div>
 
-      {/* ── Create League Modal ── */}
+      {/* Create League Modal */}
       <Modal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         title="Create a New League"
       >
-        <form
-          className="league-form"
-          onSubmit={(e) => { e.preventDefault(); handleCreateLeague(); }}
-        >
+        <form className="league-form" onSubmit={(e) => { e.preventDefault(); handleCreateLeague(); }}>
           <div className="form-group">
             <label htmlFor="league-name">League Name *</label>
             <input
@@ -340,10 +344,9 @@ export const LeaguePage: React.FC = () => {
               🔒 A 6-character invite code will be generated. Only people with the code can join.
             </p>
           )}
-
           {!isPrivate && (
             <p className="form-hint">
-              🌍 This league will appear in the public league list for anyone to join.
+              🌍 This league will appear in the public list for anyone to join.
             </p>
           )}
 
@@ -353,16 +356,13 @@ export const LeaguePage: React.FC = () => {
         </form>
       </Modal>
 
-      {/* ── Join Private League Modal ── */}
+      {/* Join Private League Modal */}
       <Modal
         isOpen={showJoinModal}
         onClose={() => setShowJoinModal(false)}
         title="Join a Private League"
       >
-        <form
-          className="league-form"
-          onSubmit={(e) => { e.preventDefault(); handleJoinPrivateLeague(); }}
-        >
+        <form className="league-form" onSubmit={(e) => { e.preventDefault(); handleJoinPrivateLeague(); }}>
           <div className="form-group">
             <label htmlFor="join-code">6-Character League Code</label>
             <input
@@ -377,7 +377,7 @@ export const LeaguePage: React.FC = () => {
           </div>
 
           <p className="form-hint">
-            🔑 Ask the league creator for their invite code to join a private league.
+            🔑 Ask the league creator for their invite code.
           </p>
 
           <button
