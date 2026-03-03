@@ -1,86 +1,99 @@
+/* ── Page shell ──────────────────────────────────────────────────────────── */
 .footy-coin-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
 .coin-content {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 70px;
+  padding-bottom: 80px;
 }
 
+/* ── Balance card ────────────────────────────────────────────────────────── */
 .coin-balance-section {
-  padding: 16px;
+  padding: 20px 16px 0;
 }
 
 .balance-card {
-  background-color: #111;
-  border: 2px solid #fff;
-  border-radius: 12px;
-  padding: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 20px;
   text-align: center;
-  animation: slideUp 0.3s ease;
+  animation: slideUp 0.3s ease both;
 }
 
 .balance-card h2 {
-  font-size: 1rem;
-  color: #999;
-  margin-bottom: 16px;
+  font-size: 0.78rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin: 0 0 16px;
 }
 
 .coin-amount {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
-.coin-icon {
-  font-size: 2.5rem;
-}
+.coin-icon { font-size: 2.2rem; }
 
 .amount {
   font-size: 3rem;
-  font-weight: 700;
-  color: #fff;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1;
 }
 
 .coin-description {
-  color: #999;
-  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
   margin: 0;
 }
 
+/* ── Earn section ────────────────────────────────────────────────────────── */
 .earn-coins-section {
-  padding: 16px;
+  padding: 20px 16px 0;
 }
 
 .earn-coins-section h2 {
-  font-size: 1.2rem;
-  margin-bottom: 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0 0 12px;
 }
 
 .tasks-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
+/* ── Task card ───────────────────────────────────────────────────────────── */
 .task-card {
-  background-color: #111;
-  border: 2px solid #333;
-  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 16px;
-  animation: slideUp 0.3s ease;
+  animation: slideUp 0.3s ease both;
+  transition: border-color 0.2s;
 }
 
 .task-card.completed {
-  opacity: 0.6;
-  border-color: #51cf66;
+  opacity: 0.55;
+  border-color: var(--accent-green);
 }
 
 .task-header {
@@ -92,103 +105,78 @@
 }
 
 .task-header h3 {
-  font-size: 1rem;
-  margin: 0 0 4px 0;
+  font-size: 0.97rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--text-primary);
 }
 
 .task-description {
-  color: #999;
-  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-size: 0.83rem;
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
+/* Gold coin reward badge */
 .coin-reward {
-  background-color: #1a1a1a;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-weight: 600;
-  font-size: 0.85rem;
+  background: rgba(212, 160, 23, 0.12);
+  border: 1px solid rgba(212, 160, 23, 0.3);
+  color: var(--accent-gold);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.82rem;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
+/* Task action button */
 .btn-task {
   width: 100%;
   padding: 12px;
-  background-color: #fff;
-  color: #000;
+  background: var(--text-primary);
+  color: var(--bg-deep);
   border: none;
-  border-radius: 8px;
-  font-weight: 600;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 0.92rem;
   cursor: pointer;
-  transition: all 0.2s ease;
-  margin-top: 8px;
+  transition: filter 0.2s, transform 0.1s;
+  margin-top: 4px;
 }
 
-.btn-task:hover:not(:disabled) {
-  background-color: #f0f0f0;
-}
+.btn-task:hover:not(:disabled) { filter: brightness(0.92); }
+.btn-task:active:not(:disabled) { transform: scale(0.98); }
 
 .btn-task:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .btn-task.completed {
-  background-color: #333;
-  color: #999;
+  background: var(--bg-card-alt);
+  color: var(--text-muted);
   cursor: default;
 }
 
 .no-tasks {
   text-align: center;
-  color: #999;
+  color: var(--text-muted);
   padding: 40px 20px;
   font-size: 0.95rem;
 }
 
+/* ── Animations ──────────────────────────────────────────────────────────── */
 @keyframes slideUp {
-  from {
-    transform: translateY(10px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 480px) {
-  .coin-balance-section {
-    padding: 12px;
-  }
-
-  .balance-card {
-    padding: 20px;
-  }
-
-  .amount {
-    font-size: 2.5rem;
-  }
-
-  .earn-coins-section {
-    padding: 12px;
-  }
-
-  .task-card {
-    padding: 12px;
-  }
-
-  .task-header {
-    flex-direction: column;
-  }
-
-  .coin-reward {
-    align-self: flex-start;
-  }
-
-  .btn-task {
-    padding: 10px;
-    font-size: 0.95rem;
-  }
+  .balance-card { padding: 20px 16px; }
+  .amount { font-size: 2.5rem; }
+  .task-card { padding: 13px; }
+  .task-header { flex-direction: column; }
+  .coin-reward { align-self: flex-start; }
 }

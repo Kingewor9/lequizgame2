@@ -1,63 +1,92 @@
+/* ── Page shell ──────────────────────────────────────────────────────────── */
 .tournament-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
 .tournament-content {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 70px;
+  padding-bottom: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 40px 20px 80px;
 }
 
+/* ── Coming soon card ────────────────────────────────────────────────────── */
 .coming-soon-banner {
+  background: var(--bg-card);
+  border: 1px solid var(--accent-purple);
+  border-radius: 20px;
+  padding: 40px 28px;
   text-align: center;
-  padding: 40px 20px;
-  max-width: 400px;
+  max-width: 380px;
+  width: 100%;
+  animation: fadeUp 0.4s ease both;
+  box-shadow: 0 0 40px rgba(124, 92, 191, 0.12);
 }
 
 .banner-icon {
   font-size: 4rem;
   margin-bottom: 16px;
+  display: block;
+  /* Gold trophy tint to match screenshot */
+  filter: sepia(1) saturate(3) hue-rotate(5deg);
 }
 
 .coming-soon-banner h1 {
   font-size: 2rem;
-  margin-bottom: 12px;
-  font-weight: 700;
+  font-weight: 800;
+  margin: 0 0 12px;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .coming-soon-banner p {
-  color: #999;
-  font-size: 1rem;
-  margin: 8px 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin: 0 0 24px;
   line-height: 1.6;
 }
 
+/* Gold "COMING SOON..." button — decorative, not clickable */
+.coming-soon-btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  background: var(--accent-purple);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--accent-gold);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: default;
+  pointer-events: none;
+  /* Subtle shimmer */
+  background: linear-gradient(135deg, #1e1854 0%, var(--accent-purple) 50%, #1e1854 100%);
+}
+
 .banner-subtitle {
-  color: #666;
-  font-size: 0.9rem;
-  margin-top: 12px !important;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-top: 14px !important;
+  opacity: 0.7;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 480px) {
-  .coming-soon-banner {
-    padding: 30px 16px;
-  }
-
-  .banner-icon {
-    font-size: 3rem;
-  }
-
-  .coming-soon-banner h1 {
-    font-size: 1.5rem;
-  }
-
-  .coming-soon-banner p {
-    font-size: 0.9rem;
-  }
+  .coming-soon-banner { padding: 30px 20px; }
+  .banner-icon { font-size: 3rem; }
+  .coming-soon-banner h1 { font-size: 1.6rem; }
 }
