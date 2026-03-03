@@ -13,15 +13,15 @@ def user_league_dict(ul, league):
         'id': ul.id,
         'user_id': ul.user_id,
         'league_id': ul.league_id,
-        'name': league.name,
-        'description': league.description,
-        'is_private': league.is_private,
-        'code': league.code if ul.is_owner else None,  # only expose code to owner
-        'total_members': league.total_members,
-        'rank': ul.rank,
-        'points': ul.points,
-        'is_owner': ul.is_owner,
-        'joined_at': ul.joined_at.isoformat(),
+        'name': league.name or '',
+        'description': league.description or '',
+        'is_private': league.is_private or False,
+        'code': (league.code if league.code else None) if ul.is_owner else None,  # only expose code to owner
+        'total_members': league.total_members or 1,
+        'rank': ul.rank or 0,
+        'points': ul.points or 0,
+        'is_owner': ul.is_owner or False,
+        'joined_at': ul.joined_at.isoformat() if ul.joined_at else datetime.utcnow().isoformat(),
     }
 
 
@@ -103,13 +103,19 @@ def get_user_leagues():
 
         result = []
         for ul in user_leagues:
-            league = League.objects(id=ul.league_id).first()
-            if league:
-                result.append(user_league_dict(ul, league))
+            try:
+                league = League.objects(id=ul.league_id).first()
+                if league:
+                    result.append(user_league_dict(ul, league))
+            except Exception as e:
+                print(f'Error processing league {ul.league_id} for user {user_id}: {str(e)}')
+                # Skip this league if there's an error processing it
+                continue
 
         return jsonify(format_success(data=result)), 200
 
     except Exception as e:
+        print(f'Error in get_user_leagues: {str(e)}')
         return jsonify(format_error(f'Error fetching leagues: {str(e)}')), 500
 
 
