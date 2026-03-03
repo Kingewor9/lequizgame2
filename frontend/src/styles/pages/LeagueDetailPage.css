@@ -114,9 +114,11 @@
   font-size: 16px;
 }
 
-/* ── Tab content wrapper ────────────────────────────────────────────────── */
+/* ── Tab content wrapper ────────────────────────────────────────────────– */
 .tab-content {
   padding: 16px;
+  overflow-y: auto;
+  max-height: calc(100vh - 160px);
 }
 
 /* ── STANDINGS ──────────────────────────────────────────────────────────── */
