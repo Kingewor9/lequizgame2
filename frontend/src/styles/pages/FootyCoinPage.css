@@ -1,17 +1,111 @@
+/* ── CSS Variables (Premium Design System) ───────────────────────────── */
+:root {
+  --coin-primary: #0f172b;
+  --coin-secondary: #1a2847;
+  --coin-tertiary: #2a3f5f;
+  --coin-accent-gold: #ffd700;
+  --coin-accent-blue: #00d4ff;
+  --coin-accent-green: #00ff6b;
+  --coin-text-primary: #ffffff;
+  --coin-text-muted: #a6b3cc;
+  --coin-border: rgba(255, 215, 0, 0.15);
+  --coin-shadow-sm: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --coin-shadow-lg: 0 20px 60px rgba(0, 212, 255, 0.1);
+}
+
 /* ── Page shell ──────────────────────────────────────────────────────────── */
 .footy-coin-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--bg-deep);
-  color: var(--text-primary);
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--coin-primary);
+  color: var(--coin-text-primary);
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Background Layers ──────────────────────────────────────────────────── */
+.footy-coin-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    var(--coin-primary) 0%,
+    var(--coin-secondary) 25%,
+    var(--coin-tertiary) 50%,
+    var(--coin-secondary) 75%,
+    var(--coin-primary) 100%
+  );
+  animation: gradientShift 15s ease infinite;
+  z-index: -3;
+}
+
+.footy-coin-page::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  z-index: -2;
+  animation: gridFloat 30s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes gridFloat {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(40px); }
 }
 
 .coin-content {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 80px;
+  position: relative;
+  z-index: 1;
+}
+
+.coin-content::before {
+  content: '';
+  position: fixed;
+  top: 10%;
+  left: 10%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(0, 212, 255, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: float 20s ease-in-out infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.coin-content::after {
+  content: '';
+  position: fixed;
+  bottom: 15%;
+  right: 5%;
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.06) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: float 25s ease-in-out infinite reverse;
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) translateX(0px); }
+  25% { transform: translateY(-30px) translateX(20px); }
+  50% { transform: translateY(-60px) translateX(-20px); }
+  75% { transform: translateY(-30px) translateX(30px); }
 }
 
 /* ── Balance card ────────────────────────────────────────────────────────── */
@@ -20,12 +114,14 @@
 }
 
 .balance-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(26, 40, 71, 0.7) 0%, rgba(42, 63, 95, 0.5) 100%);
+  backdrop-filter: blur(20px);
+  border: 2px solid var(--coin-accent-gold);
+  border-radius: 16px;
   padding: 24px 20px;
   text-align: center;
-  animation: slideUp 0.3s ease both;
+  animation: slideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.2), 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .balance-card h2 {
@@ -33,7 +129,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--text-muted);
+  color: var(--coin-text-muted);
   margin: 0 0 16px;
 }
 
@@ -45,18 +141,29 @@
   margin-bottom: 8px;
 }
 
-.coin-icon { font-size: 2.2rem; }
+.coin-icon {
+  font-size: 2.2rem;
+  animation: bobbing 2s ease-in-out infinite;
+}
+
+@keyframes bobbing {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
 
 .amount {
   font-size: 3rem;
   font-weight: 800;
-  color: var(--text-primary);
+  background: linear-gradient(135deg, var(--coin-accent-gold), var(--coin-accent-blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   letter-spacing: -0.02em;
   line-height: 1;
 }
 
 .coin-description {
-  color: var(--text-muted);
+  color: var(--coin-text-muted);
   font-size: 0.85rem;
   margin: 0;
 }
@@ -71,8 +178,19 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-muted);
+  color: var(--coin-text-muted);
   margin: 0 0 12px;
+  animation: fadeInLeft 0.8s ease 0.2s both;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .tasks-container {
@@ -83,17 +201,36 @@
 
 /* ── Task card ───────────────────────────────────────────────────────────── */
 .task-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(26, 40, 71, 0.6) 0%, rgba(42, 63, 95, 0.4) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--coin-border);
+  border-radius: 12px;
   padding: 16px;
-  animation: slideUp 0.3s ease both;
-  transition: border-color 0.2s;
+  animation: slideUpTask 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transition: all 0.3s ease;
+}
+
+.task-card:nth-child(1) { animation-delay: 0.1s; }
+.task-card:nth-child(2) { animation-delay: 0.2s; }
+.task-card:nth-child(3) { animation-delay: 0.3s; }
+.task-card:nth-child(4) { animation-delay: 0.4s; }
+.task-card:nth-child(5) { animation-delay: 0.5s; }
+.task-card:nth-child(n+6) { animation-delay: 0.6s; }
+
+@keyframes slideUpTask {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.task-card:hover {
+  border-color: var(--coin-accent-blue);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 212, 255, 0.15);
 }
 
 .task-card.completed {
-  opacity: 0.55;
-  border-color: var(--accent-green);
+  opacity: 0.6;
+  border-color: var(--coin-accent-green);
 }
 
 .task-header {
@@ -108,11 +245,11 @@
   font-size: 0.97rem;
   font-weight: 700;
   margin: 0 0 4px;
-  color: var(--text-primary);
+  color: var(--coin-text-primary);
 }
 
 .task-description {
-  color: var(--text-muted);
+  color: var(--coin-text-muted);
   font-size: 0.83rem;
   margin: 0;
   line-height: 1.45;
@@ -120,63 +257,180 @@
 
 /* Gold coin reward badge */
 .coin-reward {
-  background: rgba(212, 160, 23, 0.12);
-  border: 1px solid rgba(212, 160, 23, 0.3);
-  color: var(--accent-gold);
-  padding: 4px 10px;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(0, 212, 255, 0.08));
+  border: 1px solid var(--coin-accent-gold);
+  color: var(--coin-accent-gold);
+  padding: 6px 12px;
   border-radius: 20px;
   font-weight: 700;
   font-size: 0.82rem;
   white-space: nowrap;
   flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.15);
 }
 
 /* Task action button */
 .btn-task {
   width: 100%;
   padding: 12px;
-  background: var(--text-primary);
-  color: var(--bg-deep);
+  background: linear-gradient(135deg, var(--coin-accent-blue), var(--coin-accent-gold));
+  color: var(--coin-primary);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   font-weight: 700;
   font-size: 0.92rem;
   cursor: pointer;
-  transition: filter 0.2s, transform 0.1s;
-  margin-top: 4px;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  margin-top: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
 }
 
-.btn-task:hover:not(:disabled) { filter: brightness(0.92); }
-.btn-task:active:not(:disabled) { transform: scale(0.98); }
+.btn-task:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4), 0 0px 10px rgba(255, 215, 0, 0.2);
+}
+
+.btn-task:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
+}
 
 .btn-task:disabled {
-  opacity: 0.4;
+  background: linear-gradient(135deg, var(--coin-secondary), var(--coin-tertiary));
+  color: var(--coin-text-muted);
   cursor: not-allowed;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-task:disabled:hover {
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .btn-task.completed {
-  background: var(--bg-card-alt);
-  color: var(--text-muted);
+  background: linear-gradient(135deg, var(--coin-accent-green), var(--coin-accent-gold));
+  color: var(--coin-primary);
   cursor: default;
 }
 
 .no-tasks {
   text-align: center;
-  color: var(--text-muted);
+  color: var(--coin-text-muted);
   padding: 40px 20px;
   font-size: 0.95rem;
+  animation: fadeInUp 0.6s ease 0.4s both;
 }
 
 /* ── Animations ──────────────────────────────────────────────────────────── */
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsive Design ────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .balance-card {
+    padding: 20px 16px;
+    border-radius: 14px;
+  }
+
+  .amount {
+    font-size: 2.8rem;
+  }
+
+  .coin-icon {
+    font-size: 1.8rem;
+  }
+
+  .task-card {
+    padding: 14px;
+  }
+
+  .task-header {
+    flex-direction: column;
+  }
+
+  .coin-reward {
+    align-self: flex-start;
+  }
+
+  .btn-task {
+    padding: 10px;
+    font-size: 0.85rem;
+  }
 }
 
 @media (max-width: 480px) {
-  .balance-card { padding: 20px 16px; }
-  .amount { font-size: 2.5rem; }
-  .task-card { padding: 13px; }
-  .task-header { flex-direction: column; }
-  .coin-reward { align-self: flex-start; }
+  .coin-balance-section,
+  .earn-coins-section {
+    padding: 16px 12px 0;
+  }
+
+  .balance-card {
+    padding: 18px 14px;
+    border-radius: 12px;
+    border-width: 1.5px;
+  }
+
+  .balance-card h2 {
+    font-size: 0.75rem;
+    margin-bottom: 12px;
+  }
+
+  .amount {
+    font-size: 2.2rem;
+  }
+
+  .coin-icon {
+    font-size: 1.6rem;
+  }
+
+  .coin-description {
+    font-size: 0.8rem;
+  }
+
+  .earn-coins-section h2 {
+    font-size: 0.75rem;
+    margin-bottom: 10px;
+  }
+
+  .tasks-container {
+    gap: 8px;
+  }
+
+  .task-card {
+    padding: 12px;
+    border-radius: 10px;
+  }
+
+  .task-header h3 {
+    font-size: 0.9rem;
+  }
+
+  .task-description {
+    font-size: 0.78rem;
+  }
+
+  .coin-reward {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+
+  .btn-task {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    margin-top: 6px;
+  }
+
+  .no-tasks {
+    padding: 30px 16px;
+    font-size: 0.9rem;
+  }
 }

@@ -1,30 +1,111 @@
+/* ── CSS Variables (Premium Design System) ───────────────────────────── */
+:root {
+  --league-primary: #0f172b;
+  --league-secondary: #1a2847;
+  --league-tertiary: #2a3f5f;
+  --league-accent-gold: #ffd700;
+  --league-accent-blue: #00d4ff;
+  --league-accent-green: #00ff6b;
+  --league-text-primary: #ffffff;
+  --league-text-muted: #a6b3cc;
+  --league-border: rgba(255, 215, 0, 0.15);
+  --league-shadow-sm: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --league-shadow-lg: 0 20px 60px rgba(0, 212, 255, 0.1);
+}
+
 /* ── Page shell ──────────────────────────────────────────────────────────── */
 .league-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--bg-deep);
-  color: var(--text-primary);
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--league-primary);
+  color: var(--league-text-primary);
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Background Layers ──────────────────────────────────────────────────── */
+.league-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    var(--league-primary) 0%,
+    var(--league-secondary) 25%,
+    var(--league-tertiary) 50%,
+    var(--league-secondary) 75%,
+    var(--league-primary) 100%
+  );
+  animation: gradientShift 15s ease infinite;
+  z-index: -3;
+}
+
+.league-page::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  z-index: -2;
+  animation: gridFloat 30s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes gridFloat {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(40px); }
 }
 
 .league-content {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 80px;
+  position: relative;
+  z-index: 1;
 }
 
-/* ── Page title ──────────────────────────────────────────────────────────── */
-.league-page-title {
-  padding: 24px 20px 16px;
+.league-content::before {
+  content: '';
+  position: fixed;
+  top: 10%;
+  left: 10%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(0, 212, 255, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: float 20s ease-in-out infinite;
+  z-index: -1;
+  pointer-events: none;
 }
 
-.league-page-title h1 {
-  font-size: 2rem;
-  font-weight: 800;
-  margin: 0;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
+.league-content::after {
+  content: '';
+  position: fixed;
+  bottom: 15%;
+  right: 5%;
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.06) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: float 25s ease-in-out infinite reverse;
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) translateX(0px); }
+  25% { transform: translateY(-30px) translateX(20px); }
+  50% { transform: translateY(-60px) translateX(-20px); }
+  75% { transform: translateY(-30px) translateX(30px); }
 }
 
 /* ── Action buttons: Create + Join ───────────────────────────────────────── */
@@ -32,6 +113,7 @@
   display: flex;
   gap: 12px;
   padding: 0 16px 20px;
+  animation: fadeInUp 0.8s ease 0.2s both;
 }
 
 .action-buttons .btn-primary,
@@ -39,33 +121,40 @@
   flex: 1;
   padding: 13px 10px;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   font-size: 0.95rem;
   font-weight: 700;
   cursor: pointer;
-  transition: filter 0.2s, transform 0.1s;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 /* Purple "Create League" */
 .action-buttons .btn-primary {
-  background: var(--accent-purple);
-  color: #fff;
+  background: linear-gradient(135deg, var(--league-accent-blue), var(--league-accent-gold));
+  color: var(--league-primary);
 }
 
 /* Green "Join with Code" */
 .action-buttons .btn-secondary {
-  background: var(--accent-green);
-  color: #fff;
+  background: linear-gradient(135deg, var(--league-accent-green), var(--league-accent-blue));
+  color: var(--league-primary);
 }
 
 .action-buttons .btn-primary:hover,
-.action-buttons .btn-secondary:hover { filter: brightness(1.12); }
+.action-buttons .btn-secondary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 212, 255, 0.4);
+}
+
 .action-buttons .btn-primary:active,
-.action-buttons .btn-secondary:active { transform: scale(0.97); }
+.action-buttons .btn-secondary:active { 
+  transform: translateY(-1px);
+}
 
 /* ── Section headings ────────────────────────────────────────────────────── */
 .my-leagues-section,
@@ -78,39 +167,57 @@
   font-size: 1.1rem;
   font-weight: 700;
   margin: 0 0 12px;
-  color: var(--text-primary);
+  color: var(--league-text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
+  animation: fadeInLeft 0.8s ease 0.3s both;
 }
 
 /* shield icon before "My Leagues", star before "Popular Public Leagues" */
 .my-leagues-section h2::before { content: '🛡'; font-size: 1rem; }
 .discover-section  h2::before  { content: '⭐'; font-size: 1rem; }
 
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 /* ── My League cards ─────────────────────────────────────────────────────── */
 .leagues-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  animation: listFadeIn 0.8s ease 0.4s both;
 }
 
 /* Override / complement LeagueCard component styles */
 .league-card,
 .leagues-list > div {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(26, 40, 71, 0.7) 0%, rgba(42, 63, 95, 0.5) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--league-border);
+  border-radius: 12px;
   padding: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  transition: border-color 0.2s;
+  transition: all 0.3s ease;
   cursor: pointer;
+  box-shadow: var(--league-shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.league-card:hover { border-color: var(--accent-purple); }
+.league-card:hover {
+  border-color: var(--league-accent-blue);
+  transform: translateY(-4px);
+  box-shadow: var(--league-shadow-lg), inset 0 1px 0 rgba(0, 212, 255, 0.2);
+}
 
 .league-card-info { flex: 1; min-width: 0; }
 
@@ -118,7 +225,7 @@
   font-size: 1rem;
   font-weight: 700;
   margin: 0 0 3px;
-  color: var(--text-primary);
+  color: var(--league-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -126,7 +233,7 @@
 
 .league-card-description {
   font-size: 0.83rem;
-  color: var(--text-muted);
+  color: var(--league-text-muted);
   margin: 0 0 8px;
 }
 
@@ -134,21 +241,22 @@
   display: flex;
   gap: 14px;
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--league-text-muted);
   flex-wrap: wrap;
 }
 
 .league-stat { display: flex; align-items: center; gap: 5px; }
-.league-stat strong { color: var(--text-primary); }
+.league-stat strong { color: var(--league-text-primary); }
 
 /* Owner badge pill */
 .owner-pill {
-  background: var(--accent-purple);
-  color: #fff;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 255, 107, 0.1));
+  color: var(--league-accent-blue);
   font-size: 0.72rem;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 20px;
+  border: 1px solid rgba(0, 212, 255, 0.3);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   flex-shrink: 0;
@@ -159,32 +267,43 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--bg-card-alt);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid var(--league-border);
+  color: var(--league-accent-blue);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.1rem;
   flex-shrink: 0;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s;
 }
-.btn-chevron:hover { background: var(--border); }
+
+.btn-chevron:hover {
+  background: rgba(0, 212, 255, 0.15);
+  border-color: var(--league-accent-blue);
+  transform: translateX(4px);
+}
 
 /* Empty state */
 .empty-state {
-  background: var(--bg-card);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(26, 40, 71, 0.5) 0%, rgba(42, 63, 95, 0.3) 100%);
+  border: 1px dashed var(--league-border);
+  border-radius: 12px;
   padding: 28px 20px;
   text-align: center;
+  backdrop-filter: blur(20px);
 }
 
 .empty-state p {
-  color: var(--text-muted);
+  color: var(--league-text-muted);
   margin: 4px 0;
   font-size: 0.9rem;
+}
+
+@keyframes listFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ── Search bar ──────────────────────────────────────────────────────────── */
@@ -192,41 +311,50 @@
   display: flex;
   align-items: center;
   gap: 0;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(26, 40, 71, 0.7) 0%, rgba(42, 63, 95, 0.5) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--league-border);
+  border-radius: 8px;
   overflow: hidden;
   margin-bottom: 16px;
-  transition: border-color 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: var(--league-shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.search-bar:focus-within { border-color: var(--accent-purple); }
+.search-bar:focus-within {
+  border-color: var(--league-accent-blue);
+  box-shadow: var(--league-shadow-lg), inset 0 1px 0 rgba(0, 212, 255, 0.2);
+}
 
 .search-bar input {
   flex: 1;
   background: none;
   border: none;
-  color: var(--text-primary);
+  color: var(--league-text-primary);
   font-size: 0.9rem;
   padding: 13px 14px;
   outline: none;
 }
 
-.search-bar input::placeholder { color: var(--text-muted); }
+.search-bar input::placeholder { color: var(--league-text-muted); }
 
 .btn-search {
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--league-accent-blue);
   padding: 0 14px;
   font-size: 1rem;
   cursor: pointer;
-  transition: color 0.2s;
+  transition: all 0.2s;
 }
 
-.btn-search:hover:not(:disabled) { color: var(--text-primary); }
+.btn-search:hover:not(:disabled) {
+  color: var(--league-accent-gold);
+  transform: scale(1.1);
+}
+
 .btn-search:disabled { opacity: 0.4; cursor: default; }
-.btn-clear { color: var(--accent-red); }
+.btn-clear { color: #ff6b6b; }
 
 /* ── Public league sub-header ────────────────────────────────────────────── */
 .public-leagues-header {
@@ -239,18 +367,24 @@
 .public-leagues-header h3 {
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--league-text-muted);
   margin: 0;
 }
 
 .btn-link {
   background: none;
   border: none;
-  color: var(--accent-purple);
+  color: var(--league-accent-blue);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   padding: 0;
+  transition: all 0.2s;
+}
+
+.btn-link:hover {
+  color: var(--league-accent-gold);
+  transform: translateX(4px);
 }
 
 /* ── Public league cards ─────────────────────────────────────────────────── */
@@ -258,17 +392,27 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  animation: listFadeIn 0.8s ease 0.5s both;
 }
 
 .public-league-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(26, 40, 71, 0.7) 0%, rgba(42, 63, 95, 0.5) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--league-border);
+  border-radius: 12px;
   padding: 14px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  transition: all 0.3s ease;
+  box-shadow: var(--league-shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.public-league-card:hover {
+  border-color: var(--league-accent-gold);
+  transform: translateY(-3px);
+  box-shadow: var(--league-shadow-lg), inset 0 1px 0 rgba(255, 215, 0, 0.1);
 }
 
 .public-league-card .league-info { flex: 1; min-width: 0; }
@@ -277,12 +421,12 @@
   font-size: 1rem;
   font-weight: 700;
   margin: 0 0 3px;
-  color: var(--text-primary);
+  color: var(--league-text-primary);
 }
 
 .public-league-card .description {
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--league-text-muted);
   margin: 0 0 6px;
 }
 
@@ -290,7 +434,7 @@
   display: flex;
   gap: 12px;
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: var(--league-text-muted);
 }
 
 .member-count { display: flex; align-items: center; gap: 4px; }
@@ -298,24 +442,29 @@
 /* Green "Join League" button */
 .btn-primary.btn-sm,
 .btn-join-public {
-  background: var(--accent-green);
-  color: #fff;
+  background: linear-gradient(135deg, var(--league-accent-green), var(--league-accent-blue));
+  color: var(--league-primary);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   padding: 10px 16px;
   font-size: 0.88rem;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: filter 0.2s;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 15px rgba(0, 255, 107, 0.3);
 }
 
 .btn-primary.btn-sm:hover,
-.btn-join-public:hover { filter: brightness(1.1); }
+.btn-join-public:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 255, 107, 0.4);
+  background: linear-gradient(135deg, var(--league-accent-blue), var(--league-accent-green));
+}
 
 .no-leagues-text {
-  color: var(--text-muted);
+  color: var(--league-text-muted);
   text-align: center;
   padding: 24px 20px;
   font-size: 0.9rem;
@@ -337,7 +486,7 @@
 .form-group label {
   font-size: 0.88rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--league-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -349,14 +498,15 @@
 .form-select,
 .form-date,
 .code-input {
-  background: var(--bg-card-alt);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
+  background: linear-gradient(135deg, rgba(26, 40, 71, 0.7) 0%, rgba(42, 63, 95, 0.5) 100%);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--league-border);
+  border-radius: 8px;
+  color: var(--league-text-primary);
   font-size: 0.95rem;
   padding: 11px 13px;
   font-family: inherit;
-  transition: border-color 0.2s;
+  transition: all 0.3s ease;
   appearance: none;
   -webkit-appearance: none;
   width: 100%;
@@ -370,13 +520,15 @@
 .form-date:focus,
 .code-input:focus {
   outline: none;
-  border-color: var(--accent-purple);
+  border-color: var(--league-accent-blue);
+  background: linear-gradient(135deg, rgba(26, 40, 71, 0.9) 0%, rgba(42, 63, 95, 0.7) 100%);
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
 }
 
 /* Custom chevron on select */
 .form-group select,
 .form-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b949e' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a6b3cc' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 36px;
@@ -394,20 +546,21 @@
 
 /* End date read-only display */
 .end-date-display {
-  background: var(--bg-card-alt);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
+  background: linear-gradient(135deg, rgba(26, 40, 71, 0.5) 0%, rgba(42, 63, 95, 0.3) 100%);
+  border: 1px dashed var(--league-border);
+  border-radius: 8px;
+  color: var(--league-text-muted);
   font-size: 0.9rem;
   padding: 11px 13px;
   font-style: italic;
   box-sizing: border-box;
+  backdrop-filter: blur(10px);
 }
 
 .end-date-display--set {
   border-style: solid;
-  border-color: var(--accent-green);
-  color: var(--accent-green);
+  border-color: var(--league-accent-green);
+  color: var(--league-accent-green);
   font-style: normal;
   font-weight: 600;
 }
@@ -421,7 +574,7 @@
 .form-group.checkbox input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: var(--accent-purple);
+  accent-color: var(--league-accent-blue);
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -431,13 +584,13 @@
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
-  color: var(--text-primary);
+  color: var(--league-text-primary);
   cursor: pointer;
 }
 
 .form-hint {
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--league-text-muted);
   margin: -4px 0 0;
   line-height: 1.5;
 }
@@ -447,25 +600,30 @@
 .btn-full {
   width: 100%;
   padding: 13px;
-  background: var(--accent-purple);
-  color: #fff;
+  background: linear-gradient(135deg, var(--league-accent-blue), var(--league-accent-gold));
+  color: var(--league-primary);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
   margin-top: 4px;
-  transition: filter 0.2s;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
 }
 
 .btn-primary.btn-full:hover,
-.btn-full:hover { filter: brightness(1.1); }
+.btn-full:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 212, 255, 0.4);
+  background: linear-gradient(135deg, var(--league-accent-gold), var(--league-accent-blue));
+}
+
 .btn-primary.btn-full:disabled,
 .btn-full:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ── Responsive Design ──────────────────────────────────────────────────── */
 @media (max-width: 480px) {
-  .league-page-title { padding: 18px 16px 12px; }
-  .league-page-title h1 { font-size: 1.7rem; }
   .action-buttons { padding: 0 12px 16px; gap: 10px; }
   .my-leagues-section, .discover-section { padding: 0 12px 16px; }
 }
