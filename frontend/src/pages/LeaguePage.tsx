@@ -55,17 +55,26 @@ export const LeaguePage: React.FC = () => {
   // ── Today's date as min for date picker ───────────────────────────────────
   const todayISO = new Date().toISOString().split('T')[0];
 
+  // ── Refresh user leagues and public leagues ───────────────────────────────
+  const refreshLeagues = async () => {
+    try {
+      const [myRes, publicRes] = await Promise.all([
+        apiService.get('/leagues/user'),
+        apiService.get('/leagues/public?limit=3'),
+      ]);
+      if (myRes.success && myRes.data) setUserLeagues(myRes.data as UserLeague[]);
+      if (publicRes.success && publicRes.data) setPublicLeagues(publicRes.data as League[]);
+    } catch (error) {
+      console.error('Error fetching leagues:', error);
+    }
+  };
+
   // ── Data load ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchLeagues = async () => {
       try {
         setIsLoading(true);
-        const [myRes, publicRes] = await Promise.all([
-          apiService.get('/leagues/user'),
-          apiService.get('/leagues/public?limit=3'),
-        ]);
-        if (myRes.success && myRes.data) setUserLeagues(myRes.data as UserLeague[]);
-        if (publicRes.success && publicRes.data) setPublicLeagues(publicRes.data as League[]);
+        await refreshLeagues();
       } catch (error) {
         console.error('Error fetching leagues:', error);
       } finally {
@@ -117,10 +126,11 @@ export const LeaguePage: React.FC = () => {
       });
 
       if (response.success && response.data) {
-        setUserLeagues((prev) => [...prev, response.data as UserLeague]);
         setAlert({ message: 'League created successfully!', type: 'success' });
         setShowCreateModal(false);
         resetCreateForm();
+        // Refresh leagues from backend to ensure newly created league persists
+        await refreshLeagues();
       } else {
         setAlert({ message: response.error || 'Failed to create league', type: 'error' });
       }
@@ -137,10 +147,11 @@ export const LeaguePage: React.FC = () => {
     try {
       const response = await apiService.post('/leagues/join', { code: joinCode.toUpperCase() });
       if (response.success && response.data) {
-        setUserLeagues((prev) => [...prev, response.data as UserLeague]);
         setAlert({ message: 'Joined league successfully!', type: 'success' });
         setShowJoinModal(false);
         setJoinCode('');
+        // Refresh leagues from backend to ensure joined league persists
+        await refreshLeagues();
       } else {
         setAlert({ message: response.error || 'Failed to join league', type: 'error' });
       }
@@ -149,14 +160,13 @@ export const LeaguePage: React.FC = () => {
     }
   };
 
-  const handleJoinPublicLeague = async (leagueId: string, fromSearch = false) => {
+  const handleJoinPublicLeague = async (leagueId: string) => {
     try {
       const response = await apiService.post(`/leagues/${leagueId}/join-public`, {});
       if (response.success && response.data) {
-        setUserLeagues((prev) => [...prev, response.data as UserLeague]);
-        if (fromSearch) setSearchResults((prev) => prev.filter((l) => l.id !== leagueId));
-        else setPublicLeagues((prev) => prev.filter((l) => l.id !== leagueId));
         setAlert({ message: 'Joined league successfully!', type: 'success' });
+        // Refresh leagues from backend to ensure joined league persists
+        await refreshLeagues();
       } else {
         setAlert({ message: response.error || 'Failed to join league', type: 'error' });
       }
@@ -280,7 +290,7 @@ export const LeaguePage: React.FC = () => {
                   </div>
                   <button
                     className="btn-primary btn-sm"
-                    onClick={() => handleJoinPublicLeague(league.id, hasSearched)}
+                    onClick={() => handleJoinPublicLeague(league.id)}
                   >
                     Join
                   </button>
