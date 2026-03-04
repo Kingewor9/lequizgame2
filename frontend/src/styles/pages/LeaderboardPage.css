@@ -1,0 +1,262 @@
+/* ── Cyber-Pitch LeaderboardPage ───────────────────────────────────────────── */
+
+.leaderboard-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    position: relative;
+    background-color: var(--bg-obsidian);
+    animation: fadeIn 0.4s ease;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.leaderboard-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background-color: rgba(13, 13, 17, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+    padding: 20px 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.btn-back-icon {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 2rem;
+    line-height: 1;
+    padding: 0 8px;
+    cursor: pointer;
+    transition: color 0.2s ease, transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-back-icon:hover {
+    color: var(--cyan-accent);
+    transform: translateX(-4px);
+}
+
+.header-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.leaderboard-title {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.leaderboard-subtitle {
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 4px 0 0 0;
+}
+
+/* ── Content Area ───────────────────────────────────────────────────────── */
+.leaderboard-content {
+    flex: 1;
+    padding: 16px;
+    padding-bottom: 100px;
+}
+
+.empty-text {
+    text-align: center;
+    font-family: 'Manrope', sans-serif;
+    color: var(--text-muted);
+    padding: 40px;
+}
+
+.leaderboard-error {
+    text-align: center;
+    padding: 40px;
+    color: var(--electric-pink);
+    font-family: 'Unbounded', sans-serif;
+}
+
+.btn-back {
+    margin-top: 16px;
+    padding: 12px 24px;
+    background-color: transparent;
+    border: 1px solid var(--text-muted);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: 'Unbounded', sans-serif;
+    text-transform: uppercase;
+}
+
+/* ── Standings List ─────────────────────────────────────────────────────── */
+.standings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: slideUp 0.5s ease-out;
+}
+
+.standing-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: var(--surface-low);
+    border: var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    transition: all 0.2s ease;
+}
+
+.standing-row:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.standing-row--me {
+    background-color: rgba(0, 240, 255, 0.05);
+    border-color: var(--cyan-accent);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.15);
+}
+
+.standing-row--me:hover {
+    border-color: var(--cyan-accent);
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+}
+
+.standing-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Rank Number & Arrows */
+.rank-number {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 900;
+    width: 32px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.rank-number--1 {
+    color: #FFD700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.rank-number--2 {
+    color: #C0C0C0;
+}
+
+.rank-number--3 {
+    color: #CD7F32;
+}
+
+.rank-number--other {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.rank-arrow {
+    font-size: 0.8rem;
+    font-weight: bold;
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.rank-up {
+    color: var(--volt-yellow);
+    text-shadow: 0 0 8px var(--volt-yellow-glow);
+}
+
+.rank-down {
+    color: var(--electric-pink);
+    text-shadow: 0 0 8px var(--electric-pink-glow);
+}
+
+.rank-same {
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+/* Avatar */
+.member-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: var(--surface-highest);
+}
+
+.avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--surface-highest), var(--surface-base));
+    color: var(--text-primary);
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 800;
+}
+
+/* Names & Points */
+.member-name {
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.member-name--me {
+    color: var(--cyan-accent);
+    font-weight: 800;
+}
+
+.standing-right {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.member-points {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.points-label {
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}

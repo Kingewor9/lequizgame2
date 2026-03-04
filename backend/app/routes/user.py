@@ -6,6 +6,30 @@ from app.utils import generate_id, format_success, format_error, calculate_globa
 user_bp = Blueprint('user', __name__, url_prefix='/api/users')
 
 
+@user_bp.route('/leaderboard/global', methods=['GET'])
+@jwt_required()
+def get_global_leaderboard():
+    """Get global leaderboard for all users"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        
+        users = User.objects.order_by('-overall_score').limit(limit)
+        
+        leaderboard = []
+        for idx, u in enumerate(users, 1):
+            leaderboard.append({
+                'rank': idx,
+                'prev_rank': getattr(u, 'prev_global_rank', idx),
+                'user': u.to_dict(),
+                'score': u.overall_score
+            })
+        
+        return jsonify(format_success(data=leaderboard)), 200
+    
+    except Exception as e:
+        return jsonify(format_error(f'Error fetching global leaderboard: {str(e)}')), 500
+
+
 @user_bp.route('/<user_id>', methods=['GET'])
 @jwt_required()
 def get_user(user_id):

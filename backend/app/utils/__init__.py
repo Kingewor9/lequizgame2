@@ -110,6 +110,11 @@ def update_user_rank(user_id: str):
     rank, total = calculate_global_rank(user_id)
     user = User.objects(id=user_id).first()
     if user:
+        if getattr(user, 'global_rank', 0) > 0 and getattr(user, 'global_rank', 0) != rank:
+            user.prev_global_rank = user.global_rank
+        elif getattr(user, 'global_rank', 0) == 0:
+            user.prev_global_rank = rank
+            
         user.global_rank = rank
         user.global_total_players = total
         user.save()

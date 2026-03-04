@@ -7,6 +7,7 @@ import { Modal } from '../components/Modal';
 import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
 import { QuizQuestion } from '../components/QuizQuestion';
+import { LeaderboardPage } from './LeaderboardPage';
 import { formatQuizTimer } from '../services/utilService';
 import '../styles/pages/HomePage.css';
 
@@ -17,6 +18,7 @@ export const HomePage: React.FC = () => {
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [quizLoading, setQuizLoading] = useState(true);
   const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   // Quiz state
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -219,6 +221,10 @@ export const HomePage: React.FC = () => {
     return <Loading message="Loading today's quiz..." />;
   }
 
+  if (showLeaderboard) {
+    return <LeaderboardPage onBack={() => setShowLeaderboard(false)} />;
+  }
+
   return (
     <div className="home-page">
       {alert && (
@@ -252,7 +258,7 @@ export const HomePage: React.FC = () => {
         <section className="score-section card">
           <div className="score-header flex-between">
             <h2>Overall Score</h2>
-            <button className="btn-secondary view-leaderboard">
+            <button className="btn-secondary view-leaderboard" onClick={() => setShowLeaderboard(true)}>
               View Leaderboard
             </button>
           </div>

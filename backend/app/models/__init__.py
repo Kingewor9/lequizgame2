@@ -22,6 +22,7 @@ class User(Document):
 
     overall_score = IntField(default=0)
     global_rank = IntField(default=0)
+    prev_global_rank = IntField(default=0)
     global_total_players = IntField(default=0)
     footy_coins = IntField(default=0)
 
@@ -38,6 +39,7 @@ class User(Document):
             'photo_url': self.photo_url,
             'overall_score': self.overall_score,
             'global_rank': self.global_rank,
+            'prev_global_rank': getattr(self, 'prev_global_rank', 0),
             'global_total_players': self.global_total_players,
             'footy_coins': self.footy_coins,
             'created_at': self.created_at.isoformat(),
