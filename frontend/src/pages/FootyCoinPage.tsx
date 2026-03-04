@@ -36,7 +36,7 @@ const TASKS = [
     title: 'Join Our Telegram Channel',
     description: 'Join @footyriddles on Telegram and earn 150 Footy Coins.',
     reward_coins: 150,
-    icon: '✈️',
+    icon: '🔊',
   },
 ];
 
@@ -260,9 +260,8 @@ export const FootyCoinPage: React.FC = () => {
             {TASKS.map((task) => (
               <div
                 key={task.id}
-                className={`task-card card ${
-                  completedTasks.has(task.type) && task.type !== 'watch_ads' ? 'completed' : ''
-                }`}
+                className={`task-card card ${completedTasks.has(task.type) && task.type !== 'watch_ads' ? 'completed' : ''
+                  }`}
               >
                 <div className="task-left">
                   <div className="task-icon-badge">{task.icon}</div>
