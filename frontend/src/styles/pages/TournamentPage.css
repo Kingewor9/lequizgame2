@@ -1,95 +1,22 @@
-/* ── Competitive Sports Gaming Design System ─────────────────────────── */
-/* Using global color variables from global.css */
+/* ── Cyber-Pitch TournamentPage ─────────────────────────────────────────────── */
 
-/* ── Page shell ──────────────────────────────────────────────────────────── */
 .tournament-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: radial-gradient(circle at 50% 50%, var(--color-black-secondary) 0%, var(--color-black-primary) 100%);
-  color: var(--color-text-primary);
-  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   position: relative;
-  overflow: hidden;
 }
 
-/* ── Background Layers ──────────────────────────────────────────────────── */
-.tournament-bg-gradient {
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
-  background-size: 50px 50px;
-  z-index: 0;
-  animation: gridFloat 40s linear infinite;
-  pointer-events: none;
-}
-
-.tournament-grid-pattern {
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(circle at 20% 50%, rgba(139, 92, 246, 0.1) 0%, transparent 40%),
-              radial-gradient(circle at 80% 80%, rgba(0, 240, 255, 0.08) 0%, transparent 40%);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.tournament-floating-orbs {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-}
-
-.tournament-content {
-  flex: 1;
-  overflow-y: auto;
-  padding-bottom: 80px;
-  padding-left: 16px;
-  padding-right: 16px;
-  padding-top: 16px;
-  position: relative;
-  z-index: 1;
-}
-
-.tournament-header {
-  margin-bottom: 24px;
-  animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.tournament-header h1 {
-  font-size: 2rem;
-  font-weight: 900;
-  background: linear-gradient(135deg, var(--color-text-primary) 0%, var(--color-lime) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 8px;
-  letter-spacing: -1px;
-}
-
-.tournament-header-subtitle {
-  color: var(--color-text-secondary);
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-/* ── Main Content & Layout ──────────────────────────────────────────────── */
+/* ── Main Layout ──────────────────────────────────────────────── */
 .tournament-content {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px 80px;
+  padding: 40px 16px 120px;
   position: relative;
   z-index: 1;
-  animation: contentFade 0.8s ease 0.2s both;
-}
-
-@keyframes contentFade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  animation: fadeIn 0.8s ease;
 }
 
 /* ── Hero Card ──────────────────────────────────────────────────────────── */
@@ -97,85 +24,61 @@
   position: relative;
   max-width: 600px;
   width: 100%;
-  background: linear-gradient(135deg, rgba(26, 40, 71, 0.7) 0%, rgba(42, 63, 95, 0.5) 100%);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--tournament-border);
+  background-color: var(--surface-low);
+  border: var(--border-subtle);
   border-radius: 24px;
   padding: 60px 40px 40px;
-  box-shadow: var(--tournament-shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  animation: heroSlideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes heroSlideUp {
-  from { 
-    opacity: 0; 
-    transform: translateY(40px); 
-  }
-  to { 
-    opacity: 1; 
-    transform: translateY(0); 
-  }
+  box-shadow: var(--shadow-surface);
+  animation: slideUp 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 /* ── Accent Bars ────────────────────────────────────────────────────────── */
 .accent-bar {
   position: absolute;
   height: 4px;
-  background: linear-gradient(90deg, var(--tournament-accent-gold), var(--tournament-accent-blue));
-  opacity: 0.8;
-  animation: expandWidth 0.8s ease 0.4s both;
+  background-color: var(--cyan-accent);
+  box-shadow: 0 0 10px var(--cyan-accent);
+  border-radius: 2px;
 }
 
 .accent-bar--left {
-  width: 0;
-  top: 24px;
+  width: 80px;
+  top: 32px;
   left: 40px;
-  border-radius: 2px;
 }
 
 .accent-bar--right {
-  width: 0;
-  bottom: 24px;
+  width: 80px;
+  bottom: 32px;
   right: 40px;
-  border-radius: 2px;
-}
-
-@keyframes expandWidth {
-  from { width: 0; }
-  to { width: 80px; }
 }
 
 /* ── Floating Decorative Elements ───────────────────────────────────────── */
 .trophy-float {
   position: absolute;
   font-size: 3rem;
-  opacity: 0.15;
-  animation: floatIcon 6s ease-in-out infinite;
+  opacity: 0.2;
+  animation: bobbing 4s ease-in-out infinite;
   pointer-events: none;
 }
 
 .trophy-float--1 {
-  top: -20px;
-  right: 40px;
+  top: -24px;
+  right: 48px;
   animation-delay: 0s;
 }
 
 .trophy-float--2 {
-  bottom: 80px;
-  left: -40px;
-  animation-delay: 2s;
+  bottom: 64px;
+  left: -24px;
+  animation-delay: 1.5s;
 }
 
 .trophy-float--3 {
   top: 120px;
-  right: -30px;
+  right: -16px;
   font-size: 2.5rem;
-  animation-delay: 4s;
-}
-
-@keyframes floatIcon {
-  0%, 100% { transform: translateY(0) rotateZ(0deg); }
-  50% { transform: translateY(-30px) rotateZ(10deg); }
+  animation-delay: 3s;
 }
 
 /* ── Hero Content ───────────────────────────────────────────────────────── */
@@ -187,86 +90,54 @@
 .eyebrow-text {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-  font-weight: 700;
+  gap: 12px;
+  font-family: 'Unbounded', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--tournament-accent-blue);
-  margin-bottom: 20px;
-  animation: fadeInRight 0.8s ease 0.3s both;
+  color: var(--cyan-accent);
+  margin-bottom: 24px;
 }
 
 .eyebrow-dot {
   width: 8px;
   height: 8px;
-  background: var(--tournament-accent-blue);
+  background-color: var(--cyan-accent);
+  box-shadow: 0 0 8px var(--cyan-accent);
   border-radius: 50%;
-  animation: pulse 2s ease-in-out infinite;
+  animation: pulseGlow 2s infinite alternate;
 }
 
-@keyframes fadeInRight {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-/* ── Main Title (Typewriter Effect) ────────────────────────────────────── */
+/* ── Main Title ────────────────────────────────────── */
 .hero-title {
-  font-size: 3.5rem;
+  font-family: 'Unbounded', sans-serif;
+  font-size: 3rem;
   font-weight: 900;
-  margin: 0 0 30px;
+  margin: 0 0 32px;
   line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: var(--tournament-text-primary);
-  word-spacing: 9999px;
-  animation: titleFadeIn 0.8s ease 0.2s both;
+  color: var(--text-primary);
   min-height: 100px;
   display: flex;
   align-items: center;
 }
 
 .title-animated {
-  background: linear-gradient(135deg, #ffffff 0%, var(--tournament-accent-gold) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-family: 'Georgia', serif;
-  font-weight: 900;
-  letter-spacing: 0.05em;
+  color: var(--volt-yellow);
+  text-shadow: 0 0 10px var(--volt-yellow-glow);
 }
 
 .title-cursor {
   display: inline-block;
-  width: 3px;
+  width: 4px;
   height: 1em;
-  background: var(--tournament-accent-gold);
-  margin-left: 6px;
-  animation: blink 0.6s step-end infinite;
+  background-color: var(--volt-yellow);
+  margin-left: 8px;
+  animation: pulseGlow 1s step-end infinite;
 }
 
 .title-cursor.hidden {
   display: none;
-}
-
-@keyframes blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-
-@keyframes titleFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
 }
 
 /* ── Tournament Features ────────────────────────────────────────────────── */
@@ -274,23 +145,11 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  margin: 40px 0 35px;
+  margin: 32px 0;
   padding: 24px;
-  background: rgba(0, 212, 255, 0.04);
-  border: 1px solid rgba(0, 212, 255, 0.1);
-  border-radius: 16px;
-  animation: featuresSlide 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s both;
-}
-
-@keyframes featuresSlide {
-  from {
-    opacity: 0;
-    transform: translateX(-30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  background-color: var(--surface-highest);
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
 }
 
 .feature-item {
@@ -304,312 +163,151 @@
 .feature-icon {
   font-size: 1.8rem;
   flex-shrink: 0;
-  animation: iconBounce 0.6s ease-out;
-}
-
-@keyframes iconBounce {
-  0% { transform: scale(0) rotateZ(-30deg); }
-  70% { transform: scale(1.15); }
-  100% { transform: scale(1) rotateZ(0); }
-}
-
-.feature-text {
-  flex: 1;
-  min-width: 0;
 }
 
 .feature-label {
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-family: 'Unbounded', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--tournament-accent-green);
-  margin: 0;
+  color: var(--text-primary);
+  margin: 0 0 4px;
 }
 
 .feature-desc {
-  font-size: 0.75rem;
-  color: var(--tournament-text-muted);
-  margin: 2px 0 0;
-  opacity: 0.8;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
 }
 
 .feature-divider {
   width: 1px;
-  height: 40px;
-  background: linear-gradient(180deg, transparent, var(--tournament-border), transparent);
+  height: 48px;
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 /* ── Description ────────────────────────────────────────────────────────── */
 .hero-description {
+  font-family: 'Manrope', sans-serif;
   font-size: 1rem;
-  line-height: 1.7;
-  color: var(--tournament-text-muted);
-  margin: 0 0 32px;
-  animation: fadeInUp 0.8s ease 0.5s both;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0 0 40px;
 }
 
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ── Teaser Box (Call to Action) ────────────────────────────────────────── */
+/* ── Teaser Box ────────────────────────────────────────── */
 .teaser-box {
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(0, 212, 255, 0.05) 100%);
-  border: 2px solid var(--tournament-border);
-  border-radius: 16px;
-  padding: 20px;
+  background-color: rgba(255, 0, 85, 0.05);
+  border: 1px solid rgba(255, 0, 85, 0.2);
+  border-radius: var(--radius-md);
+  padding: 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
-  animation: teaserSlide 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.6s both;
-  transition: all 0.3s ease;
-}
-
-@keyframes teaserSlide {
-  from {
-    opacity: 0;
-    transform: translateX(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  transition: all 0.2s ease;
 }
 
 .teaser-box:hover {
-  border-color: var(--tournament-accent-gold);
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(0, 212, 255, 0.08) 100%);
+  border-color: var(--electric-pink);
+  background-color: rgba(255, 0, 85, 0.1);
 }
 
 .teaser-label {
+  font-family: 'Unbounded', sans-serif;
   font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--tournament-text-primary);
-  white-space: nowrap;
+  font-weight: 800;
+  color: var(--text-primary);
 }
 
 .notify-btn {
-  padding: 10px 20px;
-  background: linear-gradient(135deg, var(--tournament-accent-gold), var(--tournament-accent-blue));
+  padding: 12px 24px;
+  background-color: var(--electric-pink);
   border: none;
-  border-radius: 8px;
-  color: var(--tournament-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: 'Unbounded', sans-serif;
   font-size: 0.85rem;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
   flex-shrink: 0;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+  transition: all 0.2s;
+  box-shadow: 0 0 10px var(--electric-pink-glow);
 }
 
 .notify-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 25px rgba(255, 215, 0, 0.4);
-  background: linear-gradient(135deg, var(--tournament-accent-blue), var(--tournament-accent-gold));
-}
-
-.notify-btn:active {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 0 15px var(--electric-pink-glow-strong);
 }
 
 /* ── Stats Corner ───────────────────────────────────────────────────────── */
 .stats-corner {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 24px;
+  right: 24px;
   z-index: 3;
 }
 
 .stat-badge {
-  background: rgba(0, 212, 255, 0.15);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(0, 212, 255, 0.3);
-  border-radius: 12px;
+  background-color: var(--surface-highest);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
   padding: 12px 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  animation: badgeFloat 0.8s ease 0.5s both;
 }
 
 .stat-number {
-  font-size: 1.2rem;
+  font-family: 'Unbounded', sans-serif;
+  font-size: 1.25rem;
   font-weight: 900;
-  color: var(--tournament-accent-blue);
-  letter-spacing: -0.01em;
+  color: var(--cyan-accent);
 }
 
 .stat-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--tournament-text-muted);
+  font-family: 'Unbounded', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-@keyframes badgeFloat {
-  from {
-    opacity: 0;
-    transform: translateY(-20px) scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* ── Footer Accent ──────────────────────────────────────────────────────── */
-.tournament-footer-accent {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 120px;
-  background: linear-gradient(180deg, transparent, rgba(0, 212, 255, 0.08));
-  pointer-events: none;
-  z-index: 0;
 }
 
 /* ── Responsive Design ──────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .tournament-hero {
-    padding: 50px 28px 32px;
-    border-radius: 20px;
+    padding: 48px 24px 32px;
   }
 
   .hero-title {
-    font-size: 2.5rem;
+    font-size: 2.25rem;
     min-height: 80px;
   }
 
   .tournament-features {
     flex-direction: column;
-    gap: 12px;
-    padding: 16px;
-  }
-
-  .feature-item {
-    width: 100%;
+    align-items: flex-start;
+    gap: 20px;
   }
 
   .feature-divider {
-    width: 40px;
+    width: 100%;
     height: 1px;
-    transform: rotateZ(-45deg);
   }
 
   .teaser-box {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
   }
 
   .notify-btn {
     width: 100%;
-  }
-
-  .accent-bar--left {
-    width: 60px;
-    left: 28px;
-  }
-
-  .accent-bar--right {
-    width: 60px;
-    right: 28px;
-  }
-
-  .hero-description {
-    font-size: 0.95rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .tournament-hero {
-    padding: 40px 20px 28px;
-    border-radius: 16px;
-  }
-
-  .hero-title {
-    font-size: 2rem;
-    min-height: 60px;
-    margin-bottom: 20px;
-  }
-
-  .tournament-features {
-    gap: 10px;
-    padding: 14px;
-  }
-
-  .feature-icon {
-    font-size: 1.4rem;
-  }
-
-  .feature-label {
-    font-size: 0.7rem;
-  }
-
-  .feature-desc {
-    font-size: 0.65rem;
-  }
-
-  .eyebrow-text {
-    font-size: 0.75rem;
-    margin-bottom: 16px;
-  }
-
-  .teaser-label {
-    font-size: 0.8rem;
-  }
-
-  .notify-btn {
-    padding: 8px 14px;
-    font-size: 0.75rem;
-  }
-
-  .stats-corner {
-    top: 16px;
-    right: 16px;
-  }
-
-  .stat-badge {
-    padding: 10px 12px;
-  }
-
-  .stat-number {
-    font-size: 1rem;
-  }
-
-  .stat-label {
-    font-size: 0.65rem;
-  }
-
-  .trophy-float {
-    font-size: 2rem;
-  }
-
-  .trophy-float--3 {
-    font-size: 1.8rem;
-  }
-
-  .hero-description {
-    font-size: 0.9rem;
-    margin-bottom: 24px;
-  }
-
-  .accent-bar--left,
-  .accent-bar--right {
-    width: 40px;
+    text-align: center;
   }
 }

@@ -1,629 +1,365 @@
-/* ── Competitive Sports Gaming Design System ─────────────────────────── */
-/* Using global color variables from global.css */
+/* ── Cyber-Pitch LeaguePage ─────────────────────────────────────────────── */
 
-/* ── Page shell ──────────────────────────────────────────────────────────── */
 .league-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: radial-gradient(circle at 50% 50%, var(--color-black-secondary) 0%, var(--color-black-primary) 100%);
-  color: var(--color-text-primary);
-  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   position: relative;
-  overflow: hidden;
-}
-
-/* ── Background Layers ──────────────────────────────────────────────────── */
-.league-page::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
-  background-size: 50px 50px;
-  z-index: 0;
-  animation: gridFloat 40s linear infinite;
-  pointer-events: none;
-}
-
-.league-page::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(circle at 20% 50%, rgba(139, 92, 246, 0.1) 0%, transparent 40%),
-              radial-gradient(circle at 80% 80%, rgba(0, 240, 255, 0.08) 0%, transparent 40%);
-  z-index: 0;
-  pointer-events: none;
 }
 
 .league-content {
   flex: 1;
-  overflow-y: auto;
-  padding-bottom: 80px;
-  padding-left: 16px;
-  padding-right: 16px;
-  padding-top: 16px;
+  padding: 16px 16px 80px 16px;
   position: relative;
   z-index: 1;
-}
-
-.league-header {
-  margin-bottom: 24px;
-  animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.league-header h1 {
-  font-size: 2rem;
-  font-weight: 900;
-  background: linear-gradient(135deg, var(--color-text-primary) 0%, var(--color-cyan) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 8px;
-  letter-spacing: -1px;
-}
-
-.league-header-subtitle {
-  color: var(--color-text-secondary);
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.league-filter-section {
-  margin-bottom: 24px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.league-filter-btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  background: transparent;
-  border: 1px solid var(--color-text-secondary);
-  color: var(--color-text-secondary);
-  transition: all 0.3s ease;
-}
-
-.league-filter-btn.active {
-  background: linear-gradient(135deg, var(--color-purple) 0%, var(--color-cyan) 100%);
-  color: var(--color-black-primary);
-  border-color: var(--color-cyan);
-  box-shadow: 0 0 16px rgba(0, 240, 255, 0.3);
-}
-
-.league-filter-btn:hover:not(.active) {
-  border-color: var(--color-cyan);
-  color: var(--color-cyan);
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0px) translateX(0px); }
-  25% { transform: translateY(-30px) translateX(20px); }
-  50% { transform: translateY(-60px) translateX(-20px); }
-  75% { transform: translateY(-30px) translateX(30px); }
+  flex-direction: column;
+  gap: 24px;
 }
 
 /* ── Action buttons: Create + Join ───────────────────────────────────────── */
 .action-buttons {
   display: flex;
   gap: 12px;
-  padding: 0 16px 20px;
-  animation: fadeInUp 0.8s ease 0.2s both;
+  animation: fadeIn 0.4s ease-out;
 }
 
-.action-buttons .btn-primary,
-.action-buttons .btn-secondary {
+.action-buttons button {
   flex: 1;
-  padding: 13px 10px;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-size: 0.8rem;
+  padding: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-}
-
-/* Purple "Create League" */
-.action-buttons .btn-primary {
-  background: linear-gradient(135deg, var(--league-accent-blue), var(--league-accent-gold));
-  color: var(--league-primary);
-}
-
-/* Green "Join with Code" */
-.action-buttons .btn-secondary {
-  background: linear-gradient(135deg, var(--league-accent-green), var(--league-accent-blue));
-  color: var(--league-primary);
-}
-
-.action-buttons .btn-primary:hover,
-.action-buttons .btn-secondary:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 25px rgba(0, 212, 255, 0.4);
-}
-
-.action-buttons .btn-primary:active,
-.action-buttons .btn-secondary:active { 
-  transform: translateY(-1px);
+  gap: 8px;
 }
 
 /* ── Section headings ────────────────────────────────────────────────────── */
-.my-leagues-section,
-.discover-section {
-  padding: 0 16px 20px;
-}
-
 .my-leagues-section h2,
 .discover-section h2 {
   font-size: 1.1rem;
-  font-weight: 700;
-  margin: 0 0 12px;
-  color: var(--league-text-primary);
+  font-weight: 800;
+  margin: 0 0 16px;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
-  animation: fadeInLeft 0.8s ease 0.3s both;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: 'Unbounded', sans-serif;
 }
 
-/* shield icon before "My Leagues", star before "Popular Public Leagues" */
-.my-leagues-section h2::before { content: '🛡'; font-size: 1rem; }
-.discover-section  h2::before  { content: '⭐'; font-size: 1rem; }
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+.my-leagues-section h2::before,
+.discover-section h2::before {
+  content: '';
+  display: block;
+  width: 12px;
+  height: 12px;
+  background-color: var(--cyan-accent);
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
 }
 
-@keyframes fadeInLeft {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
+.discover-section h2::before {
+  background-color: var(--volt-yellow);
+  box-shadow: 0 0 8px var(--volt-yellow-glow);
 }
 
-/* ── My League cards ─────────────────────────────────────────────────────── */
+/* ── My League cards list ────────────────────────────────────────────────── */
 .leagues-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  animation: listFadeIn 0.8s ease 0.4s both;
-}
-
-/* Override / complement LeagueCard component styles */
-.league-card,
-.leagues-list > div {
-  background: linear-gradient(135deg, rgba(26, 40, 71, 0.7) 0%, rgba(42, 63, 95, 0.5) 100%);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--league-border);
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  box-shadow: var(--league-shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-.league-card:hover {
-  border-color: var(--league-accent-blue);
-  transform: translateY(-4px);
-  box-shadow: var(--league-shadow-lg), inset 0 1px 0 rgba(0, 212, 255, 0.2);
-}
-
-.league-card-info { flex: 1; min-width: 0; }
-
-.league-card-name {
-  font-size: 1rem;
-  font-weight: 700;
-  margin: 0 0 3px;
-  color: var(--league-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.league-card-description {
-  font-size: 0.83rem;
-  color: var(--league-text-muted);
-  margin: 0 0 8px;
-}
-
-.league-card-stats {
-  display: flex;
-  gap: 14px;
-  font-size: 0.82rem;
-  color: var(--league-text-muted);
-  flex-wrap: wrap;
-}
-
-.league-stat { display: flex; align-items: center; gap: 5px; }
-.league-stat strong { color: var(--league-text-primary); }
-
-/* Owner badge pill */
-.owner-pill {
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 255, 107, 0.1));
-  color: var(--league-accent-blue);
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 20px;
-  border: 1px solid rgba(0, 212, 255, 0.3);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  flex-shrink: 0;
-}
-
-/* Chevron arrow button */
-.btn-chevron {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: rgba(255, 215, 0, 0.1);
-  border: 1px solid var(--league-border);
-  color: var(--league-accent-blue);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.1rem;
-  flex-shrink: 0;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-chevron:hover {
-  background: rgba(0, 212, 255, 0.15);
-  border-color: var(--league-accent-blue);
-  transform: translateX(4px);
+  gap: 16px;
 }
 
 /* Empty state */
 .empty-state {
-  background: linear-gradient(135deg, rgba(26, 40, 71, 0.5) 0%, rgba(42, 63, 95, 0.3) 100%);
-  border: 1px dashed var(--league-border);
-  border-radius: 12px;
-  padding: 28px 20px;
+  background-color: var(--surface-low);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  padding: 32px 20px;
   text-align: center;
-  backdrop-filter: blur(20px);
 }
 
 .empty-state p {
-  color: var(--league-text-muted);
+  color: var(--text-secondary);
+  font-family: 'Manrope', sans-serif;
   margin: 4px 0;
-  font-size: 0.9rem;
-}
-
-@keyframes listFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  font-size: 0.95rem;
 }
 
 /* ── Search bar ──────────────────────────────────────────────────────────── */
 .search-bar {
   display: flex;
   align-items: center;
-  gap: 0;
-  background: linear-gradient(135deg, rgba(26, 40, 71, 0.7) 0%, rgba(42, 63, 95, 0.5) 100%);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--league-border);
-  border-radius: 8px;
+  background-color: var(--surface-low);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  margin-bottom: 16px;
-  transition: all 0.3s ease;
-  box-shadow: var(--league-shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  margin-bottom: 20px;
+  transition: all 0.2s ease;
 }
 
 .search-bar:focus-within {
-  border-color: var(--league-accent-blue);
-  box-shadow: var(--league-shadow-lg), inset 0 1px 0 rgba(0, 212, 255, 0.2);
+  border-color: var(--cyan-accent);
+  box-shadow: 0 0 0 1px var(--cyan-accent);
+  background-color: var(--surface-high);
 }
 
 .search-bar input {
   flex: 1;
-  background: none;
+  background: transparent;
   border: none;
-  color: var(--league-text-primary);
-  font-size: 0.9rem;
-  padding: 13px 14px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  padding: 14px 16px;
   outline: none;
+  font-family: 'Manrope', sans-serif;
 }
 
-.search-bar input::placeholder { color: var(--league-text-muted); }
+.search-bar input::placeholder {
+  color: var(--text-muted);
+}
 
 .btn-search {
-  background: none;
+  background: transparent;
   border: none;
-  color: var(--league-accent-blue);
-  padding: 0 14px;
+  color: var(--text-secondary);
+  padding: 0 16px;
   font-size: 1rem;
   cursor: pointer;
   transition: all 0.2s;
+  height: 100%;
 }
 
 .btn-search:hover:not(:disabled) {
-  color: var(--league-accent-gold);
-  transform: scale(1.1);
+  color: var(--volt-yellow);
 }
 
-.btn-search:disabled { opacity: 0.4; cursor: default; }
-.btn-clear { color: #ff6b6b; }
+.btn-search:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn-clear {
+  color: var(--electric-pink);
+}
 
 /* ── Public league sub-header ────────────────────────────────────────────── */
 .public-leagues-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .public-leagues-header h3 {
   font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--league-text-muted);
+  font-weight: 700;
+  color: var(--text-secondary);
   margin: 0;
+  font-family: 'Manrope', sans-serif;
 }
 
 .btn-link {
-  background: none;
+  background: transparent;
   border: none;
-  color: var(--league-accent-blue);
-  font-size: 0.82rem;
-  font-weight: 600;
+  color: var(--cyan-accent);
+  font-size: 0.85rem;
+  font-weight: 700;
   cursor: pointer;
   padding: 0;
-  transition: all 0.2s;
+  font-family: 'Manrope', sans-serif;
 }
 
 .btn-link:hover {
-  color: var(--league-accent-gold);
-  transform: translateX(4px);
+  color: var(--volt-yellow);
+  text-decoration: underline;
 }
 
 /* ── Public league cards ─────────────────────────────────────────────────── */
 .public-leagues-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  animation: listFadeIn 0.8s ease 0.5s both;
+  gap: 12px;
 }
 
 .public-league-card {
-  background: linear-gradient(135deg, rgba(26, 40, 71, 0.7) 0%, rgba(42, 63, 95, 0.5) 100%);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--league-border);
-  border-radius: 12px;
-  padding: 14px 16px;
+  background-color: var(--surface-low);
+  border: var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  transition: all 0.3s ease;
-  box-shadow: var(--league-shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  gap: 16px;
+  transition: all 0.2s ease;
 }
 
 .public-league-card:hover {
-  border-color: var(--league-accent-gold);
-  transform: translateY(-3px);
-  box-shadow: var(--league-shadow-lg), inset 0 1px 0 rgba(255, 215, 0, 0.1);
+  border-color: var(--cyan-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-surface);
 }
 
-.public-league-card .league-info { flex: 1; min-width: 0; }
+.public-league-card .league-info {
+  flex: 1;
+  min-width: 0;
+}
 
 .public-league-card h4 {
-  font-size: 1rem;
-  font-weight: 700;
-  margin: 0 0 3px;
-  color: var(--league-text-primary);
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+  font-family: 'Unbounded', sans-serif;
 }
 
 .public-league-card .description {
-  font-size: 0.82rem;
-  color: var(--league-text-muted);
-  margin: 0 0 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+  line-height: 1.4;
 }
 
-.public-league-card .league-meta {
-  display: flex;
-  gap: 12px;
-  font-size: 0.8rem;
-  color: var(--league-text-muted);
-}
-
-.member-count { display: flex; align-items: center; gap: 4px; }
-
-/* Green "Join League" button */
-.btn-primary.btn-sm,
-.btn-join-public {
-  background: linear-gradient(135deg, var(--league-accent-green), var(--league-accent-blue));
-  color: var(--league-primary);
-  border: none;
-  border-radius: 8px;
-  padding: 10px 16px;
-  font-size: 0.88rem;
+.member-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
   font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 4px 15px rgba(0, 255, 107, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.btn-primary.btn-sm:hover,
-.btn-join-public:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 255, 107, 0.4);
-  background: linear-gradient(135deg, var(--league-accent-blue), var(--league-accent-green));
+.btn-sm {
+  padding: 10px 16px;
+  font-size: 0.8rem;
+  flex-shrink: 0;
 }
 
 .no-leagues-text {
-  color: var(--league-text-muted);
+  color: var(--text-muted);
   text-align: center;
   padding: 24px 20px;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 /* ── Modal form ──────────────────────────────────────────────────────────── */
 .league-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .form-group label {
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--league-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
+  font-family: 'Unbounded', sans-serif;
 }
 
-.form-group input[type="text"],
-.form-group input[type="date"],
-.form-group textarea,
-.form-group select,
 .form-select,
 .form-date,
 .code-input {
-  background: linear-gradient(135deg, rgba(26, 40, 71, 0.7) 0%, rgba(42, 63, 95, 0.5) 100%);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--league-border);
-  border-radius: 8px;
-  color: var(--league-text-primary);
+  background-color: var(--surface-low);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
   font-size: 0.95rem;
-  padding: 11px 13px;
-  font-family: inherit;
-  transition: all 0.3s ease;
+  padding: 12px 16px;
+  font-family: 'Manrope', sans-serif;
+  transition: all 0.2s ease;
   appearance: none;
   -webkit-appearance: none;
   width: 100%;
-  box-sizing: border-box;
 }
 
-.form-group input:focus,
-.form-group textarea:focus,
-.form-group select:focus,
 .form-select:focus,
 .form-date:focus,
 .code-input:focus {
   outline: none;
-  border-color: var(--league-accent-blue);
-  background: linear-gradient(135deg, rgba(26, 40, 71, 0.9) 0%, rgba(42, 63, 95, 0.7) 100%);
-  box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+  border-color: var(--volt-yellow);
+  box-shadow: 0 0 0 1px var(--volt-yellow);
+  background-color: var(--surface-high);
 }
 
-/* Custom chevron on select */
-.form-group select,
 .form-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a6b3cc' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23F8F9FA' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 36px;
+  background-position: right 16px center;
+  padding-right: 40px;
   cursor: pointer;
 }
 
-/* Code input — monospace, centered, large */
 .code-input {
   text-align: center;
-  font-size: 1.3rem;
-  letter-spacing: 0.25em;
+  font-size: 1.5rem;
+  letter-spacing: 0.3em;
   font-family: 'Courier New', monospace;
-  font-weight: 700;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
-/* End date read-only display */
 .end-date-display {
-  background: linear-gradient(135deg, rgba(26, 40, 71, 0.5) 0%, rgba(42, 63, 95, 0.3) 100%);
-  border: 1px dashed var(--league-border);
-  border-radius: 8px;
-  color: var(--league-text-muted);
-  font-size: 0.9rem;
-  padding: 11px 13px;
+  background-color: var(--surface-low);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  padding: 12px 16px;
   font-style: italic;
-  box-sizing: border-box;
-  backdrop-filter: blur(10px);
 }
 
 .end-date-display--set {
   border-style: solid;
-  border-color: var(--league-accent-green);
-  color: var(--league-accent-green);
+  border-color: var(--volt-yellow);
+  color: var(--volt-yellow);
   font-style: normal;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .form-group.checkbox {
   flex-direction: row;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .form-group.checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--league-accent-blue);
+  width: 20px;
+  height: 20px;
+  accent-color: var(--volt-yellow);
   cursor: pointer;
   flex-shrink: 0;
+  margin: 0;
 }
 
 .form-group.checkbox label {
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size: 0.95rem;
+  font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
-  color: var(--league-text-primary);
+  color: var(--text-primary);
   cursor: pointer;
+  margin: 0;
+  font-family: 'Manrope', sans-serif;
 }
 
 .form-hint {
-  font-size: 0.82rem;
-  color: var(--league-text-muted);
-  margin: -4px 0 0;
-  line-height: 1.5;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
 }
 
-/* Full-width submit button */
-.btn-primary.btn-full,
 .btn-full {
   width: 100%;
-  padding: 13px;
-  background: linear-gradient(135deg, var(--league-accent-blue), var(--league-accent-gold));
-  color: var(--league-primary);
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-  margin-top: 4px;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
-}
-
-.btn-primary.btn-full:hover,
-.btn-full:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 212, 255, 0.4);
-  background: linear-gradient(135deg, var(--league-accent-gold), var(--league-accent-blue));
-}
-
-.btn-primary.btn-full:disabled,
-.btn-full:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* ── Responsive Design ──────────────────────────────────────────────────── */
-@media (max-width: 480px) {
-  .action-buttons { padding: 0 12px 16px; gap: 10px; }
-  .my-leagues-section, .discover-section { padding: 0 12px 16px; }
+  margin-top: 8px;
 }

@@ -1,4 +1,4 @@
-/* Loading Component */
+/* Cyber-Pitch Loading Component */
 .loading-container {
   display: flex;
   flex-direction: column;
@@ -16,11 +16,12 @@
   right: 0;
   bottom: 0;
   z-index: 999;
-  background: radial-gradient(circle at 50% 50%, var(--color-black-secondary) 0%, var(--color-black-primary) 100%);
+  background-color: var(--bg-obsidian);
   min-height: 100vh;
   overflow: hidden;
 }
 
+/* Subtle grid background for fullscreen loading */
 .loading-container.fullscreen::before {
   content: '';
   position: fixed;
@@ -29,9 +30,9 @@
   right: 0;
   bottom: 0;
   background-image:
-    linear-gradient(90deg, rgba(139, 92, 246, 0.03) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 30px 30px;
   pointer-events: none;
   z-index: 0;
 }
@@ -39,22 +40,22 @@
 .spinner {
   width: 60px;
   height: 60px;
-  border: 3px solid var(--color-black-tertiary);
-  border-top-color: var(--color-cyan);
-  border-right-color: var(--color-purple);
+  border: 4px solid var(--surface-highest);
+  border-top-color: var(--volt-yellow);
+  border-right-color: transparent;
   border-radius: 50%;
-  animation: spin 1.5s linear infinite;
+  animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
   margin-bottom: 12px;
   position: relative;
   z-index: 10;
+  box-shadow: 0 0 15px var(--volt-yellow-glow);
 }
 
 .spinner::after {
   content: '';
   position: absolute;
-  inset: -8px;
-  border: 2px solid transparent;
-  border-top-color: rgba(139, 92, 246, 0.2);
+  inset: -10px;
+  border: 2px dashed rgba(223, 255, 0, 0.3);
   border-radius: 50%;
   animation: spin 3s linear infinite reverse;
 }
@@ -63,18 +64,22 @@
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
 }
 
 .loading-message {
-  color: var(--color-text-secondary);
-  font-size: 0.95rem;
+  color: var(--volt-yellow);
+  font-family: 'Unbounded', sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   margin: 0;
   text-align: center;
-  font-weight: 500;
-  animation: fadeIn 0.4s ease;
+  font-weight: 700;
+  animation: pulseGlow 2s infinite, fadeIn 0.4s ease;
   position: relative;
   z-index: 10;
 }

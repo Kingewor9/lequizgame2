@@ -53,8 +53,10 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {renderPage()}
+    <div className="font-unbounded" style={{ display: 'flex', flexDirection: 'column', height: '100vh', position: 'relative' }}>
+      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '90px' }} className="hide-scrollbar">
+        {renderPage()}
+      </div>
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
