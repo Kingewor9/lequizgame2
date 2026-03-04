@@ -1,4 +1,10 @@
 import os
+from dotenv import load_dotenv
+
+# Load root and local .env unconditionally
+load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager

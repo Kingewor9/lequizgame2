@@ -13,6 +13,11 @@ class Config:
     # MongoDB
     MONGODB_URI = os.environ.get('MONGODB_URI') or 'mongodb://localhost:27017/footy_iq'
     MONGODB_DB = os.environ.get('MONGODB_DB') or 'footy_iq'
+    
+    # Admin Configuration
+    ADMIN_TELEGRAM_IDS = [
+        int(x.strip()) for x in os.environ.get('ADMIN_TELEGRAM_IDS', '').split(',') if x.strip()
+    ]
 
 
 class DevelopmentConfig(Config):
