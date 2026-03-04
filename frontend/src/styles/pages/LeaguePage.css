@@ -1,26 +1,14 @@
-/* ── CSS Variables (Premium Design System) ───────────────────────────── */
-:root {
-  --league-primary: #0f172b;
-  --league-secondary: #1a2847;
-  --league-tertiary: #2a3f5f;
-  --league-accent-gold: #ffd700;
-  --league-accent-blue: #00d4ff;
-  --league-accent-green: #00ff6b;
-  --league-text-primary: #ffffff;
-  --league-text-muted: #a6b3cc;
-  --league-border: rgba(255, 215, 0, 0.15);
-  --league-shadow-sm: 0 4px 20px rgba(0, 0, 0, 0.3);
-  --league-shadow-lg: 0 20px 60px rgba(0, 212, 255, 0.1);
-}
+/* ── Competitive Sports Gaming Design System ─────────────────────────── */
+/* Using global color variables from global.css */
 
 /* ── Page shell ──────────────────────────────────────────────────────────── */
 .league-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--league-primary);
-  color: var(--league-text-primary);
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: radial-gradient(circle at 50% 50%, var(--color-black-secondary) 0%, var(--color-black-primary) 100%);
+  color: var(--color-text-primary);
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   position: relative;
   overflow: hidden;
 }
@@ -30,77 +18,89 @@
   content: '';
   position: fixed;
   inset: 0;
-  background: linear-gradient(
-    135deg,
-    var(--league-primary) 0%,
-    var(--league-secondary) 25%,
-    var(--league-tertiary) 50%,
-    var(--league-secondary) 75%,
-    var(--league-primary) 100%
-  );
-  animation: gradientShift 15s ease infinite;
-  z-index: -3;
+  background-image:
+    linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+  background-size: 50px 50px;
+  z-index: 0;
+  animation: gridFloat 40s linear infinite;
+  pointer-events: none;
 }
 
 .league-page::after {
   content: '';
   position: fixed;
   inset: 0;
-  background-image:
-    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-  z-index: -2;
-  animation: gridFloat 30s linear infinite;
+  background: radial-gradient(circle at 20% 50%, rgba(139, 92, 246, 0.1) 0%, transparent 40%),
+              radial-gradient(circle at 80% 80%, rgba(0, 240, 255, 0.08) 0%, transparent 40%);
+  z-index: 0;
   pointer-events: none;
-}
-
-@keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-@keyframes gridFloat {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(40px); }
 }
 
 .league-content {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 80px;
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-top: 16px;
   position: relative;
   z-index: 1;
 }
 
-.league-content::before {
-  content: '';
-  position: fixed;
-  top: 10%;
-  left: 10%;
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, rgba(0, 212, 255, 0.08) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: float 20s ease-in-out infinite;
-  z-index: -1;
-  pointer-events: none;
+.league-header {
+  margin-bottom: 24px;
+  animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.league-content::after {
-  content: '';
-  position: fixed;
-  bottom: 15%;
-  right: 5%;
-  width: 250px;
-  height: 250px;
-  background: radial-gradient(circle, rgba(255, 215, 0, 0.06) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: float 25s ease-in-out infinite reverse;
-  z-index: -1;
-  pointer-events: none;
+.league-header h1 {
+  font-size: 2rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--color-text-primary) 0%, var(--color-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+  letter-spacing: -1px;
 }
 
+.league-header-subtitle {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.league-filter-section {
+  margin-bottom: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.league-filter-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: transparent;
+  border: 1px solid var(--color-text-secondary);
+  color: var(--color-text-secondary);
+  transition: all 0.3s ease;
+}
+
+.league-filter-btn.active {
+  background: linear-gradient(135deg, var(--color-purple) 0%, var(--color-cyan) 100%);
+  color: var(--color-black-primary);
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.3);
+}
+
+.league-filter-btn:hover:not(.active) {
+  border-color: var(--color-cyan);
+  color: var(--color-cyan);
+}
 @keyframes float {
   0%, 100% { transform: translateY(0px) translateX(0px); }
   25% { transform: translateY(-30px) translateX(20px); }

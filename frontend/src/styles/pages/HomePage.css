@@ -1,16 +1,6 @@
-/* ── CSS Variables (Premium Design System) ───────────────────────────── */
+/* ── Competitive Sports Gaming Design System ─────────────────────────── */
 :root {
-  --home-primary: #0f172b;
-  --home-secondary: #1a2847;
-  --home-tertiary: #2a3f5f;
-  --home-accent-gold: #ffd700;
-  --home-accent-blue: #00d4ff;
-  --home-accent-green: #00ff6b;
-  --home-text-primary: #ffffff;
-  --home-text-muted: #a6b3cc;
-  --home-border: rgba(255, 215, 0, 0.15);
-  --home-shadow-sm: 0 4px 20px rgba(0, 0, 0, 0.3);
-  --home-shadow-lg: 0 20px 60px rgba(0, 212, 255, 0.1);
+  /* Already defined in global.css - using CSS variables */
 }
 
 /* ── Page shell ──────────────────────────────────────────────────────────── */
@@ -18,9 +8,9 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--home-primary);
-  color: var(--home-text-primary);
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: radial-gradient(circle at 50% 50%, var(--color-black-secondary) 0%, var(--color-black-primary) 100%);
+  color: var(--color-text-primary);
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   position: relative;
   overflow: hidden;
 }
@@ -30,76 +20,42 @@
   content: '';
   position: fixed;
   inset: 0;
-  background: linear-gradient(
-    135deg,
-    var(--home-primary) 0%,
-    var(--home-secondary) 25%,
-    var(--home-tertiary) 50%,
-    var(--home-secondary) 75%,
-    var(--home-primary) 100%
-  );
-  animation: gradientShift 15s ease infinite;
-  z-index: -3;
+  background-image:
+    linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+  background-size: 50px 50px;
+  z-index: 0;
+  animation: gridFloat 40s linear infinite;
+  pointer-events: none;
 }
 
 .home-page::after {
   content: '';
   position: fixed;
   inset: 0;
-  background-image:
-    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-  z-index: -2;
-  animation: gridFloat 30s linear infinite;
+  background: radial-gradient(circle at 20% 50%, rgba(139, 92, 246, 0.1) 0%, transparent 40%),
+              radial-gradient(circle at 80% 80%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+              radial-gradient(circle at 50% 0%, rgba(255, 215, 0, 0.05) 0%, transparent 40%);
+  z-index: 0;
   pointer-events: none;
-}
-
-@keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
 }
 
 @keyframes gridFloat {
   0% { transform: translateY(0); }
-  100% { transform: translateY(40px); }
+  100% { transform: translateY(50px); }
 }
 
 .home-content {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 80px;
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-top: 16px;
   position: relative;
   z-index: 1;
 }
 
-.home-content::before {
-  content: '';
-  position: fixed;
-  top: 10%;
-  left: 10%;
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, rgba(0, 212, 255, 0.08) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: float 20s ease-in-out infinite;
-  z-index: -1;
-  pointer-events: none;
-}
-
-.home-content::after {
-  content: '';
-  position: fixed;
-  bottom: 15%;
-  right: 5%;
-  width: 250px;
-  height: 250px;
-  background: radial-gradient(circle, rgba(255, 215, 0, 0.06) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: float 25s ease-in-out infinite reverse;
-  z-index: -1;
-  pointer-events: none;
-}
 
 @keyframes float {
   0%, 100% { transform: translateY(0px) translateX(0px); }
@@ -120,103 +76,80 @@
   margin: 0;
   background: linear-gradient(135deg, #ffffff 0%, var(--home-accent-gold) 100%);
   -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: -0.01em;
-  line-height: 1.25;
+.home-welcome {
+  margin-bottom: 24px;
+  padding: 0 0 16px 0;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+  animation: slideDown 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Username highlighted in purple, matching screenshot */
+.welcome-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--color-text-primary) 0%, var(--color-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+
 .welcome-name {
-  color: var(--home-accent-gold);
+  color: var(--color-lime);
+  font-weight: 900;
 }
 
 .welcome-subtitle {
-  color: var(--home-text-muted);
-  font-size: 0.88rem;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
   margin: 6px 0 0;
-  animation: fadeInUp 0.8s ease 0.3s both;
-}
-
-@keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  font-weight: 500;
 }
 
 /* ── Quiz section ────────────────────────────────────────────────────────── */
 .quiz-section {
-  padding: 0 16px 16px;
+  margin-bottom: 24px;
 }
 
 .quiz-section h2 {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--home-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin: 0 0 10px;
-  animation: fadeInLeft 0.8s ease 0.4s both;
+  letter-spacing: 0.8px;
+  margin: 0 0 12px;
 }
 
-.quiz-card {
-  background: linear-gradient(135deg, rgba(26, 40, 71, 0.7) 0%, rgba(42, 63, 95, 0.5) 100%);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--home-border);
-  border-radius: 16px;
-  padding: 18px;
-  animation: cardSlideUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s both;
-  box-shadow: var(--home-shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
+.quiz-card-wrapper {
+  animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.quiz-card:hover {
-  border-color: var(--home-accent-blue);
-  box-shadow: var(--home-shadow-lg), inset 0 1px 0 rgba(0, 212, 255, 0.2);
-  transform: translateY(-4px);
-}
-
-@keyframes cardSlideUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeInLeft {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-/* Title row: icon + quiz name */
 .quiz-card-title {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 16px;
 }
 
 .quiz-icon {
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   flex-shrink: 0;
-  margin-top: 2px;
-  animation: iconBounce 0.6s ease-out;
-}
-
-@keyframes iconBounce {
-  0% { transform: scale(0) rotateZ(-30deg); }
-  70% { transform: scale(1.15); }
-  100% { transform: scale(1) rotateZ(0); }
+  margin-top: 0;
+  animation: pulse-glow 2s infinite;
+  filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.3));
 }
 
 .quiz-card-title h3 {
-  font-size: 1.1rem;
+  font-size: 1.3rem;
   font-weight: 700;
   margin: 0;
-  color: var(--home-text-primary);
+  color: var(--color-text-primary);
   line-height: 1.3;
+  background: linear-gradient(135deg, var(--color-text-primary) 0%, var(--color-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* 2×2 meta grid */
@@ -230,16 +163,25 @@
 .quiz-meta-item {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 0.85rem;
-  color: var(--home-text-muted);
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(0, 240, 255, 0.05);
+  border-radius: 6px;
+  border-left: 2px solid var(--color-purple);
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
 }
 
-.meta-icon { font-size: 0.95rem; }
+.meta-icon {
+  font-size: 0.9rem;
+  margin-right: 4px;
+}
 
 .meta-value {
-  color: var(--home-text-primary);
-  font-weight: 500;
+  color: var(--color-cyan);
+  font-weight: 700;
+  font-family: 'Courier Prime', monospace;
+}
 }
 
 /* Expires row — gold value */

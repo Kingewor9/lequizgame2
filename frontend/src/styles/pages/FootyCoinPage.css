@@ -1,26 +1,14 @@
-/* ── CSS Variables (Premium Design System) ───────────────────────────── */
-:root {
-  --coin-primary: #0f172b;
-  --coin-secondary: #1a2847;
-  --coin-tertiary: #2a3f5f;
-  --coin-accent-gold: #ffd700;
-  --coin-accent-blue: #00d4ff;
-  --coin-accent-green: #00ff6b;
-  --coin-text-primary: #ffffff;
-  --coin-text-muted: #a6b3cc;
-  --coin-border: rgba(255, 215, 0, 0.15);
-  --coin-shadow-sm: 0 4px 20px rgba(0, 0, 0, 0.3);
-  --coin-shadow-lg: 0 20px 60px rgba(0, 212, 255, 0.1);
-}
+/* ── Competitive Sports Gaming Design System ─────────────────────────── */
+/* Using global color variables from global.css */
 
 /* ── Page shell ──────────────────────────────────────────────────────────── */
 .footy-coin-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--coin-primary);
-  color: var(--coin-text-primary);
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: radial-gradient(circle at 50% 50%, var(--color-black-secondary) 0%, var(--color-black-primary) 100%);
+  color: var(--color-text-primary);
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   position: relative;
   overflow: hidden;
 }
@@ -30,76 +18,95 @@
   content: '';
   position: fixed;
   inset: 0;
-  background: linear-gradient(
-    135deg,
-    var(--coin-primary) 0%,
-    var(--coin-secondary) 25%,
-    var(--coin-tertiary) 50%,
-    var(--coin-secondary) 75%,
-    var(--coin-primary) 100%
-  );
-  animation: gradientShift 15s ease infinite;
-  z-index: -3;
+  background-image:
+    linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+  background-size: 50px 50px;
+  z-index: 0;
+  animation: gridFloat 40s linear infinite;
+  pointer-events: none;
 }
 
 .footy-coin-page::after {
   content: '';
   position: fixed;
   inset: 0;
-  background-image:
-    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-  z-index: -2;
-  animation: gridFloat 30s linear infinite;
+  background: radial-gradient(circle at 20% 50%, rgba(139, 92, 246, 0.1) 0%, transparent 40%),
+              radial-gradient(circle at 80% 80%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+              radial-gradient(circle at 50% 0%, rgba(255, 215, 0, 0.05) 0%, transparent 40%);
+  z-index: 0;
   pointer-events: none;
-}
-
-@keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-@keyframes gridFloat {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(40px); }
 }
 
 .coin-content {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 80px;
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-top: 16px;
   position: relative;
   z-index: 1;
 }
 
-.coin-content::before {
-  content: '';
-  position: fixed;
-  top: 10%;
-  left: 10%;
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, rgba(0, 212, 255, 0.08) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: float 20s ease-in-out infinite;
-  z-index: -1;
-  pointer-events: none;
+.coin-header {
+  margin-bottom: 24px;
+  animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.coin-content::after {
-  content: '';
-  position: fixed;
-  bottom: 15%;
-  right: 5%;
-  width: 250px;
-  height: 250px;
-  background: radial-gradient(circle, rgba(255, 215, 0, 0.06) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: float 25s ease-in-out infinite reverse;
-  z-index: -1;
-  pointer-events: none;
+.coin-header h1 {
+  font-size: 2rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--color-text-primary) 0%, var(--color-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+  letter-spacing: -1px;
 }
+
+.coin-header-subtitle {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.coin-balance-card {
+  background: linear-gradient(135deg, var(--color-black-secondary) 0%, var(--color-black-tertiary) 100%);
+  border: 2px solid rgba(255, 215, 0, 0.4);
+  border-radius: 12px;
+  padding: 24px 20px;
+  margin-bottom: 24px;
+  text-align: center;
+  box-shadow: 0 0 24px rgba(255, 215, 0, 0.15);
+  animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.coin-balance-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.coin-balance-amount {
+  font-size: 2.5rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--color-gold) 0%, #ffed4e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-family: 'Courier Prime', monospace;
+}
+
+.coin-icon {
+  font-size: 1.5rem;
+  margin-left: 8px;
+  animation: pulse-glow 1.5s infinite;
+}
+
 
 @keyframes float {
   0%, 100% { transform: translateY(0px) translateX(0px); }
