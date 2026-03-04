@@ -5,12 +5,13 @@ import { HomePage } from './pages/HomePage';
 import { LeaguePage } from './pages/LeaguePage';
 import { TournamentPage } from './pages/TournamentPage';
 import { FootyCoinPage } from './pages/FootyCoinPage';
+import { AdminPage } from './pages/AdminPage';
 import { Loading } from './components/Loading';
 import './styles/global.css';
 
 const AppContent: React.FC = () => {
   const { isLoading, isAuthenticated, error } = useAuth();
-  const [activeTab, setActiveTab] = useState<'home' | 'league' | 'tournament' | 'coins'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'league' | 'tournament' | 'coins' | 'admin'>('home');
 
   if (isLoading) {
     return <Loading message="Authenticating with Telegram..." fullScreen />;
@@ -47,6 +48,8 @@ const AppContent: React.FC = () => {
         return <TournamentPage />;
       case 'coins':
         return <FootyCoinPage />;
+      case 'admin':
+        return <AdminPage />;
       default:
         return <HomePage />;
     }

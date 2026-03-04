@@ -48,6 +48,73 @@ def create_quiz():
         return jsonify(format_error(str(e))), 500
 
 
+@admin_bp.route('/quizzes/bulk', methods=['POST'])
+def create_quiz_bulk():
+    """Create a new quiz with all questions and options (Admin only)"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required = ['name', 'total_questions', 'time_limit_seconds', 'total_points']
+        for field in required:
+            if field not in data:
+                return jsonify(format_error(f'Missing: {field}')), 400
+        
+        # Set expiration to 24 hours from now by default
+        expires_at = datetime.utcnow() + timedelta(hours=24)
+        if 'expires_at' in data and data['expires_at']:
+            # Handle ISO timestamp format coming from JS
+            expires_at_str = data['expires_at'].replace('Z', '+00:00')
+            expires_at = datetime.fromisoformat(expires_at_str)
+        
+        quiz = Quiz(
+            id=generate_id(),
+            name=data['name'],
+            description=data.get('description'),
+            total_questions=data['total_questions'],
+            time_limit_seconds=data['time_limit_seconds'],
+            points_per_question=data.get('points_per_question', 10),
+            total_points=data['total_points'],
+            cost_in_footy_coins=data.get('cost_in_footy_coins', 0),
+            is_active=True,
+            expires_at=expires_at
+        )
+
+        questions_data = data.get('questions', [])
+        for q_idx, q_data in enumerate(questions_data):
+            question = Question(
+                id=generate_id(),
+                question_text=q_data.get('question_text'),
+                order=q_idx,
+            )
+
+            options_data = q_data.get('options', [])
+            correct_option_index = q_data.get('correct_option_index', 0)
+
+            for o_idx, o_text in enumerate(options_data):
+                option = Option(
+                    id=generate_id(),
+                    option_text=o_text,
+                    order=o_idx,
+                )
+                question.options.append(option)
+                
+                if o_idx == correct_option_index:
+                    question.correct_option_id = option.id
+            
+            quiz.questions.append(question)
+            
+        quiz.save()
+        
+        return jsonify(format_success(
+            data=quiz.to_dict(),
+            message='Quiz created in bulk successfully'
+        )), 201
+    
+    except Exception as e:
+        return jsonify(format_error(str(e))), 500
+
+
 @admin_bp.route('/quizzes/<quiz_id>/questions', methods=['POST'])
 def add_question(quiz_id):
     """Add question to quiz"""

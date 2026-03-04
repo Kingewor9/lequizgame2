@@ -2,8 +2,8 @@ import React from 'react';
 import '../styles/components/Navigation.css';
 
 interface NavigationProps {
-  activeTab: 'home' | 'league' | 'tournament' | 'coins';
-  onTabChange: (tab: 'home' | 'league' | 'tournament' | 'coins') => void;
+  activeTab: 'home' | 'league' | 'tournament' | 'coins' | 'admin';
+  onTabChange: (tab: 'home' | 'league' | 'tournament' | 'coins' | 'admin') => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
@@ -43,6 +43,15 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
       >
         <span className="nav-icon">💰</span>
         <span className="nav-label">Coins</span>
+      </button>
+
+      <button
+        className={`nav-item ${activeTab === 'admin' ? 'active' : ''}`}
+        onClick={() => onTabChange('admin')}
+        title="Admin"
+      >
+        <span className="nav-icon">⚙️</span>
+        <span className="nav-label">Admin</span>
       </button>
     </nav>
   );
