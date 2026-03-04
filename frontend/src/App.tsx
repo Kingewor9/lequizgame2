@@ -10,7 +10,7 @@ import { Loading } from './components/Loading';
 import './styles/global.css';
 
 const AppContent: React.FC = () => {
-  const { isLoading, isAuthenticated, error } = useAuth();
+  const { isLoading, isAuthenticated, error, user } = useAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'league' | 'tournament' | 'coins' | 'admin'>('home');
 
   if (isLoading) {
@@ -49,7 +49,7 @@ const AppContent: React.FC = () => {
       case 'coins':
         return <FootyCoinPage />;
       case 'admin':
-        return <AdminPage />;
+        return user?.is_admin ? <AdminPage /> : <HomePage />;
       default:
         return <HomePage />;
     }
@@ -60,7 +60,7 @@ const AppContent: React.FC = () => {
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '90px' }} className="hide-scrollbar">
         {renderPage()}
       </div>
-      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <Navigation activeTab={activeTab} user={user} onTabChange={setActiveTab} />
     </div>
   );
 };

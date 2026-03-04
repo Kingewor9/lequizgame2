@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token
 from app.models import User
 from app.utils import generate_id, format_success, format_error
@@ -47,9 +47,14 @@ def telegram_login():
         # Generate JWT token
         access_token = create_access_token(identity=user.id)
         
+        
+        # Check if user is an admin
+        is_admin = telegram_id in current_app.config.get('ADMIN_TELEGRAM_IDS', [])
+        
         return jsonify(format_success(
             data={
                 **user.to_dict(),
+                'is_admin': is_admin,
                 'access_token': access_token
             },
             message='Login successful'

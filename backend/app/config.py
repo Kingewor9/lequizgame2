@@ -23,6 +23,9 @@ class Config:
     # Admin Configuration
     ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
     ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
+    ADMIN_TELEGRAM_IDS = [
+        int(x.strip()) for x in os.getenv('ADMIN_TELEGRAM_IDS', '').split(',') if x.strip()
+    ]
 
 class DevelopmentConfig(Config):
     """Development configuration"""

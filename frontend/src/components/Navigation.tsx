@@ -1,12 +1,15 @@
 import React from 'react';
 import '../styles/components/Navigation.css';
 
+import { User } from '../types';
+
 interface NavigationProps {
   activeTab: 'home' | 'league' | 'tournament' | 'coins' | 'admin';
+  user: User | null;
   onTabChange: (tab: 'home' | 'league' | 'tournament' | 'coins' | 'admin') => void;
 }
 
-export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
+export const Navigation: React.FC<NavigationProps> = ({ activeTab, user, onTabChange }) => {
   return (
     <nav className="bottom-nav">
       <button
@@ -45,14 +48,16 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
         <span className="nav-label">Coins</span>
       </button>
 
-      <button
-        className={`nav-item ${activeTab === 'admin' ? 'active' : ''}`}
-        onClick={() => onTabChange('admin')}
-        title="Admin"
-      >
-        <span className="nav-icon">⚙️</span>
-        <span className="nav-label">Admin</span>
-      </button>
+      {user?.is_admin && (
+        <button
+          className={`nav-item ${activeTab === 'admin' ? 'active' : ''}`}
+          onClick={() => onTabChange('admin')}
+          title="Admin"
+        >
+          <span className="nav-icon">⚙️</span>
+          <span className="nav-label">Admin</span>
+        </button>
+      )}
     </nav>
   );
 };

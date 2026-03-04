@@ -1,14 +1,30 @@
-from flask import Blueprint, request, jsonify
-from app.models import Quiz, Question, Option, FootyCoinTask
+from flask import Blueprint, request, jsonify, current_app
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.models import Quiz, Question, Option, FootyCoinTask, User
 from app.utils import generate_id, format_success, format_error
 from datetime import datetime, timedelta
+from functools import wraps
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
-# Note: In production, add proper authentication middleware to verify admin access
-
-
+def admin_required(fn):
+    @wraps(fn)
+    @jwt_required()
+    def wrapper(*args, **kwargs):
+        current_user_id = get_jwt_identity()
+        user = User.objects(id=current_user_id).first()
+        
+        if not user:
+            return jsonify(format_error('User not found')), 404
+            
+        admin_ids = current_app.config.get('ADMIN_TELEGRAM_IDS', [])
+        if user.telegram_id not in admin_ids:
+            return jsonify(format_error('Admin privileges required')), 403
+            
+        return fn(*args, **kwargs)
+    return wrapper
 @admin_bp.route('/quizzes', methods=['POST'])
+@admin_required
 def create_quiz():
     """Create a new quiz (Admin only)"""
     try:
@@ -49,6 +65,7 @@ def create_quiz():
 
 
 @admin_bp.route('/quizzes/bulk', methods=['POST'])
+@admin_required
 def create_quiz_bulk():
     """Create a new quiz with all questions and options (Admin only)"""
     try:
@@ -116,6 +133,7 @@ def create_quiz_bulk():
 
 
 @admin_bp.route('/quizzes/<quiz_id>/questions', methods=['POST'])
+@admin_required
 def add_question(quiz_id):
     """Add question to quiz"""
     try:
@@ -144,6 +162,7 @@ def add_question(quiz_id):
 
 
 @admin_bp.route('/questions/<question_id>/options', methods=['POST'])
+@admin_required
 def add_option(question_id):
     """Add option to question"""
     try:
@@ -188,6 +207,7 @@ def add_option(question_id):
 
 
 @admin_bp.route('/quizzes/<quiz_id>', methods=['PUT'])
+@admin_required
 def update_quiz(quiz_id):
     """Update quiz"""
     try:
@@ -220,6 +240,7 @@ def update_quiz(quiz_id):
 
 
 @admin_bp.route('/quizzes/<quiz_id>', methods=['DELETE'])
+@admin_required
 def delete_quiz(quiz_id):
     """Delete quiz"""
     try:
@@ -236,6 +257,7 @@ def delete_quiz(quiz_id):
 
 
 @admin_bp.route('/tasks', methods=['GET'])
+@admin_required
 def get_all_tasks():
     """Get all footy coin tasks"""
     try:
@@ -249,6 +271,7 @@ def get_all_tasks():
 
 
 @admin_bp.route('/tasks/<task_id>', methods=['PUT'])
+@admin_required
 def update_task(task_id):
     """Update footy coin task"""
     try:

@@ -34,6 +34,7 @@ export interface User {
   footy_coins: number;
   created_at: string;
   updated_at: string;
+  is_admin?: boolean;
 }
 
 // Quiz Data

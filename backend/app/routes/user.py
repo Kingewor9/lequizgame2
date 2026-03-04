@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models import User, FootyCoinTransaction
 from app.utils import generate_id, format_success, format_error, calculate_global_rank
@@ -17,10 +17,13 @@ def get_global_leaderboard():
         
         leaderboard = []
         for idx, u in enumerate(users, 1):
+            u_dict = u.to_dict()
+            u_dict['is_admin'] = u.telegram_id in current_app.config.get('ADMIN_TELEGRAM_IDS', [])
+            
             leaderboard.append({
                 'rank': idx,
                 'prev_rank': getattr(u, 'prev_global_rank', idx),
-                'user': u.to_dict(),
+                'user': u_dict,
                 'score': u.overall_score
             })
         
@@ -46,7 +49,10 @@ def get_user(user_id):
         user.global_total_players = total
         user.save()
         
-        return jsonify(format_success(data=user.to_dict())), 200
+        user_dict = user.to_dict()
+        user_dict['is_admin'] = user.telegram_id in current_app.config.get('ADMIN_TELEGRAM_IDS', [])
+        
+        return jsonify(format_success(data=user_dict)), 200
     
     except Exception as e:
         return jsonify(format_error(f'Error fetching user: {str(e)}')), 500
@@ -108,9 +114,12 @@ def get_leaderboard(user_id):
         
         leaderboard = []
         for idx, u in enumerate(users, 1):
+            u_dict = u.to_dict()
+            u_dict['is_admin'] = u.telegram_id in current_app.config.get('ADMIN_TELEGRAM_IDS', [])
+            
             leaderboard.append({
                 'rank': idx,
-                'user': u.to_dict(),
+                'user': u_dict,
                 'score': u.overall_score
             })
         
