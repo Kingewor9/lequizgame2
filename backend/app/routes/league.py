@@ -18,6 +18,8 @@ def user_league_dict(ul, league):
         'is_private': league.is_private or False,
         'code': (league.code if league.code else None) if ul.is_owner else None,  # only expose code to owner
         'total_members': league.total_members or 1,
+        'start_date': league.start_date.isoformat() if league.start_date else None,
+        'end_date': league.end_date.isoformat() if league.end_date else None,
         'rank': ul.rank or 0,
         'points': ul.points or 0,
         'is_owner': ul.is_owner or False,
@@ -174,6 +176,11 @@ def join_private_league():
         if not league:
             return jsonify(format_error('No league found with that code')), 404
 
+        now = datetime.utcnow()
+        if league.start_date and league.end_date:
+            if league.start_date <= now < league.end_date:
+                return jsonify(format_error('Cannot join an active league. You can only join before it starts or after it ends.')), 400
+
         existing = UserLeague.objects(user_id=user_id, league_id=league.id).first()
         if existing:
             return jsonify(format_error('You are already a member of this league')), 400
@@ -213,6 +220,11 @@ def join_public_league(league_id):
 
         if league.is_private:
             return jsonify(format_error('This is a private league. Use a code to join.')), 400
+
+        now = datetime.utcnow()
+        if league.start_date and league.end_date:
+            if league.start_date <= now < league.end_date:
+                return jsonify(format_error('Cannot join an active league. You can only join before it starts or after it ends.')), 400
 
         existing = UserLeague.objects(user_id=user_id, league_id=league.id).first()
         if existing:

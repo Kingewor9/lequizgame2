@@ -98,6 +98,10 @@ export interface League {
   code?: string;
   creator_id: string;
   total_members: number;
+  total_game_weeks?: number;
+  current_game_week?: number;
+  start_date?: string;
+  end_date?: string;
   created_at: string;
   updated_at: string;
 }
@@ -111,6 +115,13 @@ export interface UserLeague {
   points: number;
   is_owner: boolean;
   joined_at: string;
+  name?: string;
+  description?: string;
+  is_private?: boolean;
+  code?: string;
+  total_members?: number;
+  start_date?: string;
+  end_date?: string;
 }
 
 export interface LeagueRanking {

@@ -72,6 +72,31 @@
   color: var(--bg-obsidian);
 }
 
+.league-badges-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.badge-active {
+  background-color: var(--volt-yellow);
+  color: var(--bg-obsidian);
+  box-shadow: 0 0 8px var(--volt-yellow-glow);
+}
+
+.badge-ended {
+  background-color: var(--electric-pink);
+  color: #fff;
+  box-shadow: 0 0 8px var(--electric-pink-glow);
+}
+
+.badge-inactive {
+  background-color: var(--surface-highest);
+  color: var(--text-primary);
+  border: 1px solid var(--text-secondary);
+}
+
 .league-stats,
 .league-info {
   margin-bottom: 20px;
@@ -130,4 +155,33 @@
   .league-card {
     padding: 16px;
   }
+}
+
+/* Title + status badge side by side on public league cards */
+.public-league-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.public-league-title-row h4 {
+  margin: 0;
+}
+
+/* league-meta row on public cards (members + status) */
+.league-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.starts-at {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }

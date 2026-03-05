@@ -129,7 +129,6 @@ export const LeaguePage: React.FC = () => {
         setAlert({ message: 'League created successfully!', type: 'success' });
         setShowCreateModal(false);
         resetCreateForm();
-        // Refresh leagues from backend to ensure newly created league persists
         await refreshLeagues();
       } else {
         setAlert({ message: response.error || 'Failed to create league', type: 'error' });
@@ -150,7 +149,6 @@ export const LeaguePage: React.FC = () => {
         setAlert({ message: 'Joined league successfully!', type: 'success' });
         setShowJoinModal(false);
         setJoinCode('');
-        // Refresh leagues from backend to ensure joined league persists
         await refreshLeagues();
       } else {
         setAlert({ message: response.error || 'Failed to join league', type: 'error' });
@@ -165,7 +163,6 @@ export const LeaguePage: React.FC = () => {
       const response = await apiService.post(`/leagues/${leagueId}/join-public`, {});
       if (response.success && response.data) {
         setAlert({ message: 'Joined league successfully!', type: 'success' });
-        // Refresh leagues from backend to ensure joined league persists
         await refreshLeagues();
       } else {
         setAlert({ message: response.error || 'Failed to join league', type: 'error' });
@@ -281,21 +278,55 @@ export const LeaguePage: React.FC = () => {
 
           {joinableLeagues.length > 0 ? (
             <div className="public-leagues-list">
-              {joinableLeagues.map((league) => (
-                <div key={league.id} className="public-league-card card">
-                  <div className="league-info">
-                    <h4>{league.name}</h4>
-                    {league.description && <p className="description">{league.description}</p>}
-                    <span className="member-count">👥 {league.total_members} members</span>
+              {joinableLeagues.map((league) => {
+                // Inline status logic — same pattern as LeagueCard.tsx
+                const getStatus = () => {
+                  if (!league.start_date || !league.end_date) return null;
+                  const start = new Date(league.start_date);
+                  const end = new Date(league.end_date);
+                  const now = new Date();
+                  if (now < start) {
+                    const diffMs = start.getTime() - now.getTime();
+                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                    const diffMins = Math.floor(diffMs / (1000 * 60));
+                    if (diffDays > 0) return { label: `Starts in ${diffDays}d`, status: 'inactive' };
+                    if (diffHours > 0) return { label: `Starts in ${diffHours}h`, status: 'inactive' };
+                    if (diffMins > 0) return { label: `Starts in ${diffMins}m`, status: 'inactive' };
+                    return { label: 'Starts soon', status: 'inactive' };
+                  }
+                  if (now >= start && now < end) return { label: 'Active', status: 'active' };
+                  return { label: 'Ended', status: 'ended' };
+                };
+                const statusInfo = getStatus();
+
+                return (
+                  <div key={league.id} className="public-league-card card">
+                    <div className="league-info">
+                      <div className="public-league-title-row">
+                        <h4>{league.name}</h4>
+                        {statusInfo && (
+                          <span className={`badge badge-${statusInfo.status}`}>
+                            {statusInfo.label}
+                          </span>
+                        )}
+                      </div>
+                      {league.description && (
+                        <p className="description">{league.description}</p>
+                      )}
+                      <div className="league-meta">
+                        <span className="member-count">👥 {league.total_members} Members</span>
+                      </div>
+                    </div>
+                    <button
+                      className="btn-primary btn-sm"
+                      onClick={() => handleJoinPublicLeague(league.id)}
+                    >
+                      Join League
+                    </button>
                   </div>
-                  <button
-                    className="btn-primary btn-sm"
-                    onClick={() => handleJoinPublicLeague(league.id)}
-                  >
-                    Join
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="no-leagues-text">
@@ -337,7 +368,6 @@ export const LeaguePage: React.FC = () => {
             />
           </div>
 
-          {/* Number of Weeks */}
           <div className="form-group">
             <label htmlFor="total-weeks">Number of Weeks</label>
             <select
@@ -354,7 +384,6 @@ export const LeaguePage: React.FC = () => {
             </select>
           </div>
 
-          {/* Start Date */}
           <div className="form-group">
             <label htmlFor="start-date">Start Date *</label>
             <input
@@ -367,7 +396,6 @@ export const LeaguePage: React.FC = () => {
             />
           </div>
 
-          {/* Auto End Date — read only */}
           <div className="form-group">
             <label>End Date</label>
             <div className={`end-date-display ${endDate ? 'end-date-display--set' : ''}`}>
