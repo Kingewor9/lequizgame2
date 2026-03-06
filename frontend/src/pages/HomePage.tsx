@@ -31,14 +31,17 @@ export const HomePage: React.FC = () => {
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizResults, setQuizResults] = useState<QuizResponse | null>(null);
 
-  // ── Fetch today's quiz ────────────────────────────────────────────────────
+  // ── Fetch today's quiz + refresh user rank in one go ─────────────────────
   useEffect(() => {
     const fetchQuiz = async () => {
       try {
         setQuizLoading(true);
-        const response = await apiService.get('/quizzes/today');
-        if (response.success && response.data) {
-          setQuiz(response.data as Quiz);
+        const [quizRes] = await Promise.all([
+          apiService.get('/quizzes/today'),
+          refreshUser(),   // runs in parallel — no re-render race condition
+        ]);
+        if (quizRes.success && quizRes.data) {
+          setQuiz(quizRes.data as Quiz);
         }
       } catch (error) {
         console.error('Error fetching quiz:', error);
@@ -46,12 +49,8 @@ export const HomePage: React.FC = () => {
         setQuizLoading(false);
       }
     };
-    fetchQuiz();
-  }, []);
 
-  // ── Refresh user on mount so rank/total always reflects latest DB values ──
-  useEffect(() => {
-    refreshUser();
+    fetchQuiz();
   }, []);
 
   // ── Quiz timer ────────────────────────────────────────────────────────────
