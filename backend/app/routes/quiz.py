@@ -104,6 +104,9 @@ def submit_quiz(quiz_id):
         answers = data.get('answers', [])
         time_taken_seconds = data.get('time_taken_seconds', 0)
         
+        print(f"[DEBUG submit_quiz] Received answers: {answers}")
+        print(f"[DEBUG submit_quiz] Received time_taken_seconds: {time_taken_seconds}")
+        
         # ── Validate answers against quiz questions ────────────────────────────
         quiz_answers = []
         correct_count = 0
@@ -129,6 +132,7 @@ def submit_quiz(quiz_id):
             
             # Validate the answer
             is_correct = (selected_option_id == question.correct_option_id)
+            print(f"[DEBUG] Question {question_id}: selected={selected_option_id}, correct={question.correct_option_id}, is_correct={is_correct}")
             if is_correct:
                 correct_count += 1
             
@@ -139,11 +143,14 @@ def submit_quiz(quiz_id):
             ))
         
         total_count = len(answers)
+        print(f"[DEBUG] Total answers: {total_count}, Correct: {correct_count}")
         accuracy = calculate_quiz_accuracy(correct_count, total_count)
         
         # Calculate points
         points_per_question = quiz.total_points / quiz.total_questions
         points_earned = int(correct_count * points_per_question)
+        print(f"[DEBUG] Points: {points_per_question} per question, {points_earned} total")
+        
         
         # Save quiz response
         response = QuizResponse(
@@ -177,9 +184,11 @@ def submit_quiz(quiz_id):
         # ── Recalculate ALL users' global ranks so homepage shows live data ──
         update_global_rankings()
 
+        result_dict = response.to_dict()
+        print(f"[DEBUG] Returning result: {result_dict}")
         
         return jsonify(format_success(
-            data=response.to_dict(),
+            data=result_dict,
             message='Quiz submitted successfully'
         )), 200
     

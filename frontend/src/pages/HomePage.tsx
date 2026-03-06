@@ -143,18 +143,23 @@ export const HomePage: React.FC = () => {
       isCorrect 
     });
 
-    setAnswers((prev) => [
-      ...prev,
-      { questionId: currentQuestion.id, answerId: optionId, isCorrect },
-    ]);
+    // Create the new answer object
+    const newAnswer = { questionId: currentQuestion.id, answerId: optionId, isCorrect };
+    
+    // Update answers state
+    const updatedAnswers = [...answers, newAnswer];
+    setAnswers(updatedAnswers);
 
     setTimeout(() => {
-      if (currentQuestionIndex < (currentQuiz.questions?.length || 0) - 1) {
+      const isLastQuestion = currentQuestionIndex >= (currentQuiz.questions?.length || 0) - 1;
+      
+      if (!isLastQuestion) {
         setCurrentQuestionIndex((prev) => prev + 1);
         setSelectedAnswer(null);
         setIsAnswered(false);
       } else {
-        handleQuizComplete();
+        // Pass the updated answers directly instead of relying on state
+        handleQuizComplete(updatedAnswers);
       }
     }, 1500);
   };
@@ -163,19 +168,24 @@ export const HomePage: React.FC = () => {
     if (navigator.vibrate) navigator.vibrate(pattern);
   };
 
-  const handleQuizComplete = async () => {
+  const handleQuizComplete = async (completionAnswers?: Array<{ questionId: string; answerId: string; isCorrect: boolean }>) => {
     if (!currentQuiz || !user) return;
 
-    console.log('[Quiz Complete] answers:', answers);
+    // Use passed answers or fall back to state (for when called directly)
+    const answersToSubmit = completionAnswers || answers;
+    
+    console.log('[Quiz Complete] answers:', answersToSubmit);
+    console.log('[Quiz Complete] total_questions:', currentQuiz.total_questions);
     
     // Create submission payload - backend will recalculate is_correct
-    const submissionAnswers = answers.map((a) => ({
+    const submissionAnswers = answersToSubmit.map((a) => ({
       question_id: a.questionId,
       selected_option_id: a.answerId,
       // Note: backend will validate the answer, not trust is_correct from frontend
     }));
 
     console.log('[Quiz Complete] Submitting:', submissionAnswers);
+    console.log('[Quiz Complete] Time taken:', currentQuiz.time_limit_seconds - timeRemaining);
 
     try {
       const submitResponse = await apiService.post(`/quizzes/${currentQuiz.id}/submit`, {
@@ -187,6 +197,7 @@ export const HomePage: React.FC = () => {
 
       if (submitResponse.success && submitResponse.data) {
         // Use backend's validated results
+        console.log('[Quiz Complete] Results:', submitResponse.data);
         setQuizResults(submitResponse.data as QuizResponse);
         // Mark as already played in local state so card updates immediately
         setQuizzes((prev) => prev.map((q) => 
@@ -196,9 +207,11 @@ export const HomePage: React.FC = () => {
         await refreshUser();
       } else {
         console.error('[Quiz Complete] Submission failed:', submitResponse.error);
+        setAlert({ message: 'Failed to submit quiz. Please try again.', type: 'error' });
       }
     } catch (error) {
       console.error('Error submitting quiz:', error);
+      setAlert({ message: 'Error submitting quiz', type: 'error' });
     }
   };
 
