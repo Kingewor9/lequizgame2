@@ -104,24 +104,46 @@ def submit_quiz(quiz_id):
         answers = data.get('answers', [])
         time_taken_seconds = data.get('time_taken_seconds', 0)
         
-        # Calculate results
-        correct_count = sum(1 for a in answers if a.get('is_correct'))
+        # ── Validate answers against quiz questions ────────────────────────────
+        quiz_answers = []
+        correct_count = 0
+        
+        for answer_data in answers:
+            question_id = answer_data.get('question_id')
+            selected_option_id = answer_data.get('selected_option_id')
+            
+            if not question_id or not selected_option_id:
+                return jsonify(format_error('Missing question_id or selected_option_id')), 400
+            
+            # Find question in quiz
+            question = None
+            for q in quiz.questions:
+                if q.id == question_id:
+                    question = q
+                    break
+            
+            if not question:
+                print(f"[DEBUG] Question {question_id} not found in quiz {quiz_id}")
+                print(f"[DEBUG] Available questions: {[q.id for q in quiz.questions]}")
+                return jsonify(format_error(f'Question not found in this quiz')), 400
+            
+            # Validate the answer
+            is_correct = (selected_option_id == question.correct_option_id)
+            if is_correct:
+                correct_count += 1
+            
+            quiz_answers.append(QuizAnswer(
+                question_id=question_id,
+                selected_option_id=selected_option_id,
+                is_correct=is_correct
+            ))
+        
         total_count = len(answers)
         accuracy = calculate_quiz_accuracy(correct_count, total_count)
         
         # Calculate points
         points_per_question = quiz.total_points / quiz.total_questions
         points_earned = int(correct_count * points_per_question)
-        
-        # Create answer objects
-        quiz_answers = [
-            QuizAnswer(
-                question_id=a.get('question_id'),
-                selected_option_id=a.get('selected_option_id'),
-                is_correct=a.get('is_correct')
-            )
-            for a in answers
-        ]
         
         # Save quiz response
         response = QuizResponse(

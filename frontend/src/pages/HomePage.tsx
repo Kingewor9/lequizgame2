@@ -136,6 +136,13 @@ export const HomePage: React.FC = () => {
       triggerVibration([100, 50, 100]);
     }
 
+    console.log('[Quiz] Selected option:', { 
+      questionId: currentQuestion.id, 
+      selectedOptionId: optionId, 
+      correctOptionId: currentQuestion.correct_option_id, 
+      isCorrect 
+    });
+
     setAnswers((prev) => [
       ...prev,
       { questionId: currentQuestion.id, answerId: optionId, isCorrect },
@@ -159,43 +166,36 @@ export const HomePage: React.FC = () => {
   const handleQuizComplete = async () => {
     if (!currentQuiz || !user) return;
 
-    const correctAnswers = answers.filter((a) => a.isCorrect).length;
-    const pointsPerQuestion = currentQuiz.total_points / currentQuiz.total_questions;
-    const pointsEarned = correctAnswers * pointsPerQuestion;
-    const accuracy = Math.round((correctAnswers / answers.length) * 100);
+    console.log('[Quiz Complete] answers:', answers);
+    
+    // Create submission payload - backend will recalculate is_correct
+    const submissionAnswers = answers.map((a) => ({
+      question_id: a.questionId,
+      selected_option_id: a.answerId,
+      // Note: backend will validate the answer, not trust is_correct from frontend
+    }));
 
-    const result: QuizResponse = {
-      id: '',
-      user_id: user.id,
-      quiz_id: currentQuiz.id,
-      answers: answers.map((a) => ({
-        question_id: a.questionId,
-        selected_option_id: a.answerId,
-        is_correct: a.isCorrect,
-      })),
-      total_questions: currentQuiz.total_questions,
-      correct_answers: correctAnswers,
-      incorrect_answers: answers.length - correctAnswers,
-      points_earned: Math.round(pointsEarned),
-      accuracy_rate: accuracy,
-      completed_at: new Date().toISOString(),
-      time_taken_seconds: currentQuiz.time_limit_seconds - timeRemaining,
-    };
+    console.log('[Quiz Complete] Submitting:', submissionAnswers);
 
     try {
       const submitResponse = await apiService.post(`/quizzes/${currentQuiz.id}/submit`, {
-        answers: result.answers,
-        time_taken_seconds: result.time_taken_seconds,
+        answers: submissionAnswers,
+        time_taken_seconds: currentQuiz.time_limit_seconds - timeRemaining,
       });
 
-      if (submitResponse.success) {
-        setQuizResults(result);
+      console.log('[Quiz Complete] Backend response:', submitResponse);
+
+      if (submitResponse.success && submitResponse.data) {
+        // Use backend's validated results
+        setQuizResults(submitResponse.data as QuizResponse);
         // Mark as already played in local state so card updates immediately
         setQuizzes((prev) => prev.map((q) => 
           q.id === currentQuiz.id ? { ...q, already_played: true } : q
         ));
         // Refresh user so rank/total on homepage reflects new submission
         await refreshUser();
+      } else {
+        console.error('[Quiz Complete] Submission failed:', submitResponse.error);
       }
     } catch (error) {
       console.error('Error submitting quiz:', error);
