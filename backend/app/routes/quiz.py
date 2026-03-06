@@ -50,6 +50,8 @@ def get_today_quiz():
             'total_points': quiz.total_points,
             'cost_in_footy_coins': quiz.cost_in_footy_coins,
             'expires_at': quiz.expires_at.isoformat(),
+            'created_at': quiz.created_at.isoformat(),
+            'already_played': already_played,
         })), 200
     
     except Exception as e:
