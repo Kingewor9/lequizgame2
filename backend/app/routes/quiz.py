@@ -24,35 +24,39 @@ def update_global_rankings():
 @quiz_bp.route('/today', methods=['GET'])
 @jwt_required()
 def get_today_quiz():
-    """Get today's quiz"""
+    """Get all active quizzes (not expired)"""
     try:
         user_id = get_jwt_identity() 
         now = datetime.utcnow()
         
-        # Get quiz that expires in the future (today's quiz)
-        quiz = Quiz.objects(expires_at__gt=now, is_active=True).first()
+        # Get all quizzes that expire in the future (today's quizzes)
+        quizzes = list(Quiz.objects(expires_at__gt=now, is_active=True).order_by('-created_at'))
         
-        if not quiz:
-            return jsonify(format_success(data=None, message='No quiz available')), 200
+        if not quizzes:
+            return jsonify(format_success(data=[], message='No quizzes available')), 200
         
-        # Check if this user has already submitted a response for this quiz
-        already_played = QuizResponse.objects(
-            user_id=user_id, quiz_id=quiz.id
-        ).first() is not None
-
-        return jsonify(format_success(data={
-            'id': quiz.id,
-            'name': quiz.name,
-            'description': quiz.description,
-            'total_questions': quiz.total_questions,
-            'time_limit_seconds': quiz.time_limit_seconds,
-            'points_per_question': quiz.points_per_question,
-            'total_points': quiz.total_points,
-            'cost_in_footy_coins': quiz.cost_in_footy_coins,
-            'expires_at': quiz.expires_at.isoformat() + 'Z',
-            'created_at': quiz.created_at.isoformat() + 'Z',
-            'already_played': already_played,
-        })), 200
+        quizzes_data = []
+        for quiz in quizzes:
+            # Check if this user has already submitted a response for this quiz
+            already_played = QuizResponse.objects(
+                user_id=user_id, quiz_id=quiz.id
+            ).first() is not None
+            
+            quizzes_data.append({
+                'id': quiz.id,
+                'name': quiz.name,
+                'description': quiz.description,
+                'total_questions': quiz.total_questions,
+                'time_limit_seconds': quiz.time_limit_seconds,
+                'points_per_question': quiz.points_per_question,
+                'total_points': quiz.total_points,
+                'cost_in_footy_coins': quiz.cost_in_footy_coins,
+                'expires_at': quiz.expires_at.isoformat() + 'Z',
+                'created_at': quiz.created_at.isoformat() + 'Z',
+                'already_played': already_played,
+            })
+        
+        return jsonify(format_success(data=quizzes_data)), 200
     
     except Exception as e:
         return jsonify(format_error(f'Error fetching quiz: {str(e)}')), 500

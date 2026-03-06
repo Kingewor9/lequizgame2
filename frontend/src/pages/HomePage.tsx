@@ -13,7 +13,8 @@ import '../styles/pages/HomePage.css';
 
 export const HomePage: React.FC = () => {
   const { user, telegramUser, refreshUser } = useAuth();
-  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
   const [isQuizLoading, setIsQuizLoading] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [quizLoading, setQuizLoading] = useState(true);
@@ -31,23 +32,24 @@ export const HomePage: React.FC = () => {
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizResults, setQuizResults] = useState<QuizResponse | null>(null);
 
-  // ── Fetch today's quiz ────────────────────────────────────────────────────
+  // ── Fetch today's quizzes ────────────────────────────────────────────────────
   useEffect(() => {
-    const fetchQuiz = async () => {
+    const fetchQuizzes = async () => {
       try {
         setQuizLoading(true);
         const response = await apiService.get('/quizzes/today');
         if (response.success && response.data) {
-          setQuiz(response.data as Quiz);
+          const quizzesData = Array.isArray(response.data) ? response.data : [response.data];
+          setQuizzes(quizzesData as Quiz[]);
         }
       } catch (error) {
-        console.error('Error fetching quiz:', error);
+        console.error('Error fetching quizzes:', error);
       } finally {
         setQuizLoading(false);
       }
     };
 
-    fetchQuiz();
+    fetchQuizzes();
 
     // Refresh user rank separately — failure must never affect quiz display
     refreshUser().catch((e) => console.error('refreshUser error:', e));
@@ -55,7 +57,7 @@ export const HomePage: React.FC = () => {
 
   // ── Quiz timer ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!quizStarted || !quiz) return;
+    if (!quizStarted || !currentQuiz) return;
     if (timeRemaining <= 0) {
       handleQuizTimeout();
       return;
@@ -64,23 +66,23 @@ export const HomePage: React.FC = () => {
       setTimeRemaining((prev) => prev - 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [quizStarted, timeRemaining, quiz]);
+  }, [quizStarted, timeRemaining, currentQuiz]);
 
-  const handleStartQuiz = async () => {
-    if (!quiz || !user) return;
+  const handleStartQuiz = async (selectedQuiz: Quiz) => {
+    if (!selectedQuiz || !user) return;
 
     // ── Block replay on the frontend ─────────────────────────────────────
-    if (quiz.already_played) {
+    if (selectedQuiz.already_played) {
       setAlert({
-        message: "You've already completed today's quiz. Come back tomorrow!",
+        message: "You've already completed this quiz. Come back later!",
         type: 'warning',
       });
       return;
     }
 
-    if (user.footy_coins < quiz.cost_in_footy_coins) {
+    if (user.footy_coins < selectedQuiz.cost_in_footy_coins) {
       setAlert({
-        message: `You need ${quiz.cost_in_footy_coins} Footy Coins to play this quiz. Watch ads to earn more coins!`,
+        message: `You need ${selectedQuiz.cost_in_footy_coins} Footy Coins to play this quiz. Watch ads to earn more coins!`,
         type: 'error',
       });
       return;
@@ -90,8 +92,8 @@ export const HomePage: React.FC = () => {
       setIsQuizLoading(true);
 
       const deductResponse = await apiService.post('/users/spend-coins', {
-        amount: quiz.cost_in_footy_coins,
-        reason: `Quiz: ${quiz.name}`,
+        amount: selectedQuiz.cost_in_footy_coins,
+        reason: `Quiz: ${selectedQuiz.name}`,
       });
 
       if (!deductResponse.success) {
@@ -99,15 +101,15 @@ export const HomePage: React.FC = () => {
         return;
       }
 
-      const quizResponse = await apiService.get(`/quizzes/${quiz.id}`);
+      const quizResponse = await apiService.get(`/quizzes/${selectedQuiz.id}`);
       if (quizResponse.success && quizResponse.data) {
-        setQuiz(quizResponse.data as Quiz);
+        setCurrentQuiz(quizResponse.data as Quiz);
         setQuizStarted(true);
         setCurrentQuestionIndex(0);
         setAnswers([]);
         setSelectedAnswer(null);
         setIsAnswered(false);
-        setTimeRemaining(quiz.time_limit_seconds);
+        setTimeRemaining(selectedQuiz.time_limit_seconds);
         setShowQuizModal(true);
         await refreshUser();
       }
@@ -120,9 +122,9 @@ export const HomePage: React.FC = () => {
   };
 
   const handleOptionSelect = async (optionId: string) => {
-    if (!quiz || !quiz.questions) return;
+    if (!currentQuiz || !currentQuiz.questions) return;
 
-    const currentQuestion = quiz.questions[currentQuestionIndex];
+    const currentQuestion = currentQuiz.questions[currentQuestionIndex];
     const isCorrect = optionId === currentQuestion.correct_option_id;
 
     setSelectedAnswer(optionId);
@@ -140,7 +142,7 @@ export const HomePage: React.FC = () => {
     ]);
 
     setTimeout(() => {
-      if (currentQuestionIndex < (quiz.questions?.length || 0) - 1) {
+      if (currentQuestionIndex < (currentQuiz.questions?.length || 0) - 1) {
         setCurrentQuestionIndex((prev) => prev + 1);
         setSelectedAnswer(null);
         setIsAnswered(false);
@@ -155,33 +157,33 @@ export const HomePage: React.FC = () => {
   };
 
   const handleQuizComplete = async () => {
-    if (!quiz || !user) return;
+    if (!currentQuiz || !user) return;
 
     const correctAnswers = answers.filter((a) => a.isCorrect).length;
-    const pointsPerQuestion = quiz.total_points / quiz.total_questions;
+    const pointsPerQuestion = currentQuiz.total_points / currentQuiz.total_questions;
     const pointsEarned = correctAnswers * pointsPerQuestion;
     const accuracy = Math.round((correctAnswers / answers.length) * 100);
 
     const result: QuizResponse = {
       id: '',
       user_id: user.id,
-      quiz_id: quiz.id,
+      quiz_id: currentQuiz.id,
       answers: answers.map((a) => ({
         question_id: a.questionId,
         selected_option_id: a.answerId,
         is_correct: a.isCorrect,
       })),
-      total_questions: quiz.total_questions,
+      total_questions: currentQuiz.total_questions,
       correct_answers: correctAnswers,
       incorrect_answers: answers.length - correctAnswers,
       points_earned: Math.round(pointsEarned),
       accuracy_rate: accuracy,
       completed_at: new Date().toISOString(),
-      time_taken_seconds: quiz.time_limit_seconds - timeRemaining,
+      time_taken_seconds: currentQuiz.time_limit_seconds - timeRemaining,
     };
 
     try {
-      const submitResponse = await apiService.post(`/quizzes/${quiz.id}/submit`, {
+      const submitResponse = await apiService.post(`/quizzes/${currentQuiz.id}/submit`, {
         answers: result.answers,
         time_taken_seconds: result.time_taken_seconds,
       });
@@ -189,7 +191,9 @@ export const HomePage: React.FC = () => {
       if (submitResponse.success) {
         setQuizResults(result);
         // Mark as already played in local state so card updates immediately
-        setQuiz((prev) => prev ? { ...prev, already_played: true } : prev);
+        setQuizzes((prev) => prev.map((q) => 
+          q.id === currentQuiz.id ? { ...q, already_played: true } : q
+        ));
         // Refresh user so rank/total on homepage reflects new submission
         await refreshUser();
       }
@@ -236,8 +240,12 @@ export const HomePage: React.FC = () => {
         {/* Today's Quiz Section */}
         <section className="quiz-section">
           <h2>Today's Quiz</h2>
-          {quiz ? (
-            <QuizCard quiz={quiz} onStartClick={handleStartQuiz} isLoading={isQuizLoading} />
+          {quizzes.length > 0 ? (
+            <div>
+              {quizzes.map((q) => (
+                <QuizCard key={q.id} quiz={q} onStartClick={handleStartQuiz} isLoading={isQuizLoading} />
+              ))}
+            </div>
           ) : (
             <div className="no-quiz-message">
               <p>No Quiz Yet, Check back later</p>
@@ -276,10 +284,10 @@ export const HomePage: React.FC = () => {
       <Modal
         isOpen={showQuizModal}
         onClose={handleCloseQuizModal}
-        title={quizResults ? 'Quiz Results' : quiz?.name || 'Quiz'}
+        title={quizResults ? 'Quiz Results' : currentQuiz?.name || 'Quiz'}
         closeButton={!quizStarted || !!quizResults}
       >
-        {!quizResults && quizStarted && quiz?.questions && (
+        {!quizResults && quizStarted && currentQuiz?.questions && (
           <div className="quiz-container">
             <div className="quiz-timer">
               <span className={timeRemaining < 30 ? 'timer-warning' : ''}>
@@ -287,9 +295,9 @@ export const HomePage: React.FC = () => {
               </span>
             </div>
             <QuizQuestion
-              question={quiz.questions[currentQuestionIndex]}
+              question={currentQuiz.questions[currentQuestionIndex]}
               currentIndex={currentQuestionIndex}
-              totalQuestions={quiz.questions.length}
+              totalQuestions={currentQuiz.questions.length}
               selectedOptionId={selectedAnswer}
               isAnswered={isAnswered}
               isCorrect={
