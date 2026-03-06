@@ -26,6 +26,7 @@ def update_global_rankings():
 def get_today_quiz():
     """Get today's quiz"""
     try:
+        user_id = get_jwt_identity() 
         now = datetime.utcnow()
         
         # Get quiz that expires in the future (today's quiz)
