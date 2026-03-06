@@ -37,8 +37,12 @@ export const HomePage: React.FC = () => {
       try {
         setQuizLoading(true);
         const response = await apiService.get('/quizzes/today');
+        console.log('[HomePage] Quiz response:', response);
         if (response.success && response.data) {
+          console.log('[HomePage] Setting quiz:', response.data);
           setQuiz(response.data as Quiz);
+        } else {
+          console.log('[HomePage] No quiz data. success:', response.success, 'data:', response.data);
         }
       } catch (error) {
         console.error('Error fetching quiz:', error);

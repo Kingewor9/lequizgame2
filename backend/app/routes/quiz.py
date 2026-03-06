@@ -32,6 +32,8 @@ def get_today_quiz():
         # Get quiz that expires in the future (today's quiz)
         quiz = Quiz.objects(expires_at__gt=now, is_active=True).first()
         
+        print(f"[DEBUG] get_today_quiz: now={now}, quiz_count={Quiz.objects(is_active=True).count()}, found_quiz={quiz.id if quiz else None}")
+        
         if not quiz:
             return jsonify(format_success(data=None, message='No quiz available')), 200
         
@@ -40,7 +42,7 @@ def get_today_quiz():
             user_id=user_id, quiz_id=quiz.id
         ).first() is not None
 
-        return jsonify(format_success(data={
+        result = {
             'id': quiz.id,
             'name': quiz.name,
             'description': quiz.description,
@@ -52,7 +54,10 @@ def get_today_quiz():
             'expires_at': quiz.expires_at.isoformat(),
             'created_at': quiz.created_at.isoformat(),
             'already_played': already_played,
-        })), 200
+            'is_active': quiz.is_active,
+        }
+        print(f"[DEBUG] Returning quiz data: {result}")
+        return jsonify(format_success(data=result)), 200
     
     except Exception as e:
         return jsonify(format_error(f'Error fetching quiz: {str(e)}')), 500
