@@ -98,9 +98,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const refreshUser = async () => {
     try {
-      if (!telegramUser) return;
+      if (!user) return;
 
-      const response = await apiService.get(`/users/${telegramUser.id}`);
+      const response = await apiService.get(`/users/${user.id}`);
       if (response.success && response.data) {
         setUser(response.data as User);
         localStorage.setItem('user_data', JSON.stringify(response.data));
