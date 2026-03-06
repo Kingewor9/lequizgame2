@@ -42,8 +42,8 @@ class User(Document):
             'prev_global_rank': getattr(self, 'prev_global_rank', 0),
             'global_total_players': self.global_total_players,
             'footy_coins': self.footy_coins,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat(),
+            'created_at': self.created_at.isoformat() + 'Z',
+            'updated_at': self.updated_at.isoformat() + 'Z',
         }
 
 
@@ -111,8 +111,8 @@ class Quiz(Document):
             'total_points': self.total_points,
             'cost_in_footy_coins': self.cost_in_footy_coins,
             'is_active': self.is_active,
-            'created_at': self.created_at.isoformat(),
-            'expires_at': self.expires_at.isoformat(),
+            'created_at': self.created_at.isoformat() + 'Z',
+            'expires_at': self.expires_at.isoformat() + 'Z',
             'questions': [q.to_dict() for q in self.questions] if self.questions else [],
         }
 
@@ -166,8 +166,8 @@ class QuizResponse(Document):
             'accuracy_rate': self.accuracy_rate,
             'time_taken_seconds': self.time_taken_seconds,
             'answers': [a.to_dict() for a in self.answers] if self.answers else [],
-            'completed_at': self.completed_at.isoformat(),
-            'created_at': self.created_at.isoformat(),
+            'completed_at': self.completed_at.isoformat() + 'Z',
+            'created_at': self.created_at.isoformat() + 'Z',
         }
 
 
@@ -205,8 +205,8 @@ class League(Document):
             'total_members': self.total_members,
             'total_game_weeks': self.total_game_weeks,
             'current_game_week': self.current_game_week,
-            'start_date': self.start_date.isoformat() if self.start_date else None,
-            'end_date': self.end_date.isoformat() if self.end_date else None,
+            'start_date': (self.start_date.isoformat() + 'Z') if self.start_date else None,
+            'end_date': (self.end_date.isoformat() + 'Z') if self.end_date else None,
         }
 
 
@@ -239,7 +239,7 @@ class UserLeague(Document):
             'prev_rank': self.prev_rank,
             'points': self.points,
             'is_owner': self.is_owner,
-            'joined_at': self.joined_at.isoformat(),
+            'joined_at': self.joined_at.isoformat() + 'Z',
         }
 
 
@@ -265,7 +265,7 @@ class FootyCoinTransaction(Document):
             'type': self.type,
             'amount': self.amount,
             'reason': self.reason,
-            'created_at': self.created_at.isoformat(),
+            'created_at': self.created_at.isoformat() + 'Z',
         }
 
 
@@ -292,7 +292,7 @@ class FootyCoinTask(Document):
             'description': self.description,
             'reward_coins': self.reward_coins,
             'is_active': self.is_active,
-            'created_at': self.created_at.isoformat(),
+            'created_at': self.created_at.isoformat() + 'Z',
         }
 
 
@@ -317,6 +317,6 @@ class UserFootyCoinTask(Document):
             'user_id': self.user_id,
             'task_id': self.task_id,
             'is_completed': self.is_completed,
-            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
-            'created_at': self.created_at.isoformat(),
+            'completed_at': (self.completed_at.isoformat() + 'Z') if self.completed_at else None,
+            'created_at': self.created_at.isoformat() + 'Z',
         }

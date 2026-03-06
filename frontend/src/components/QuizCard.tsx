@@ -13,8 +13,6 @@ export const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStartClick, isLoadin
   const [timeRemaining, setTimeRemaining] = useState(getTimeUntilExpiry(quiz.expires_at));
   const isExpired = isQuizExpired(quiz.expires_at);
 
-  console.log('[QuizCard] expires_at:', quiz.expires_at, 'now:', new Date().toISOString(), 'isExpired:', isExpired, 'timeRemaining:', timeRemaining);
-
   useEffect(() => {
     if (isExpired) return;
 
