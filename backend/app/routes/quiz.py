@@ -6,6 +6,20 @@ from datetime import datetime
 
 quiz_bp = Blueprint('quiz', __name__, url_prefix='/api/quizzes')
 
+def update_global_rankings():
+    """
+    Recalculate global_rank and global_total_players for all users.
+    Called after every quiz submission so the homepage always shows live data.
+    """
+    try:
+        all_users = list(User.objects().order_by('-overall_score'))
+        total = len(all_users)
+        for rank, u in enumerate(all_users, 1):
+            u.global_rank = rank
+            u.global_total_players = total
+            u.save()
+    except Exception as e:
+        print(f'Error updating global rankings: {str(e)}')
 
 @quiz_bp.route('/today', methods=['GET'])
 @jwt_required()
@@ -20,6 +34,11 @@ def get_today_quiz():
         if not quiz:
             return jsonify(format_success(data=None, message='No quiz available')), 200
         
+        # Check if this user has already submitted a response for this quiz
+        already_played = QuizResponse.objects(
+            user_id=user_id, quiz_id=quiz.id
+        ).first() is not None
+
         return jsonify(format_success(data={
             'id': quiz.id,
             'name': quiz.name,
@@ -67,6 +86,13 @@ def submit_quiz(quiz_id):
         user = User.objects(id=user_id).first()
         if not user:
             return jsonify(format_error('User not found')), 404
+
+        # ── Block replay ──────────────────────────────────────────────────────
+        already_played = QuizResponse.objects(user_id=user_id, quiz_id=quiz_id).first()
+        if already_played:
+            return jsonify(format_error(
+                'You have already completed this quiz. Come back tomorrow!'
+            )), 400
         
         answers = data.get('answers', [])
         time_taken_seconds = data.get('time_taken_seconds', 0)
@@ -118,6 +144,10 @@ def submit_quiz(quiz_id):
             reason=f'Quiz: {quiz.name}'
         )
         transaction.save()
+
+        # ── Recalculate ALL users' global ranks so homepage shows live data ──
+        update_global_rankings()
+
         
         return jsonify(format_success(
             data=response.to_dict(),

@@ -69,13 +69,21 @@ export const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStartClick, isLoadin
         </div>
       </div>
 
-      <button
-        className="btn-primary start-quiz-btn"
-        onClick={() => onStartClick(quiz)}
-        disabled={isLoading}
-      >
-        {isLoading ? 'Starting...' : 'Start Quiz'}
-      </button>
+      {/* ── Show locked state if already played, otherwise show Start button ── */}
+      {quiz.already_played ? (
+        <div className="quiz-played-banner">
+          ✅ You've completed today's quiz. Come back tomorrow!
+        </div>
+      ) : (
+
+        <button
+          className="btn-primary start-quiz-btn"
+          onClick={() => onStartClick(quiz)}
+          disabled={isLoading}
+        >
+          {isLoading ? 'Starting...' : 'Start Quiz'}
+        </button>
+      )}
     </div>
   );
 };

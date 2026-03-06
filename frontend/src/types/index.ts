@@ -50,6 +50,7 @@ export interface Quiz {
   expires_at: string;
   created_at: string;
   questions?: Question[];
+  already_played?: boolean;
 }
 
 export interface Question {

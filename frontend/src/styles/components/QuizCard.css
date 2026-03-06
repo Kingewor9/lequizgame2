@@ -97,3 +97,15 @@
   box-shadow: none;
   cursor: not-allowed;
 }
+
+.quiz-played-banner {
+  width: 100%;
+  padding: 14px;
+  background: var(--bg-card-alt, #1c2230);
+  border: 1px solid var(--accent-green, #3fb950);
+  border-radius: 8px;
+  color: var(--accent-green, #3fb950);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+}
