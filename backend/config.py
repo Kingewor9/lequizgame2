@@ -10,6 +10,7 @@ class Config:
     # Telegram
     TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
     TELEGRAM_BOT_USERNAME = os.environ.get('TELEGRAM_BOT_USERNAME', '')
+    TELEGRAM_CHANNEL_URL = os.environ.get('TELEGRAM_CHANNEL_URL', '')
     MINIAPP_URL = os.environ.get('MINIAPP_URL', 'https://t.me/botname/appname')
     
     # MongoDB

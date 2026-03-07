@@ -124,24 +124,17 @@ def create_quiz_bulk():
             
         quiz.save()
         
-        # Send telegram notifications to all users
+        # Send telegram notification to channel
         try:
-            all_users = User.objects()
             telegram_service = get_telegram_service()
-            
-            for user in all_users:
-                if user.telegram_id:
-                    # Send notification asynchronously to not block the response
-                    try:
-                        telegram_service.send_quiz_notification(
-                            user.telegram_id,
-                            quiz.name,
-                            quiz.id
-                        )
-                    except Exception as e:
-                        print(f"[ADMIN] Failed to send notification to user {user.id}: {str(e)}")
+            telegram_service.send_quiz_notification(
+                quiz.name,
+                quiz.description,
+                quiz.total_questions,
+                quiz.total_points
+            )
         except Exception as e:
-            print(f"[ADMIN] Error sending quiz notifications: {str(e)}")
+            print(f"[ADMIN] Error sending quiz notification to channel: {str(e)}")
         
         return jsonify(format_success(
             data=quiz.to_dict(),
