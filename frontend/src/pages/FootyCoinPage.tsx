@@ -1,10 +1,3 @@
-// Type declaration for Adsgram SDK
-declare global {
-  interface Window {
-    Adsgram: any;
-  }
-}
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/apiService';
