@@ -69,9 +69,7 @@ class TelegramBotService:
                     [
                         {
                             "text": "Play Quiz 🚀",
-                            "web_app": {
-                                "url": self.miniapp_url
-                            }
+                            "url": self.miniapp_url
                         }
                     ]
                 ]
