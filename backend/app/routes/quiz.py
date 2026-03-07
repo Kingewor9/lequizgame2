@@ -171,6 +171,30 @@ def submit_quiz(quiz_id):
         user.overall_score += points_earned
         user.save()
         
+        # ── Add points to active leagues ──────────────────────────────────────
+        # Find all active leagues the user is in
+        from app.models import UserLeague, League
+        from app.utils import update_league_rankings
+        user_leagues = UserLeague.objects(user_id=user_id)
+        now = datetime.utcnow()
+        
+        updated_leagues = set()
+        for user_league in user_leagues:
+            league = League.objects(id=user_league.league_id).first()
+            
+            # Only add points if league is active (end_date in the future)
+            if league and league.end_date > now:
+                user_league.points += points_earned
+                user_league.save()
+                updated_leagues.add(league.id)
+                print(f"[DEBUG] Added {points_earned} points to user {user_id} in league {league.id}")
+            else:
+                print(f"[DEBUG] Skipped league {user_league.league_id} - inactive or not found")
+        
+        # ── Update rankings for each affected league ─────────────────────────────
+        for league_id in updated_leagues:
+            update_league_rankings(league_id)
+        
         # Add footy coins transaction (reward)
         transaction = FootyCoinTransaction(
             id=generate_id(),

@@ -18,12 +18,12 @@ def user_league_dict(ul, league):
         'is_private': league.is_private or False,
         'code': (league.code if league.code else None) if ul.is_owner else None,  # only expose code to owner
         'total_members': league.total_members or 1,
-        'start_date': league.start_date.isoformat() if league.start_date else None,
-        'end_date': league.end_date.isoformat() if league.end_date else None,
+        'start_date': (league.start_date.isoformat() + 'Z') if league.start_date else None,
+        'end_date': (league.end_date.isoformat() + 'Z') if league.end_date else None,
         'rank': ul.rank or 0,
         'points': ul.points or 0,
         'is_owner': ul.is_owner or False,
-        'joined_at': ul.joined_at.isoformat() if ul.joined_at else datetime.utcnow().isoformat(),
+        'joined_at': (ul.joined_at.isoformat() + 'Z') if ul.joined_at else (datetime.utcnow().isoformat() + 'Z'),
     }
 
 
@@ -312,8 +312,8 @@ def get_league_detail(league_id):
     'total_members': league.total_members,
     'current_game_week': league.current_game_week,      # no more getattr needed
     'total_game_weeks': league.total_game_weeks,         # no more getattr needed
-    'start_date': league.start_date.isoformat() if league.start_date else None,
-    'end_date': league.end_date.isoformat() if league.end_date else None,
+    'start_date': (league.start_date.isoformat() + 'Z') if league.start_date else None,
+    'end_date': (league.end_date.isoformat() + 'Z') if league.end_date else None,
     'is_owner': my_membership.is_owner,
     'final_winner': final_winner,
     'final_winner_photo': final_winner_photo,
