@@ -82,7 +82,7 @@ class ApiService {
   /**
    * Execute request with retry logic
    */
-  private async executeWithRetry<T>(
+  private async executeWithRetry(
     request: () => Promise<any>,
     onRetry?: (attempt: number, delay: number) => void
   ): Promise<any> {
