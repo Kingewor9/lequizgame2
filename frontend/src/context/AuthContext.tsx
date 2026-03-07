@@ -52,14 +52,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const parsedUser: TelegramUser = JSON.parse(userData);
         setTelegramUser(parsedUser);
 
-        const response = await apiService.post('/auth/telegram-login', {
-          telegram_id: parsedUser.id,
-          first_name: parsedUser.first_name,
-          last_name: parsedUser.last_name,
-          username: parsedUser.username,
-          photo_url: parsedUser.photo_url,
-          init_data: initData,
-        });
+        // Keep loading state true while retrying until successful
+        const response = await apiService.post(
+          '/auth/telegram-login',
+          {
+            telegram_id: parsedUser.id,
+            first_name: parsedUser.first_name,
+            last_name: parsedUser.last_name,
+            username: parsedUser.username,
+            photo_url: parsedUser.photo_url,
+            init_data: initData,
+          },
+          (attempt, delay) => {
+            console.log(`Retrying authentication (attempt ${attempt})... Waiting ${(delay / 1000).toFixed(1)}s`);
+          }
+        );
 
         if (response.success && response.data) {
           const data = response.data as any;
@@ -100,7 +107,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       if (!user) return;
 
-      const response = await apiService.get(`/users/${user.id}`);
+      const response = await apiService.get(`/users/${user.id}`, (attempt, delay) => {
+        console.log(`Retrying user refresh (attempt ${attempt})... Waiting ${(delay / 1000).toFixed(1)}s`);
+      });
       if (response.success && response.data) {
         setUser(response.data as User);
         localStorage.setItem('user_data', JSON.stringify(response.data));
