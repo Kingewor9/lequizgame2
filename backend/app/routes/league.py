@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models import User, League, UserLeague
 from app.utils import generate_id, format_success, format_error, generate_league_code
+from app.services.telegram_service import get_telegram_service
 from datetime import datetime
 
 league_bp = Blueprint('league', __name__, url_prefix='/api/leagues')
@@ -198,6 +199,23 @@ def join_private_league():
         league.total_members += 1
         league.save()
 
+        # Send telegram notification to league owner
+        try:
+            owner_ul = UserLeague.objects(league_id=league.id, is_owner=True).first()
+            if owner_ul:
+                owner = User.objects(id=owner_ul.user_id).first()
+                joining_user = User.objects(id=user_id).first()
+                
+                if owner and owner.telegram_id and joining_user:
+                    telegram_service = get_telegram_service()
+                    telegram_service.send_league_join_notification(
+                        owner.telegram_id,
+                        joining_user.first_name or 'A user',
+                        league.name
+                    )
+        except Exception as e:
+            print(f"[LEAGUE] Error sending join notification: {str(e)}")
+
         return jsonify(format_success(
             data=user_league_dict(ul, league),
             message='Successfully joined league'
@@ -242,6 +260,23 @@ def join_public_league(league_id):
 
         league.total_members += 1
         league.save()
+
+        # Send telegram notification to league owner
+        try:
+            owner_ul = UserLeague.objects(league_id=league.id, is_owner=True).first()
+            if owner_ul:
+                owner = User.objects(id=owner_ul.user_id).first()
+                joining_user = User.objects(id=user_id).first()
+                
+                if owner and owner.telegram_id and joining_user:
+                    telegram_service = get_telegram_service()
+                    telegram_service.send_league_join_notification(
+                        owner.telegram_id,
+                        joining_user.first_name or 'A user',
+                        league.name
+                    )
+        except Exception as e:
+            print(f"[LEAGUE] Error sending join notification: {str(e)}")
 
         return jsonify(format_success(
             data=user_league_dict(ul, league),

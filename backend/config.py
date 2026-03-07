@@ -9,6 +9,8 @@ class Config:
     
     # Telegram
     TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+    TELEGRAM_BOT_USERNAME = os.environ.get('TELEGRAM_BOT_USERNAME', '')
+    MINIAPP_URL = os.environ.get('MINIAPP_URL', 'https://t.me/botname/appname')
     
     # MongoDB
     MONGODB_URI = os.environ.get('MONGODB_URI') or 'mongodb://localhost:27017/footy_iq'

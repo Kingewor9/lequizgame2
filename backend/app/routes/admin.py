@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models import Quiz, Question, Option, FootyCoinTask, User
 from app.utils import generate_id, format_success, format_error
+from app.services.telegram_service import get_telegram_service
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -122,6 +123,25 @@ def create_quiz_bulk():
             quiz.questions.append(question)
             
         quiz.save()
+        
+        # Send telegram notifications to all users
+        try:
+            all_users = User.objects()
+            telegram_service = get_telegram_service()
+            
+            for user in all_users:
+                if user.telegram_id:
+                    # Send notification asynchronously to not block the response
+                    try:
+                        telegram_service.send_quiz_notification(
+                            user.telegram_id,
+                            quiz.name,
+                            quiz.id
+                        )
+                    except Exception as e:
+                        print(f"[ADMIN] Failed to send notification to user {user.id}: {str(e)}")
+        except Exception as e:
+            print(f"[ADMIN] Error sending quiz notifications: {str(e)}")
         
         return jsonify(format_success(
             data=quiz.to_dict(),
