@@ -97,6 +97,12 @@ export const FootyCoinPage: React.FC = () => {
       return;
     }
 
+    const taskId = backendTaskIds['watch_ads'];
+    if (!taskId) {
+      setAlert({ message: 'Task not available. Please try again later.', type: 'error' });
+      return;
+    }
+
     setIsAdLoading(true);
 
     adControllerRef.current
@@ -104,10 +110,11 @@ export const FootyCoinPage: React.FC = () => {
       .then(async () => {
         setTaskInProgress('watch_ads');
         try {
-          const response = await apiService.post('/footy-coins/tasks/ad/complete', {});
+          const response = await apiService.post(`/footy-coins/tasks/${taskId}/complete`, {});
           if (response.success) {
             setAlert({ message: '🎉 Earned 50 Footy Coins for watching the ad!', type: 'success' });
             await refreshUser();
+            setCompletedTasks((prev) => new Set(prev).add('watch_ads'));
           } else {
             setAlert({ message: response.error || 'Failed to claim ad reward', type: 'error' });
           }
