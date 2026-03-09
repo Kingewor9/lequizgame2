@@ -84,7 +84,11 @@ def initialize_default_tasks():
 
     for task_data in defaults:
         exists = FootyCoinTask.objects(type=task_data['type']).first()
-        if not exists:
+        if exists:
+            # Update existing task with correct values
+            exists.update(**task_data)
+        else:
+            # Create new task
             FootyCoinTask(
                 id=generate_id(),
                 is_active=True,
