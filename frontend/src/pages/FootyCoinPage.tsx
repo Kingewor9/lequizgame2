@@ -114,7 +114,7 @@ export const FootyCoinPage: React.FC = () => {
           if (response.success) {
             setAlert({ message: '🎉 Earned 50 Footy Coins for watching the ad!', type: 'success' });
             await refreshUser();
-            setCompletedTasks((prev) => new Set(prev).add('watch_ads'));
+            // Don't mark watch_ads as completed since it's repeatable
           } else {
             setAlert({ message: response.error || 'Failed to claim ad reward', type: 'error' });
           }

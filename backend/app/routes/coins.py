@@ -82,9 +82,9 @@ def complete_task(task_id):
         if task.type == 'join_telegram':
             return jsonify(format_error('Please use the verify-telegram endpoint for this task')), 400
 
-        # Check if already completed
+        # Check if already completed (except for repeatable tasks like watch_ads)
         completed = UserFootyCoinTask.objects(user_id=user_id, task_id=task_id).first()
-        if completed:
+        if completed and task.type != 'watch_ads':
             return jsonify(format_error('Task already completed')), 400
 
         user = User.objects(id=user_id).first()
