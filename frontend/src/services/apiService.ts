@@ -23,7 +23,7 @@ class ApiService {
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 15000,
+      timeout: 60000,
     });
 
     // Attach JWT token to every request
