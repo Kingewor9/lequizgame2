@@ -7,8 +7,8 @@ from app.utils import generate_id
 
 scheduler = BackgroundScheduler()
 
-def generate_daily_quiz_job():
-    print("[SCHEDULER] Running daily automated quiz generation job...")
+def generate_periodic_quiz_job():
+    print("[SCHEDULER] Running periodic automated quiz generation job (every 15 mins)...")
     
     # 1. Fetch recent questions to prevent repetition
     recent_quizzes = Quiz.objects.order_by('-created_at').limit(3)
@@ -98,17 +98,16 @@ def init_scheduler(app):
     Initialize and start the scheduler. 
     It is recommended to run this within the app_context if DB access is needed immediately.
     """
-    # 09:00 UTC = 9, minute = 0
+    # Run every 15 minutes
     scheduler.add_job(
-        generate_daily_quiz_job,
-        'cron',
-        hour=9,
-        minute=0,
+        generate_periodic_quiz_job,
+        'interval',
+        minutes=15,
         timezone='UTC',
-        id='daily_fifa_world_cup_quiz_generator',
+        id='periodic_fifa_world_cup_quiz_generator',
         replace_existing=True
     )
     
     if not scheduler.running:
         scheduler.start()
-        print("[SCHEDULER] APScheduler started successfully. Registered daily quiz job at 09:00 UTC.")
+        print("[SCHEDULER] APScheduler started successfully. Registered periodic quiz job (every 15 mins).")
