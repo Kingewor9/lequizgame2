@@ -13,6 +13,9 @@ export const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStartClick, isLoadin
   const [timeRemaining, setTimeRemaining] = useState(getTimeUntilExpiry(quiz.expires_at));
   const isExpired = isQuizExpired(quiz.expires_at);
 
+  const [timeUntilLive, setTimeUntilLive] = useState(quiz.scheduled_for ? getTimeUntilExpiry(quiz.scheduled_for) : 0);
+  const isCurrentlyLocked = timeUntilLive > 0;
+
   useEffect(() => {
     if (isExpired) return;
 
@@ -28,6 +31,14 @@ export const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStartClick, isLoadin
 
     return () => clearInterval(interval);
   }, [isExpired]);
+
+  useEffect(() => {
+    if (timeUntilLive <= 0) return;
+    const interval = setInterval(() => {
+      setTimeUntilLive((prev) => prev > 0 ? prev - 1 : 0);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timeUntilLive]);
 
   if (isExpired) {
     return null;
@@ -73,6 +84,10 @@ export const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStartClick, isLoadin
       {quiz.already_played ? (
         <div className="quiz-played-banner">
           ✅ You've completed today's quiz. Come back tomorrow!
+        </div>
+      ) : isCurrentlyLocked ? (
+        <div className="quiz-locked-banner" style={{background: 'rgba(255, 51, 102, 0.1)', color: '#ff3366', padding: '12px', borderRadius: '8px', textAlign: 'center', fontWeight: 'bold', border: '1px solid rgba(255, 51, 102, 0.3)'}}>
+          ⏳ Goes live in: {formatTimeRemaining(timeUntilLive)}
         </div>
       ) : (
 

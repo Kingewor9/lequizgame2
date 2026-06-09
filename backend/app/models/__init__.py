@@ -99,6 +99,8 @@ class Quiz(Document):
 
     created_at = DateTimeField(default=datetime.utcnow)
     expires_at = DateTimeField(required=True)
+    scheduled_for = DateTimeField()
+    notification_sent = BooleanField(default=False)
 
     def to_dict(self):
         return {
@@ -113,6 +115,8 @@ class Quiz(Document):
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() + 'Z',
             'expires_at': self.expires_at.isoformat() + 'Z',
+            'scheduled_for': (self.scheduled_for.isoformat() + 'Z') if self.scheduled_for else None,
+            'notification_sent': getattr(self, 'notification_sent', False),
             'questions': [q.to_dict() for q in self.questions] if self.questions else [],
         }
 

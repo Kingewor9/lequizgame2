@@ -48,6 +48,7 @@ export interface Quiz {
   total_points: number;
   cost_in_footy_coins: number;
   expires_at: string;
+  scheduled_for?: string;
   created_at: string;
   questions?: Question[];
   already_played?: boolean;

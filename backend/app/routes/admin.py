@@ -85,6 +85,11 @@ def create_quiz_bulk():
             expires_at_str = data['expires_at'].replace('Z', '+00:00')
             expires_at = datetime.fromisoformat(expires_at_str)
         
+        scheduled_for = None
+        if 'scheduled_for' in data and data['scheduled_for']:
+            scheduled_for_str = data['scheduled_for'].replace('Z', '+00:00')
+            scheduled_for = datetime.fromisoformat(scheduled_for_str)
+
         quiz = Quiz(
             id=generate_id(),
             name=data['name'],
@@ -95,7 +100,9 @@ def create_quiz_bulk():
             total_points=data['total_points'],
             cost_in_footy_coins=data.get('cost_in_footy_coins', 0),
             is_active=True,
-            expires_at=expires_at
+            expires_at=expires_at,
+            scheduled_for=scheduled_for,
+            notification_sent=False if scheduled_for else True
         )
 
         questions_data = data.get('questions', [])
@@ -124,17 +131,18 @@ def create_quiz_bulk():
             
         quiz.save()
         
-        # Send telegram notification to channel
-        try:
-            telegram_service = get_telegram_service()
-            telegram_service.send_quiz_notification(
-                quiz.name,
-                quiz.description,
-                quiz.total_questions,
-                quiz.total_points
-            )
-        except Exception as e:
-            print(f"[ADMIN] Error sending quiz notification to channel: {str(e)}")
+        # Send telegram notification to channel if not scheduled
+        if not scheduled_for:
+            try:
+                telegram_service = get_telegram_service()
+                telegram_service.send_quiz_notification(
+                    quiz.name,
+                    quiz.description,
+                    quiz.total_questions,
+                    quiz.total_points
+                )
+            except Exception as e:
+                print(f"[ADMIN] Error sending quiz notification to channel: {str(e)}")
         
         return jsonify(format_success(
             data=quiz.to_dict(),

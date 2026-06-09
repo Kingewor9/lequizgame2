@@ -75,14 +75,17 @@ class TelegramBotService:
                 ]
             }
             
+            image_url = "https://i.ibb.co/tTXt8Mbx/cropped-best-bike-3.png"
+            
             payload = {
                 'chat_id': self.channel_id,
-                'text': text,
+                'photo': image_url,
+                'caption': text,
                 'parse_mode': 'Markdown',
                 'reply_markup': inline_keyboard
             }
             
-            response = requests.post(f'{self.api_base}/sendMessage', json=payload, timeout=10)
+            response = requests.post(f'{self.api_base}/sendPhoto', json=payload, timeout=10)
             
             if response.status_code == 200:
                 print(f"[TELEGRAM] Quiz notification sent to channel {self.channel_id}")

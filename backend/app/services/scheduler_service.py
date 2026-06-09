@@ -93,6 +93,41 @@ def generate_periodic_quiz_job():
     except Exception as e:
         print(f"[SCHEDULER] Exception mapping/saving generated quiz: {e}")
 
+def check_scheduled_quizzes_job():
+    """Background task to poll exact unlocked quotas and run notification engine"""
+    from datetime import datetime
+    
+    now = datetime.utcnow()
+    # Check for anything specifically locked to a time that's lapsed where we haven't notified yet.
+    # ne=None guarantees we don't accidentally snag immediate quizzes where notification_sent might be False somehow
+    pending_quizzes = Quiz.objects(
+        is_active=True, 
+        notification_sent=False, 
+        scheduled_for__ne=None, 
+        scheduled_for__lte=now
+    )
+
+    if not pending_quizzes:
+        return
+
+    from app.services.telegram_service import get_telegram_service
+    telegram_service = get_telegram_service()
+
+    for quiz in pending_quizzes:
+        try:
+            success = telegram_service.send_quiz_notification(
+                quiz.name,
+                quiz.description,
+                quiz.total_questions,
+                quiz.total_points
+            )
+            if success:
+                quiz.notification_sent = True
+                quiz.save()
+                print(f"[SCHEDULER] Fired exact timed scheduled notification for quiz: {quiz.name}")
+        except Exception as e:
+            print(f"[SCHEDULER] Failed to send scheduled quiz notification: {e}")
+
 def init_scheduler(app):
     """
     Initialize and start the scheduler. 
@@ -105,6 +140,16 @@ def init_scheduler(app):
         minutes=15,
         timezone='UTC',
         id='periodic_fifa_world_cup_quiz_generator',
+        replace_existing=True
+    )
+
+    # Run every minute bridging delayed notifications
+    scheduler.add_job(
+        check_scheduled_quizzes_job,
+        'interval',
+        minutes=1,
+        timezone='UTC',
+        id='scheduled_quiz_notification_checker',
         replace_existing=True
     )
     

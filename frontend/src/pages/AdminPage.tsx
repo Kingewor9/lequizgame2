@@ -22,6 +22,10 @@ export const AdminPage: React.FC = () => {
     const [pointsPerQuestion, setPointsPerQuestion] = useState<number>(10);
     const [costInCoins, setCostInCoins] = useState<number>(0);
     const [expiresInHours, setExpiresInHours] = useState<number>(24);
+    
+    // Publish State
+    const [publishMode, setPublishMode] = useState<'now' | 'schedule'>('now');
+    const [scheduledFor, setScheduledFor] = useState('');
 
     // Dynamic Questions State
     const [questions, setQuestions] = useState<QuestionDraft[]>([{
@@ -74,6 +78,7 @@ export const AdminPage: React.FC = () => {
                 if (!opt.trim()) return `Question ${idx + 1}, Option ${oIdx + 1} is empty.`;
             }
         }
+        if (publishMode === 'schedule' && !scheduledFor) return 'Please select a date and time for scheduling.';
         return null;
     };
 
@@ -100,6 +105,7 @@ export const AdminPage: React.FC = () => {
                 total_points: pointsPerQuestion * questions.length,
                 cost_in_footy_coins: costInCoins,
                 expires_at: expires_at_date.toISOString(),
+                scheduled_for: publishMode === 'schedule' && scheduledFor ? new Date(scheduledFor).toISOString() : null,
                 questions: questions.map(q => ({
                     question_text: q.question_text,
                     options: q.options,
@@ -259,13 +265,37 @@ export const AdminPage: React.FC = () => {
                     ))}
                 </div>
 
+                <div className="publish-mode-selector" style={{display: 'flex', gap: '1rem', marginBottom: '1.5rem', marginTop: '1rem', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px'}}>
+                    <div style={{flex: 1}}>
+                        <input type="radio" id="publish-now" checked={publishMode === 'now'} onChange={() => setPublishMode('now')} style={{marginRight: '8px'}} />
+                        <label htmlFor="publish-now" style={{color: 'white', fontWeight: 'bold'}}>🚀 Publish Now</label>
+                    </div>
+                    <div style={{flex: 1}}>
+                        <input type="radio" id="publish-schedule" checked={publishMode === 'schedule'} onChange={() => setPublishMode('schedule')} style={{marginRight: '8px'}} />
+                        <label htmlFor="publish-schedule" style={{color: '#ff3366', fontWeight: 'bold'}}>⏳ Schedule Quiz</label>
+                    </div>
+                </div>
+
+                {publishMode === 'schedule' && (
+                    <div className="input-group" style={{marginBottom: '2rem'}}>
+                        <label>Schedule Go-Live Date & Time</label>
+                        <input 
+                            type="datetime-local" 
+                            value={scheduledFor} 
+                            onChange={(e) => setScheduledFor(e.target.value)} 
+                            className="cyber-input"
+                            style={{width: '100%', padding: '12px'}}
+                        />
+                    </div>
+                )}
+
                 <div className="form-actions">
                     <button type="button" className="btn-add-q" onClick={handleAddQuestion}>
                         + Add Another Question
                     </button>
 
                     <button type="submit" className="btn-publish-quiz">
-                        🚀 Publish Quiz to App
+                        {publishMode === 'now' ? '🚀 Publish Quiz to App' : '⏳ Schedule Quiz to App'}
                     </button>
                 </div>
             </form>
