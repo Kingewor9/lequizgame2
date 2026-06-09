@@ -54,10 +54,9 @@ def create_app(config_name=None):
         initialize_default_tasks()
         
     # Start scheduler
-    # In development with reloader, prevent duplicate scheduler
-    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        from app.services.scheduler_service import init_scheduler
-        init_scheduler(app)
+    # Ensuring it starts on Render/Gunicorn even if app.debug is True natively
+    from app.services.scheduler_service import init_scheduler
+    init_scheduler(app)
     
     return app
 
