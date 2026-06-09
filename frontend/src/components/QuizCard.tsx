@@ -17,7 +17,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStartClick, isLoadin
   const isCurrentlyLocked = timeUntilLive > 0;
 
   useEffect(() => {
-    if (isExpired) return;
+    if (isExpired || isCurrentlyLocked) return;
 
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
@@ -74,8 +74,8 @@ export const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStartClick, isLoadin
 
         <div className="detail-row flex-between">
           <span className="detail-label">Expires In:</span>
-          <span className={`detail-value ${timeRemaining < 3600 ? 'text-error' : ''}`}>
-            {formatTimeRemaining(timeRemaining)}
+          <span className={`detail-value ${!isCurrentlyLocked && timeRemaining < 3600 ? 'text-error' : ''}`}>
+            {isCurrentlyLocked ? 'Pending Go-Live...' : formatTimeRemaining(timeRemaining)}
           </span>
         </div>
       </div>

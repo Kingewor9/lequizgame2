@@ -1,6 +1,6 @@
 import requests
 import os
-from flask import current_app
+from flask import current_app, has_app_context
 import asyncio
 
 
@@ -8,9 +8,14 @@ class TelegramBotService:
     """Service for sending notifications via Telegram Bot"""
     
     def __init__(self):
-        self.bot_token = current_app.config.get('TELEGRAM_BOT_TOKEN', '')
-        self.miniapp_url = current_app.config.get('MINIAPP_URL', '')
-        self.channel_url = current_app.config.get('TELEGRAM_CHANNEL_URL', '')
+        if has_app_context():
+            self.bot_token = current_app.config.get('TELEGRAM_BOT_TOKEN', '')
+            self.miniapp_url = current_app.config.get('MINIAPP_URL', '')
+            self.channel_url = current_app.config.get('TELEGRAM_CHANNEL_URL', '')
+        else:
+            self.bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+            self.miniapp_url = os.environ.get('MINIAPP_URL', '')
+            self.channel_url = os.environ.get('TELEGRAM_CHANNEL_URL', '')
         self.api_base = f'https://api.telegram.org/bot{self.bot_token}'
         self.channel_id = self._extract_channel_id()
     

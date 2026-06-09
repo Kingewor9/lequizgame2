@@ -93,7 +93,8 @@ export const AdminPage: React.FC = () => {
         try {
             setIsLoading(true);
 
-            const expires_at_date = new Date();
+            const baseDate = publishMode === 'schedule' && scheduledFor ? new Date(scheduledFor) : new Date();
+            const expires_at_date = new Date(baseDate.getTime());
             expires_at_date.setHours(expires_at_date.getHours() + expiresInHours);
 
             const payload = {
