@@ -11,9 +11,8 @@ class GeminiService:
         else:
             print("[GEMINI] Warning: GEMINI_API_KEY is not set.")
 
-        # We can use modern models like gemini-1.5-flash or gemini-pro
-        # Use simple gemini-1.5-flash since we just need text generation
-        self.model = 'gemini-1.5-flash'
+        # Use gemini-pro which is the most universally stable model string
+        self.model = 'gemini-pro'
 
     def generate_fifa_world_cup_quiz(self, num_questions=6, recent_questions=None):
         """
