@@ -5,6 +5,7 @@ from app.utils import generate_id, format_success, format_error
 from app.services.telegram_service import get_telegram_service
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import urlparse
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -24,6 +25,78 @@ def admin_required(fn):
             
         return fn(*args, **kwargs)
     return wrapper
+
+
+@admin_bp.route('/broadcast', methods=['POST'])
+@admin_required
+def broadcast_message():
+    """Queue a message broadcast to all registered users (Admin only)."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(format_error('A JSON request body is required')), 400
+
+    message = data.get('message')
+    if not isinstance(message, str) or not message.strip():
+        return jsonify(format_error('A message is required')), 400
+    message = message.strip()
+    if len(message) > 4096:
+        return jsonify(format_error('Messages must be 4,096 characters or fewer')), 400
+
+    image_url = data.get('image_url')
+    cta_link = data.get('cta_link')
+    cta_text = data.get('cta_text')
+    for field, value in (('image_url', image_url), ('cta_link', cta_link)):
+        if value is not None:
+            if not isinstance(value, str):
+                return jsonify(format_error(f'{field} must be a URL')), 400
+            parsed_url = urlparse(value.strip())
+            if parsed_url.scheme != 'https' or not parsed_url.netloc:
+                return jsonify(format_error(f'{field} must be a valid HTTPS URL')), 400
+            if field == 'image_url':
+                image_url = value.strip()
+            else:
+                cta_link = value.strip()
+
+    if cta_text is not None:
+        if not isinstance(cta_text, str):
+            return jsonify(format_error('cta_text must be text')), 400
+        cta_text = cta_text.strip()
+        if not cta_text or len(cta_text) > 64:
+            return jsonify(format_error('Button text must be between 1 and 64 characters')), 400
+
+    if bool(cta_link) != bool(cta_text):
+        return jsonify(format_error('Provide both a CTA link and button text')), 400
+    if image_url and len(message) > 1024:
+        return jsonify(format_error('Messages sent with an image must be 1,024 characters or fewer')), 400
+
+    try:
+        telegram_service = get_telegram_service()
+        if not telegram_service.bot_token:
+            return jsonify(format_error('Telegram bot is not configured')), 503
+        telegram_ids = list({
+            user.telegram_id
+            for user in User.objects(telegram_id__ne=None).only('telegram_id')
+            if user.telegram_id
+        })
+        if not telegram_service.send_broadcast(
+            telegram_ids,
+            message,
+            image_url=image_url,
+            cta_link=cta_link,
+            cta_text=cta_text,
+            async_send=True,
+        ):
+            return jsonify(format_error('The broadcast could not be queued')), 500
+
+        return jsonify(format_success(
+            data={'recipient_count': len(telegram_ids)},
+            message='Broadcast queued for delivery',
+        )), 202
+    except Exception as error:
+        current_app.logger.exception('Could not queue admin broadcast')
+        return jsonify(format_error(str(error))), 500
+
+
 @admin_bp.route('/quizzes', methods=['POST'])
 @admin_required
 def create_quiz():
@@ -94,6 +167,7 @@ def create_quiz_bulk():
             id=generate_id(),
             name=data['name'],
             description=data.get('description'),
+            quiz_type=data.get('quiz_type', 'multiple_choice'),
             total_questions=data['total_questions'],
             time_limit_seconds=data['time_limit_seconds'],
             points_per_question=data.get('points_per_question', 10),
@@ -107,9 +181,13 @@ def create_quiz_bulk():
 
         questions_data = data.get('questions', [])
         for q_idx, q_data in enumerate(questions_data):
+            q_type = q_data.get('question_type') or data.get('quiz_type', 'multiple_choice')
             question = Question(
                 id=generate_id(),
-                question_text=q_data.get('question_text'),
+                question_text=q_data.get('question_text', ''),
+                question_type=q_type,
+                image_url=q_data.get('image_url'),
+                correct_answer_text=q_data.get('correct_answer_text'),
                 order=q_idx,
             )
 
@@ -131,7 +209,7 @@ def create_quiz_bulk():
             
         quiz.save()
         
-        # Send telegram notification to channel if not scheduled
+        # Send telegram notification to users via bot if not scheduled
         if not scheduled_for:
             try:
                 telegram_service = get_telegram_service()
@@ -139,10 +217,12 @@ def create_quiz_bulk():
                     quiz.name,
                     quiz.description,
                     quiz.total_questions,
-                    quiz.total_points
+                    quiz.total_points,
+                    async_send=True,
+                    expires_at=quiz.expires_at,
                 )
             except Exception as e:
-                print(f"[ADMIN] Error sending quiz notification to channel: {str(e)}")
+                print(f"[ADMIN] Error sending quiz notification to users: {str(e)}")
         
         return jsonify(format_success(
             data=quiz.to_dict(),
@@ -166,7 +246,10 @@ def add_question(quiz_id):
         
         question = Question(
             id=generate_id(),
-            question_text=data.get('question_text'),
+            question_text=data.get('question_text', ''),
+            question_type=data.get('question_type', 'multiple_choice'),
+            image_url=data.get('image_url'),
+            correct_answer_text=data.get('correct_answer_text'),
             order=data.get('order', 0),
         )
         
@@ -316,5 +399,34 @@ def update_task(task_id):
             message='Task updated'
         )), 200
     
+    except Exception as e:
+        return jsonify(format_error(str(e))), 500
+
+
+@admin_bp.route('/quizzes/<quiz_id>/notify', methods=['POST'])
+@admin_required
+def notify_quiz(quiz_id):
+    """Manually send quiz notification to users via bot (Admin only)"""
+    try:
+        quiz = Quiz.objects(id=quiz_id).first()
+        if not quiz:
+            return jsonify(format_error('Quiz not found')), 404
+
+        telegram_service = get_telegram_service()
+        telegram_service.send_quiz_notification(
+            quiz.name,
+            quiz.description or '',
+            quiz.total_questions,
+            quiz.total_points,
+            async_send=True,
+            expires_at=quiz.expires_at,
+        )
+
+        quiz.notification_sent = True
+        quiz.save()
+
+        return jsonify(format_success(
+            message='Quiz notification is being sent to users via the bot'
+        )), 200
     except Exception as e:
         return jsonify(format_error(str(e))), 500

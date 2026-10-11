@@ -1,5 +1,9 @@
 import requests
 import os
+import math
+import threading
+import time
+from datetime import datetime
 from flask import current_app, has_app_context
 import asyncio
 
@@ -36,29 +40,202 @@ class TelegramBotService:
         
         return None
     
-    def send_quiz_notification(self, quiz_name: str, quiz_description: str, total_questions: int, total_points: int):
+    def send_quiz_notification(
+        self,
+        quiz_name: str,
+        quiz_description: str,
+        total_questions: int,
+        total_points: int,
+        user_telegram_ids: list = None,
+        async_send: bool = True,
+        expires_at=None,
+    ) -> bool:
         """
-        Send quiz notification to Telegram channel with inline button to open mini app
+        Send quiz notification directly to registered users via Telegram Bot.
         
         Args:
             quiz_name: Name of the quiz
             quiz_description: Description of the quiz
             total_questions: Total number of questions in the quiz
             total_points: Total points available in the quiz
+            user_telegram_ids: Optional list of target user telegram IDs. If None, queries all users from DB.
+            async_send: If True (default), broadcasts in a background thread so callers are not blocked.
         """
-        if not self.bot_token or not self.miniapp_url or not self.channel_id:
-            missing = []
-            if not self.bot_token:
-                missing.append('TELEGRAM_BOT_TOKEN')
-            if not self.miniapp_url:
-                missing.append('MINIAPP_URL')
-            if not self.channel_id:
-                missing.append('TELEGRAM_CHANNEL_URL')
-            print(f"[TELEGRAM] Service not configured. Missing: {', '.join(missing)}")
+        if not self.bot_token:
+            print("[TELEGRAM] Bot service not configured. Missing: TELEGRAM_BOT_TOKEN")
             return False
-        
+
+        if user_telegram_ids is None:
+            try:
+                from app.models import User
+                users = User.objects(telegram_id__ne=None).only('telegram_id')
+                user_telegram_ids = list({u.telegram_id for u in users if getattr(u, 'telegram_id', None)})
+            except Exception as e:
+                print(f"[TELEGRAM] Error fetching users from database: {e}")
+                user_telegram_ids = []
+
+        if not user_telegram_ids:
+            print("[TELEGRAM] No registered users found to notify.")
+            return True
+
+        if async_send:
+            thread = threading.Thread(
+                target=self._dispatch_quiz_notifications_to_users,
+                args=(
+                    user_telegram_ids,
+                    quiz_name,
+                    quiz_description,
+                    total_questions,
+                    total_points,
+                    expires_at,
+                ),
+                daemon=True
+            )
+            thread.start()
+            return True
+        else:
+            self._dispatch_quiz_notifications_to_users(
+                user_telegram_ids,
+                quiz_name,
+                quiz_description,
+                total_questions,
+                total_points,
+                expires_at,
+            )
+            return True
+
+    def _dispatch_quiz_notifications_to_users(
+        self,
+        user_telegram_ids: list,
+        quiz_name: str,
+        quiz_description: str,
+        total_questions: int,
+        total_points: int,
+        expires_at=None,
+    ) -> int:
+        """Helper to broadcast quiz notifications directly to users via the bot."""
+        description_line = f"\n{quiz_description}" if quiz_description else ""
+        expiry_line = ""
+        if expires_at:
+            now = datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.utcnow()
+            hours_remaining = max(
+                0,
+                math.ceil((expires_at - now).total_seconds() / 3600),
+            )
+            expiry_text = (
+                'Expired'
+                if hours_remaining == 0
+                else f'{hours_remaining} hour' + ('' if hours_remaining == 1 else 's')
+            )
+            expiry_line = f"\n⏳ *Expires in:* {expiry_text}\n"
+        text = (
+            f"🎯 *New Quiz Available!*\n\n"
+            f"*{quiz_name}*{description_line}\n\n"
+            f"📝 *Questions:* {total_questions}\n"
+            f"⭐ *Points Available:* {total_points}"
+            f"{expiry_line}\n"
+            f"Tap the button below to play and earn points!"
+        )
+
+        reply_markup = None
+        if self.miniapp_url:
+            reply_markup = {
+                "inline_keyboard": [
+                    [
+                        {
+                            "text": "Play Quiz 🚀",
+                            "url": self.miniapp_url
+                        }
+                    ]
+                ]
+            }
+
+        image_url = "https://i.ibb.co/tTXt8Mbx/cropped-best-bike-3.png"
+
+        total_users = len(user_telegram_ids)
+        print(f"[TELEGRAM] Starting quiz notification broadcast to {total_users} users via bot...")
+
+        success_count = 0
+        blocked_count = 0
+        error_count = 0
+
+        for user_id in user_telegram_ids:
+            try:
+                # 1. Try sending Photo with Caption and Inline Button
+                payload = {
+                    'chat_id': user_id,
+                    'photo': image_url,
+                    'caption': text,
+                    'parse_mode': 'Markdown'
+                }
+                if reply_markup:
+                    payload['reply_markup'] = reply_markup
+
+                response = requests.post(f'{self.api_base}/sendPhoto', json=payload, timeout=10)
+
+                # Handle rate limiting (HTTP 429)
+                if response.status_code == 429:
+                    try:
+                        retry_after = response.json().get('parameters', {}).get('retry_after', 1)
+                    except Exception:
+                        retry_after = 1
+                    time.sleep(retry_after)
+                    response = requests.post(f'{self.api_base}/sendPhoto', json=payload, timeout=10)
+
+                if response.status_code == 200:
+                    success_count += 1
+                elif response.status_code == 403:
+                    # User blocked the bot or account deactivated
+                    blocked_count += 1
+                else:
+                    # Photo failed (e.g. photo URL error or caption parse issue). Fallback to sendMessage
+                    msg_payload = {
+                        'chat_id': user_id,
+                        'text': text,
+                        'parse_mode': 'Markdown'
+                    }
+                    if reply_markup:
+                        msg_payload['reply_markup'] = reply_markup
+
+                    fallback_res = requests.post(f'{self.api_base}/sendMessage', json=msg_payload, timeout=10)
+                    if fallback_res.status_code == 200:
+                        success_count += 1
+                    elif fallback_res.status_code == 400:
+                        # Markdown parse error: retry plain text without Markdown parse_mode
+                        msg_payload.pop('parse_mode', None)
+                        plain_res = requests.post(f'{self.api_base}/sendMessage', json=msg_payload, timeout=10)
+                        if plain_res.status_code == 200:
+                            success_count += 1
+                        else:
+                            error_count += 1
+                    elif fallback_res.status_code == 403:
+                        blocked_count += 1
+                    else:
+                        error_count += 1
+
+                # Polite delay between messages to respect Telegram limits (~20 msgs/sec max)
+                time.sleep(0.05)
+
+            except Exception as e:
+                error_count += 1
+                print(f"[TELEGRAM] Error sending quiz notification to user {user_id}: {str(e)}")
+
+        print(
+            f"[TELEGRAM] Quiz notification broadcast finished: {success_count} sent, "
+            f"{blocked_count} blocked/inactive, {error_count} failed "
+            f"(Total target: {total_users} users)"
+        )
+        return success_count
+
+    def send_quiz_notification_to_channel(self, quiz_name: str, quiz_description: str, total_questions: int, total_points: int):
+        """
+        Send quiz notification to Telegram channel (optional/legacy)
+        """
+        if not self.bot_token or not self.channel_id:
+            print("[TELEGRAM] Channel notification skipped: missing bot token or channel id")
+            return False
+
         try:
-            # Build message with quiz details
             description_line = f"\n{quiz_description}" if quiz_description else ""
             text = (
                 f"🎯 *New Quiz Available!*\n\n"
@@ -67,8 +244,6 @@ class TelegramBotService:
                 f"⭐ *Points Available:* {total_points}\n\n"
                 f"Tap the button below to play and earn points!"
             )
-            
-            # Create inline button that opens the mini app
             inline_keyboard = {
                 "inline_keyboard": [
                     [
@@ -79,9 +254,7 @@ class TelegramBotService:
                     ]
                 ]
             }
-            
             image_url = "https://i.ibb.co/tTXt8Mbx/cropped-best-bike-3.png"
-            
             payload = {
                 'chat_id': self.channel_id,
                 'photo': image_url,
@@ -89,18 +262,10 @@ class TelegramBotService:
                 'parse_mode': 'Markdown',
                 'reply_markup': inline_keyboard
             }
-            
             response = requests.post(f'{self.api_base}/sendPhoto', json=payload, timeout=10)
-            
-            if response.status_code == 200:
-                print(f"[TELEGRAM] Quiz notification sent to channel {self.channel_id}")
-                return True
-            else:
-                print(f"[TELEGRAM] Failed to send quiz notification: {response.text}")
-                return False
-                
+            return response.status_code == 200
         except Exception as e:
-            print(f"[TELEGRAM] Error sending quiz notification: {str(e)}")
+            print(f"[TELEGRAM] Error sending quiz notification to channel: {str(e)}")
             return False
     
     def send_league_join_notification(self, owner_telegram_id: int, user_first_name: str, league_name: str):
@@ -178,6 +343,125 @@ class TelegramBotService:
         
         print(f"[TELEGRAM] Bulk notifications: {success_count}/{len(user_telegram_ids)} sent successfully")
         return success_count
+
+    def send_broadcast(
+        self,
+        user_telegram_ids: list,
+        message_text: str,
+        image_url: str = None,
+        cta_link: str = None,
+        cta_text: str = None,
+        async_send: bool = True,
+    ) -> bool:
+        """Send an admin-authored message, with optional image and inline URL button."""
+        if not self.bot_token:
+            raise RuntimeError('Telegram bot is not configured')
+        if len(message_text) > 4096:
+            raise ValueError('Broadcast messages must be 4,096 characters or fewer')
+        if image_url and len(message_text) > 1024:
+            raise ValueError('Messages sent with an image must be 1,024 characters or fewer')
+
+        if async_send:
+            thread = threading.Thread(
+                target=self._dispatch_broadcast,
+                args=(user_telegram_ids, message_text, image_url, cta_link, cta_text),
+                daemon=True,
+            )
+            thread.start()
+        else:
+            self._dispatch_broadcast(user_telegram_ids, message_text, image_url, cta_link, cta_text)
+        return True
+
+    def _dispatch_broadcast(
+        self,
+        user_telegram_ids: list,
+        message_text: str,
+        image_url: str = None,
+        cta_link: str = None,
+        cta_text: str = None,
+    ) -> int:
+        """Deliver a broadcast to each registered Telegram user."""
+        reply_markup = None
+        if cta_link and cta_text:
+            reply_markup = {
+                'inline_keyboard': [[{'text': cta_text, 'url': cta_link}]]
+            }
+
+        success_count = 0
+        failed_count = 0
+        for user_id in user_telegram_ids:
+            try:
+                if image_url:
+                    photo_payload = {
+                        'chat_id': user_id,
+                        'photo': image_url,
+                        'caption': message_text,
+                    }
+                    if reply_markup:
+                        photo_payload['reply_markup'] = reply_markup
+                    response = None
+                    try:
+                        response = requests.post(
+                            f'{self.api_base}/sendPhoto',
+                            json=photo_payload,
+                            timeout=15,
+                        )
+                        try:
+                            photo_sent = response.status_code == 200 and response.json().get('ok')
+                        except ValueError:
+                            photo_sent = False
+                    except requests.RequestException as error:
+                        photo_sent = False
+                        print(f"[TELEGRAM] Broadcast image request failed for user {user_id}: {error}")
+                    if photo_sent:
+                        success_count += 1
+                    else:
+                        if response is not None:
+                            print(
+                                f"[TELEGRAM] Broadcast image failed for user {user_id}: "
+                                f"{response.status_code} {response.text}"
+                            )
+                        sent = self._send_broadcast_text(user_id, message_text, reply_markup)
+                        success_count += sent
+                        failed_count += int(not sent)
+                else:
+                    sent = self._send_broadcast_text(user_id, message_text, reply_markup)
+                    success_count += sent
+                    failed_count += int(not sent)
+            except requests.RequestException as error:
+                failed_count += 1
+                print(f"[TELEGRAM] Broadcast failed for user {user_id}: {error}")
+            except Exception as error:
+                failed_count += 1
+                print(f"[TELEGRAM] Unexpected broadcast error for user {user_id}: {error}")
+
+            time.sleep(0.05)
+
+        print(
+            f"[TELEGRAM] Broadcast finished: {success_count} sent, "
+            f"{failed_count} failed (target: {len(user_telegram_ids)} users)"
+        )
+        return success_count
+
+    def _send_broadcast_text(self, user_id: int, message_text: str, reply_markup) -> int:
+        payload = {'chat_id': user_id, 'text': message_text}
+        if reply_markup:
+            payload['reply_markup'] = reply_markup
+        response = requests.post(
+            f'{self.api_base}/sendMessage',
+            json=payload,
+            timeout=15,
+        )
+        try:
+            sent = response.status_code == 200 and response.json().get('ok')
+        except ValueError:
+            sent = False
+        if not sent:
+            print(
+                f"[TELEGRAM] Broadcast text failed for user {user_id}: "
+                f"{response.status_code} {response.text}"
+            )
+        return int(bool(sent))
 
 
 def get_telegram_service():

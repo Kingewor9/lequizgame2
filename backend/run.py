@@ -8,7 +8,7 @@ load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 from app import create_app
-from app.models import User, Quiz, Question, Option, QuizResponse, League, UserLeague, FootyCoinTask, UserFootyCoinTask, FootyCoinTransaction
+from app.models import User, Quiz, Question, Option, QuizResponse, League, UserLeague, LeagueTrophy, FootyCoinTask, UserFootyCoinTask, FootyCoinTransaction
 
 
 app = create_app(os.environ.get('FLASK_ENV', 'development'))
@@ -25,6 +25,7 @@ def make_shell_context():
         'QuizResponse': QuizResponse,
         'League': League,
         'UserLeague': UserLeague,
+        'LeagueTrophy': LeagueTrophy,
         'FootyCoinTask': FootyCoinTask,
         'UserFootyCoinTask': UserFootyCoinTask,
         'FootyCoinTransaction': FootyCoinTransaction,

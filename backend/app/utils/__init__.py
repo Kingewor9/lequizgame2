@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 import random
 import string
+from urllib.parse import parse_qsl
 
 
 def generate_id() -> str:
@@ -36,42 +37,30 @@ def verify_telegram_auth(init_data: str, bot_token: str) -> bool:
     """
     Verify Telegram Web App authentication data
     """
+    if not isinstance(init_data, str) or not bot_token:
+        return False
+
     try:
-        # Parse the init data
-        data_dict = {}
-        for part in init_data.split('&'):
-            key, value = part.split('=')
-            data_dict[key] = value
-        
-        # Get the hash
-        if 'hash' not in data_dict:
+        data_dict = dict(parse_qsl(init_data, keep_blank_values=True))
+        received_hash = data_dict.pop('hash', None)
+        if not received_hash:
             return False
-        
-        received_hash = data_dict.pop('hash')
-        
-        # Create the data check string
+
         data_check_string = '\n'.join(
-            f"{k}={v}" for k, v in sorted(data_dict.items())
+            f'{key}={value}' for key, value in sorted(data_dict.items())
         )
-        
-        # Create the secret key from bot token
         secret_key = hmac.new(
             b'WebAppData',
             msg=bot_token.encode(),
             digestmod=hashlib.sha256
         ).digest()
-        
-        # Compute the hash
         computed_hash = hmac.new(
             secret_key,
             msg=data_check_string.encode(),
             digestmod=hashlib.sha256
         ).hexdigest()
-        
-        # Verify the hash
-        return computed_hash == received_hash
-    except Exception as e:
-        print(f"Error verifying Telegram auth: {e}")
+        return hmac.compare_digest(computed_hash, received_hash)
+    except (TypeError, ValueError):
         return False
 
 
@@ -139,6 +128,20 @@ def update_league_rankings(league_id: str):
     if league:
         league.total_members = len(members)
         league.save()
+
+
+def record_league_trophy(user_id: str, league_id: str, season: int):
+    """Persist a league-season win once so restarts cannot erase it."""
+    from app.models import LeagueTrophy
+
+    LeagueTrophy.objects(
+        user_id=user_id,
+        league_id=league_id,
+        season=season
+    ).update_one(
+        upsert=True,
+        set_on_insert__awarded_at=datetime.utcnow()
+    )
 
 
 def check_quiz_expiry(expires_at: datetime) -> bool:

@@ -1,24 +1,26 @@
-/* Cyber-Pitch Floating Navigation Pill */
+/* Floating Pill Navigation Bar */
 .bottom-nav {
   position: fixed;
-  bottom: 24px;
+  bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
-  width: calc(100% - 48px);
-  max-width: 400px;
-  height: 64px;
-  background: rgba(23, 24, 34, 0.7);
-  /* Surface Low with opacity */
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  width: calc(100% - 32px);
+  max-width: 420px;
+  height: 66px;
+  background: rgba(13, 17, 28, 0.88);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
   display: flex;
-  justify-content: space-between;
+  justify-content: space-around;
   align-items: center;
   padding: 0 8px;
-  z-index: 100;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  z-index: 1000;
+  box-shadow: 
+    0 16px 36px -8px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .nav-item {
@@ -27,72 +29,86 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  height: 48px;
-  border-radius: var(--radius-pill);
+  gap: 3px;
+  height: 52px;
+  max-width: 80px;
+  border-radius: 9999px;
   background: transparent;
-  color: var(--text-secondary);
-  font-family: 'Manrope', sans-serif;
+  color: #8b9bb4;
   border: none;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
-  overflow: hidden;
+  padding: 4px;
 }
 
-/* Hover state for non-active items */
+.nav-icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 26px;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: color 0.2s ease, font-weight 0.2s ease;
+  line-height: 1;
+}
+
+/* Hover state */
 .nav-item:hover:not(.active) {
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .nav-item:active {
-  transform: scale(0.92);
+  transform: scale(0.94);
 }
 
-/* Active State */
+/* Active State - Matches Purple Highlight from Screenshots */
 .nav-item.active {
-  color: var(--bg-obsidian);
-  background-color: var(--volt-yellow);
-  box-shadow: 0 0 15px var(--volt-yellow-glow-strong);
+  color: #818cf8;
+  background: rgba(99, 102, 241, 0.14);
 }
 
-.nav-item.active .nav-icon {
-  transform: translateY(-2px);
+.nav-item.active .nav-icon-container {
+  transform: translateY(-1px);
+  color: #818cf8;
+  filter: drop-shadow(0 2px 8px rgba(99, 102, 241, 0.45));
 }
 
-/* Active Indicator Glow inside the active item */
+.nav-item.active .nav-label {
+  color: #a5b4fc;
+  font-weight: 700;
+}
+
+/* Subtle active pill indicator at bottom */
 .nav-item.active::after {
   content: '';
   position: absolute;
   bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background-color: var(--bg-obsidian);
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  width: 14px;
+  height: 2.5px;
+  background: #818cf8;
+  border-radius: 99px;
+  box-shadow: 0 0 6px rgba(129, 140, 248, 0.8);
 }
 
-.nav-icon {
-  font-size: 1.2rem;
-  display: block;
-  transition: transform 0.3s ease;
-  line-height: 1;
-}
-
-.nav-label {
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  transition: opacity 0.3s ease;
-}
-
-/* Hide labels on very small screens to keep it clean */
-@media (max-width: 360px) {
+/* Very compact screen responsiveness */
+@media (max-width: 340px) {
+  .bottom-nav {
+    width: calc(100% - 20px);
+    height: 60px;
+    bottom: 12px;
+  }
   .nav-label {
-    display: none;
+    font-size: 0.62rem;
+  }
+  .nav-item {
+    height: 48px;
   }
 }

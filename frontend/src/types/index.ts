@@ -38,10 +38,14 @@ export interface User {
 }
 
 // Quiz Data
+export type QuizType = 'multiple_choice' | 'image_text';
+export type QuestionType = 'multiple_choice' | 'image_text';
+
 export interface Quiz {
   id: string;
   name: string;
   description?: string;
+  quiz_type?: QuizType;
   total_questions: number;
   time_limit_seconds: number;
   points_per_question: number;
@@ -56,10 +60,13 @@ export interface Quiz {
 
 export interface Question {
   id: string;
-  quiz_id: string;
+  quiz_id?: string;
   question_text: string;
+  question_type?: QuestionType;
+  image_url?: string;
+  correct_answer_text?: string;
   options: Option[];
-  correct_option_id: string;
+  correct_option_id?: string;
   order: number;
 }
 
@@ -87,7 +94,8 @@ export interface QuizResponse {
 
 export interface UserAnswer {
   question_id: string;
-  selected_option_id: string;
+  selected_option_id?: string;
+  answer_text?: string;
   is_correct: boolean;
 }
 
@@ -100,6 +108,7 @@ export interface League {
   code?: string;
   creator_id: string;
   total_members: number;
+  max_members?: number | null;
   total_game_weeks?: number;
   current_game_week?: number;
   start_date?: string;
@@ -122,6 +131,7 @@ export interface UserLeague {
   is_private?: boolean;
   code?: string;
   total_members?: number;
+  max_members?: number | null;
   start_date?: string;
   end_date?: string;
 }

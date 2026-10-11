@@ -25,6 +25,9 @@ class User(Document):
     prev_global_rank = IntField(default=0)
     global_total_players = IntField(default=0)
     footy_coins = IntField(default=0)
+    referral_code = StringField(unique=True, sparse=True)
+    referred_by_id = StringField()
+    referred_user_ids = ListField(StringField(), default=list)
 
     created_at = DateTimeField(default=datetime.utcnow)
     updated_at = DateTimeField(default=datetime.utcnow)
@@ -65,6 +68,9 @@ class Question(EmbeddedDocument):
     """Question embedded document"""
     id = StringField(required=True, default=lambda: str(uuid.uuid4()))
     question_text = StringField(required=True)
+    question_type = StringField(default='multiple_choice')  # 'multiple_choice' or 'image_text'
+    image_url = StringField()  # URL of image for image-based quiz
+    correct_answer_text = StringField()  # Expected text answer (and aliases)
     options = ListField(EmbeddedDocumentField(Option))
     correct_option_id = StringField()
     order = IntField(default=0)
@@ -73,6 +79,9 @@ class Question(EmbeddedDocument):
         return {
             'id': self.id,
             'question_text': self.question_text,
+            'question_type': getattr(self, 'question_type', 'multiple_choice') or 'multiple_choice',
+            'image_url': getattr(self, 'image_url', None),
+            'correct_answer_text': getattr(self, 'correct_answer_text', None),
             'correct_option_id': self.correct_option_id,
             'order': self.order,
             'options': [o.to_dict() for o in self.options] if self.options else [],
@@ -89,6 +98,7 @@ class Quiz(Document):
     id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
     name = StringField(max_length=255, required=True)
     description = StringField()
+    quiz_type = StringField(default='multiple_choice')  # 'multiple_choice' or 'image_text'
     total_questions = IntField(required=True)
     time_limit_seconds = IntField(required=True)
     points_per_question = IntField(default=10)
@@ -107,6 +117,7 @@ class Quiz(Document):
             'id': self.id,
             'name': self.name,
             'description': self.description,
+            'quiz_type': getattr(self, 'quiz_type', 'multiple_choice') or 'multiple_choice',
             'total_questions': self.total_questions,
             'time_limit_seconds': self.time_limit_seconds,
             'points_per_question': self.points_per_question,
@@ -124,13 +135,15 @@ class Quiz(Document):
 class QuizAnswer(EmbeddedDocument):
     """User's answer to a single question"""
     question_id = StringField(required=True)
-    selected_option_id = StringField(required=True)
+    selected_option_id = StringField()
+    answer_text = StringField()
     is_correct = BooleanField(required=True)
 
     def to_dict(self):
         return {
             'question_id': self.question_id,
             'selected_option_id': self.selected_option_id,
+            'answer_text': getattr(self, 'answer_text', None),
             'is_correct': self.is_correct,
         }
 
@@ -191,8 +204,10 @@ class League(Document):
     creator_id = StringField(required=True)
 
     total_members = IntField(default=1)
+    max_members = IntField(min_value=1, null=True, default=None)
     total_game_weeks = IntField(default=4)
     current_game_week = IntField(default=1)
+    season = IntField(default=1)
     start_date = DateTimeField(default=datetime.utcnow)
     end_date = DateTimeField(default=datetime.utcnow)
 
@@ -207,6 +222,7 @@ class League(Document):
             'code': self.code,
             'creator_id': self.creator_id,
             'total_members': self.total_members,
+            'max_members': self.max_members,
             'total_game_weeks': self.total_game_weeks,
             'current_game_week': self.current_game_week,
             'start_date': (self.start_date.isoformat() + 'Z') if self.start_date else None,
@@ -247,11 +263,31 @@ class UserLeague(Document):
         }
 
 
+class LeagueTrophy(Document):
+    """A user's win in a completed league season."""
+    meta = {
+        'collection': 'league_trophies',
+        'indexes': [
+            {'fields': ['user_id', 'league_id', 'season'], 'unique': True}
+        ]
+    }
+
+    id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = StringField(required=True)
+    league_id = StringField(required=True)
+    season = IntField(default=1)
+    awarded_at = DateTimeField(default=datetime.utcnow)
+
+
 class FootyCoinTransaction(Document):
     """Footy coin transaction log"""
     meta = {
         'collection': 'footy_coin_transactions',
-        'indexes': ['user_id', 'created_at']
+        'indexes': [
+            'user_id',
+            'created_at',
+            {'fields': ['telegram_payment_charge_id'], 'unique': True, 'sparse': True},
+        ]
     }
 
     id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -259,6 +295,7 @@ class FootyCoinTransaction(Document):
     type = StringField()
     amount = IntField(required=True)
     reason = StringField()
+    telegram_payment_charge_id = StringField()
 
     created_at = DateTimeField(default=datetime.utcnow)
 
@@ -271,6 +308,28 @@ class FootyCoinTransaction(Document):
             'reason': self.reason,
             'created_at': self.created_at.isoformat() + 'Z',
         }
+
+
+class StarsCoinPurchase(Document):
+    """A Telegram Stars invoice and its payment state."""
+    meta = {
+        'collection': 'stars_coin_purchases',
+        'indexes': [
+            {'fields': ['invoice_payload'], 'unique': True},
+            {'fields': ['telegram_payment_charge_id'], 'unique': True, 'sparse': True},
+            ['user_id', 'created_at'],
+        ]
+    }
+
+    id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = StringField(required=True)
+    telegram_id = IntField(required=True)
+    invoice_payload = StringField(required=True)
+    amount = IntField(required=True)
+    status = StringField(default='pending', choices=('pending', 'paid'))
+    telegram_payment_charge_id = StringField()
+    created_at = DateTimeField(default=datetime.utcnow)
+    paid_at = DateTimeField()
 
 
 class FootyCoinTask(Document):

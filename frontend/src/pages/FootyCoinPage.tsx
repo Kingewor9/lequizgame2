@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Check, Coins, Copy, Gift, Share2, Star, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/apiService';
 import { Loading } from '../components/Loading';
@@ -33,6 +34,27 @@ const TASKS = [
   },
 ];
 
+interface StarsInvoiceResponse {
+  purchase_id: string;
+  invoice_url: string;
+  amount: number;
+  stars: number;
+}
+
+interface StarsPurchaseStatus {
+  status: 'pending' | 'paid';
+  amount: number;
+}
+
+interface ReferralInfo {
+  referral_code: string;
+  referral_link: string;
+  successful_referrals: number;
+  reward_per_referral: number;
+}
+
+type TelegramInvoiceStatus = 'paid' | 'cancelled' | 'failed' | string;
+
 export const FootyCoinPage: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
@@ -40,6 +62,11 @@ export const FootyCoinPage: React.FC = () => {
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
   const [pendingTelegramVerify, setPendingTelegramVerify] = useState(false);
   const [isAdLoading, setIsAdLoading] = useState(false);
+  const [purchaseAmount, setPurchaseAmount] = useState('100');
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(null);
+  const [isReferralLoading, setIsReferralLoading] = useState(true);
+  const [isReferralCopied, setIsReferralCopied] = useState(false);
 
   // Track which task IDs exist on the backend (for one-time tasks)
   const [backendTaskIds, setBackendTaskIds] = useState<Record<string, string>>({});
@@ -89,6 +116,56 @@ export const FootyCoinPage: React.FC = () => {
 
     fetchStatus();
   }, []);
+
+  useEffect(() => {
+    const fetchReferralInfo = async () => {
+      try {
+        const response = await apiService.get<ReferralInfo>('/footy-coins/referrals');
+        if (!response.success || !response.data) {
+          setAlert({
+            message: response.error || 'Could not load your invite link.',
+            type: 'error',
+          });
+          return;
+        }
+        setReferralInfo(response.data);
+      } catch (error) {
+        console.error('Could not fetch referral information:', error);
+        setAlert({ message: 'Could not load your invite link.', type: 'error' });
+      } finally {
+        setIsReferralLoading(false);
+      }
+    };
+
+    void fetchReferralInfo();
+  }, []);
+
+  const handleCopyReferralLink = async () => {
+    if (!referralInfo) return;
+    try {
+      await navigator.clipboard.writeText(referralInfo.referral_link);
+      setIsReferralCopied(true);
+      setAlert({ message: 'Invite link copied. Share it with a friend!', type: 'success' });
+      window.setTimeout(() => setIsReferralCopied(false), 2000);
+    } catch (error) {
+      console.error('Could not copy referral link:', error);
+      setAlert({ message: 'Could not copy the invite link. Please try again.', type: 'error' });
+    }
+  };
+
+  const handleShareReferralLink = () => {
+    if (!referralInfo) return;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralInfo.referral_link)}&text=${encodeURIComponent('Join me on Footy IQ and play football quizzes!')}`;
+    const telegram = (window as Window & {
+      Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } };
+    }).Telegram?.WebApp;
+
+    if (telegram?.openTelegramLink) {
+      telegram.openTelegramLink(shareUrl);
+    } else {
+      window.open(shareUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   // ── Watch Ad ──────────────────────────────────────────────────────────────
   const handleWatchAd = async () => {
@@ -187,6 +264,90 @@ export const FootyCoinPage: React.FC = () => {
     }
   };
 
+  const handlePurchaseCoins = async () => {
+    const amount = Number(purchaseAmount);
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > 10_000_000) {
+      setAlert({ message: 'Enter a whole number from 1 to 10,000,000.', type: 'error' });
+      return;
+    }
+
+    const telegram = (window as Window & {
+      Telegram?: {
+        WebApp?: {
+          openInvoice?: (
+            invoiceUrl: string,
+            callback: (status: TelegramInvoiceStatus) => void
+          ) => void;
+        };
+      };
+    }).Telegram?.WebApp;
+
+    if (!telegram?.openInvoice) {
+      setAlert({
+        message: 'Telegram Stars checkout is only available inside the Telegram app.',
+        type: 'error',
+      });
+      return;
+    }
+
+    setIsPurchasing(true);
+    try {
+      const response = await apiService.post<StarsInvoiceResponse>(
+        '/footy-coins/stars/purchase',
+        { amount }
+      );
+      if (!response.success || !response.data) {
+        setAlert({ message: response.error || 'Could not create a Stars invoice.', type: 'error' });
+        setIsPurchasing(false);
+        return;
+      }
+
+      const { purchase_id: purchaseId, invoice_url: invoiceUrl } = response.data;
+      telegram.openInvoice(invoiceUrl, (status) => {
+        setIsPurchasing(false);
+        if (status === 'cancelled') return;
+        if (status !== 'paid') {
+          setAlert({ message: 'Telegram could not complete this payment. Please try again.', type: 'error' });
+          return;
+        }
+
+        const confirmPayment = async () => {
+          for (let attempt = 0; attempt < 12; attempt += 1) {
+            const purchase = await apiService.get<StarsPurchaseStatus>(
+              `/footy-coins/stars/purchases/${purchaseId}`
+            );
+            if (purchase.success && purchase.data?.status === 'paid') {
+              await refreshUser();
+              setAlert({
+                message: `${amount.toLocaleString()} Footy Coins added to your balance!`,
+                type: 'success',
+              });
+              return;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+
+          setAlert({
+            message: 'Payment received. Your Footy Coins are being credited and will appear shortly.',
+            type: 'info',
+          });
+        };
+
+        void confirmPayment().catch((error: unknown) => {
+          console.error('Could not confirm Stars purchase:', error);
+          setAlert({
+            message: 'Payment received. Your Footy Coins are being credited and will appear shortly.',
+            type: 'info',
+          });
+        });
+      });
+    } catch (error) {
+      console.error('Could not start Telegram Stars checkout:', error);
+      setAlert({ message: 'Could not start Stars checkout. Please try again.', type: 'error' });
+      setIsPurchasing(false);
+    }
+  };
+
   // ── Button helpers ────────────────────────────────────────────────────────
   const getButtonLabel = (type: string): string => {
     if (type === 'watch_ads') {
@@ -249,6 +410,118 @@ export const FootyCoinPage: React.FC = () => {
             </div>
             <p className="coin-description">Use coins to play quizzes and compete</p>
           </div>
+        </section>
+
+        <section className="referral-card" aria-labelledby="referral-heading">
+          <div className="referral-card-top">
+            <div className="referral-icon"><Gift size={21} /></div>
+            <span className="referral-reward">+{referralInfo?.reward_per_referral ?? 10} coins</span>
+          </div>
+          <p className="referral-eyebrow">PASS IT ON</p>
+          <h2 id="referral-heading">Bring your squad.</h2>
+          <p className="referral-copy">
+            Invite a friend to launch Footy IQ. You get 10 Footy Coins when they join — and a Telegram
+            notification when your reward lands.
+          </p>
+          <div className="referral-count">
+            <Users size={17} aria-hidden="true" />
+            <span>
+              {isReferralLoading
+                ? 'Counting your successful invites…'
+                : `${referralInfo?.successful_referrals ?? 0} successful ${referralInfo?.successful_referrals === 1 ? 'invite' : 'invites'}`}
+            </span>
+          </div>
+          <div className="referral-link-row">
+            <span className="referral-link" title={referralInfo?.referral_link}>
+              {referralInfo?.referral_link || (isReferralLoading ? 'Preparing your invite link…' : 'Invite link unavailable')}
+            </span>
+            <button
+              type="button"
+              className="referral-copy-button"
+              onClick={handleCopyReferralLink}
+              disabled={!referralInfo || isReferralLoading}
+              aria-label="Copy invite link"
+            >
+              {isReferralCopied ? <Check size={17} /> : <Copy size={17} />}
+            </button>
+          </div>
+          <button
+            type="button"
+            className="referral-share-button"
+            onClick={handleShareReferralLink}
+            disabled={!referralInfo || isReferralLoading}
+          >
+            <Share2 size={17} />
+            Share invite
+          </button>
+        </section>
+
+        <section className="buy-coins-card card" aria-labelledby="buy-coins-heading">
+          <div className="buy-coins-heading-row">
+            <div className="buy-coins-icon"><Star size={21} fill="currentColor" /></div>
+            <div>
+              <span className="buy-coins-eyebrow">TOP UP YOUR BALANCE</span>
+              <h2 id="buy-coins-heading">Buy Footy Coins</h2>
+            </div>
+          </div>
+          <p className="buy-coins-copy">
+            Choose your amount. Pay securely with Telegram Stars.
+          </p>
+
+          <label className="coin-amount-label" htmlFor="coin-purchase-amount">
+            Footy Coins
+          </label>
+          <div className="coin-purchase-input-wrap">
+            <Coins size={19} aria-hidden="true" />
+            <input
+              id="coin-purchase-amount"
+              type="number"
+              min="1"
+              max="10000000"
+              step="1"
+              inputMode="numeric"
+              value={purchaseAmount}
+              onChange={(event) => setPurchaseAmount(event.target.value)}
+              aria-describedby="coin-price-note"
+            />
+            <span className="coin-purchase-unit">COINS</span>
+          </div>
+          <div className="coin-quick-amounts" aria-label="Quick coin amounts">
+            {[100, 500, 1000].map((amount) => (
+              <button
+                key={amount}
+                type="button"
+                className={Number(purchaseAmount) === amount ? 'active' : ''}
+                onClick={() => setPurchaseAmount(String(amount))}
+                disabled={isPurchasing}
+              >
+                {amount.toLocaleString()}
+              </button>
+            ))}
+          </div>
+
+          <div className="coin-price-row" id="coin-price-note">
+            <span>You'll pay</span>
+            <strong>
+              <Star size={15} fill="currentColor" />
+              {Number(purchaseAmount || 0).toLocaleString()} Stars
+            </strong>
+          </div>
+          <p className="coin-rate-note">1 Footy Coin = 1 Telegram Star</p>
+          <button
+            type="button"
+            className="btn-buy-coins"
+            onClick={handlePurchaseCoins}
+            disabled={
+              isPurchasing
+              || !Number.isSafeInteger(Number(purchaseAmount))
+              || Number(purchaseAmount) < 1
+              || Number(purchaseAmount) > 10_000_000
+            }
+          >
+            <Star size={18} fill="currentColor" />
+            {isPurchasing ? 'Preparing checkout…' : 'Continue with Stars'}
+          </button>
         </section>
 
         {/* Earn Section */}

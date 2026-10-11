@@ -64,6 +64,8 @@ SECRET_KEY=your-secret-key
 JWT_SECRET_KEY=your-jwt-secret
 DATABASE_URL=sqlite:///footy_iq.db
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+TELEGRAM_BOT_USERNAME=your_bot_username
+MINIAPP_URL=https://t.me/your_bot/your_app
 ```
 
 5. Run migrations (if using Flask-Migrate):
@@ -100,11 +102,19 @@ The API will be available at `http://localhost:8000`
 
 ### Footy Coins Page
 - Display current balance
+- Buy Footy Coins with Telegram Stars at 1 Star per coin
 - Earn coins through tasks:
   - Watch ads (100 coins)
   - Claim free bonus (250 coins)
   - Join Telegram channel (150 coins)
+- Invite friends with your Telegram Mini App link and earn 10 coins when each friend launches the game
 - Track completed tasks
+
+#### Referral rewards
+Set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` (without `@`), and `MINIAPP_URL` to your bot's Telegram Mini App link (for example, `https://t.me/your_bot/your_app`). Referral attribution is accepted only from Telegram-signed launch data, and successful invites are rewarded once per account. The bot sends the inviter a Telegram message when the 10 coins are credited; the inviter must be reachable by the bot to receive it.
+
+#### Telegram Stars payments
+Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` in the backend environment. Register the public HTTPS endpoint `/api/footy-coins/telegram-webhook` with Telegram's `setWebhook`, using the same value for `secret_token` and subscribing to `message` and `pre_checkout_query` updates. The database must support MongoDB transactions (for example, MongoDB Atlas or a replica set) so payments are credited atomically and only once.
 
 ## API Endpoints
 
@@ -130,9 +140,13 @@ The API will be available at `http://localhost:8000`
 - `GET /api/users/<id>/leaderboard` - Get global leaderboard
 
 ### Footy Coins
+- `GET /api/footy-coins/referrals` - Get your invite link and successful referral count
 - `GET /api/footy-coins/tasks` - Get available tasks
 - `POST /api/footy-coins/tasks/<id>/complete` - Complete a task
 - `GET /api/footy-coins/balance` - Get coin balance
+- `POST /api/footy-coins/stars/purchase` - Create a Telegram Stars invoice
+- `GET /api/footy-coins/stars/purchases/<id>` - Check invoice payment status
+- `POST /api/footy-coins/telegram-webhook` - Telegram payment updates (secret header required)
 
 ## Database Models
 

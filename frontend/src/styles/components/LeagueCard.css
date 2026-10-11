@@ -1,187 +1,140 @@
-/* Cyber-Pitch League Card Component */
+/* League Card - Matching Screenshot 1 */
+
 .league-card {
-  background-color: var(--surface-low);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-md);
-  padding: 20px;
-  margin-bottom: 16px;
-  animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  background: var(--surface-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-card);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
-  overflow: hidden;
-  box-shadow: var(--shadow-surface);
 }
 
-.league-card.user-league {
-  border-color: rgba(0, 240, 255, 0.3);
+.user-league-card {
+  cursor: pointer;
 }
 
-.league-card.user-league::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background-color: var(--cyan-accent);
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+.user-league-card:hover {
+  background: var(--surface-card-hover);
+  border-color: rgba(99, 102, 241, 0.3);
+  transform: translateY(-1px);
 }
 
-.league-card:hover {
-  border-color: var(--cyan-accent);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 15px rgba(0, 240, 255, 0.1);
-  transform: translateY(-4px);
-}
-
-.league-header {
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: var(--border-subtle);
+.league-card-main {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
+  gap: 16px;
 }
 
-.league-header h3 {
-  font-size: 1.1rem;
-  margin: 0 0 4px 0;
-  color: var(--text-primary);
-  line-height: 1.2;
-}
-
-.league-description {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  margin: 0;
-  line-height: 1.4;
-}
-
-.badge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 0.65rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-family: 'Unbounded', sans-serif;
-}
-
-.badge-primary {
-  background-color: var(--volt-yellow);
-  color: var(--bg-obsidian);
-}
-
-.league-badges-container {
+.league-card-info {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  align-items: flex-end;
-}
-
-.badge-active {
-  background-color: var(--volt-yellow);
-  color: var(--bg-obsidian);
-  box-shadow: 0 0 8px var(--volt-yellow-glow);
-}
-
-.badge-ended {
-  background-color: var(--electric-pink);
-  color: #fff;
-  box-shadow: 0 0 8px var(--electric-pink-glow);
-}
-
-.badge-inactive {
-  background-color: var(--surface-highest);
-  color: var(--text-primary);
-  border: 1px solid var(--text-secondary);
-}
-
-.league-stats,
-.league-info {
-  margin-bottom: 20px;
-  display: grid;
   gap: 8px;
-}
-
-.stat-item,
-.info-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
-}
-
-.stat-item:last-child,
-.info-item:last-child {
-  border-bottom: none;
-}
-
-.stat-label,
-.info-label {
-  color: var(--text-secondary);
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-}
-
-.stat-value,
-.info-value {
-  font-weight: 700;
-  color: var(--text-primary);
-  font-size: 0.85rem;
-}
-
-/* Emphasize user rank if it's high */
-.stat-value:first-child {
-  color: var(--cyan-accent);
-  text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
-}
-
-.league-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.btn-join,
-.btn-view {
   flex: 1;
+  min-width: 0;
 }
 
-@media (max-width: 480px) {
-  .league-card {
-    padding: 16px;
-  }
-}
-
-/* Title + status badge side by side on public league cards */
-.public-league-title-row {
+.league-title-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.public-league-title-row h4 {
-  margin: 0;
-}
-
-/* league-meta row on public cards (members + status) */
-.league-meta {
-  display: flex;
-  gap: 12px;
-  margin-top: 6px;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+  gap: 10px;
   flex-wrap: wrap;
 }
 
-.starts-at {
+.league-name {
+  font-size: 1.06rem;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.25;
+}
+
+.league-description {
+  font-size: 0.86rem;
+  color: #94a3b8;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Stats Row: Rank, Points, Members */
+.league-stats-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  color: #cbd5e1;
+}
+
+.chip-icon {
+  flex-shrink: 0;
+}
+
+.chip-icon-emerald {
+  color: #34d399;
+}
+
+.chip-icon-amber {
+  color: #f59e0b;
+}
+
+.chip-icon-indigo {
+  color: #818cf8;
+}
+
+.stat-chip strong {
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.league-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.league-type-label {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+/* Circular Right Arrow Button */
+.league-arrow-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.user-league-card:hover .league-arrow-btn {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #a5b4fc;
+  transform: translateX(2px);
+}
+
+.btn-join-league {
+  padding: 9px 16px;
+  font-size: 0.85rem;
+  flex-shrink: 0;
 }

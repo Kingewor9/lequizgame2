@@ -7,11 +7,21 @@ import { TournamentPage } from './pages/TournamentPage';
 import { FootyCoinPage } from './pages/FootyCoinPage';
 import { AdminPage } from './pages/AdminPage';
 import { Loading } from './components/Loading';
+import { GameSoundProvider, useGameSound } from './context/GameSoundContext';
 import './styles/global.css';
 
 const AppContent: React.FC = () => {
   const { isLoading, isAuthenticated, error, user } = useAuth();
+  const { playSound } = useGameSound();
   const [activeTab, setActiveTab] = useState<'home' | 'league' | 'tournament' | 'coins' | 'admin'>('home');
+
+  const handleUiClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const control = target.closest('button, [role="button"]');
+    if (!control || control.closest('[data-sound="none"]')) return;
+    playSound('click');
+  };
 
   if (isLoading) {
     return <Loading message="Authenticating with Telegram..." fullScreen />;
@@ -56,7 +66,11 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="font-unbounded" style={{ display: 'flex', flexDirection: 'column', height: '100vh', position: 'relative' }}>
+    <div
+      className="font-unbounded"
+      onClickCapture={handleUiClick}
+      style={{ display: 'flex', flexDirection: 'column', height: '100vh', position: 'relative' }}
+    >
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '90px' }} className="hide-scrollbar">
         {renderPage()}
       </div>
@@ -68,7 +82,9 @@ const AppContent: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <AppContent />
+      <GameSoundProvider>
+        <AppContent />
+      </GameSoundProvider>
     </AuthProvider>
   );
 };

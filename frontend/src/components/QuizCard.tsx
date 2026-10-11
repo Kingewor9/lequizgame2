@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Zap, ListOrdered, Timer, Star, Clock, Coins, ChevronRight, CheckCircle2, Hourglass, Image as ImageIcon } from 'lucide-react';
 import { Quiz } from '../types';
 import { formatTimeRemaining, isQuizExpired, getTimeUntilExpiry } from '../services/utilService';
 import '../styles/components/QuizCard.css';
@@ -30,12 +31,12 @@ export const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStartClick, isLoadin
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isExpired]);
+  }, [isExpired, isCurrentlyLocked]);
 
   useEffect(() => {
     if (timeUntilLive <= 0) return;
     const interval = setInterval(() => {
-      setTimeUntilLive((prev) => prev > 0 ? prev - 1 : 0);
+      setTimeUntilLive((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(interval);
   }, [timeUntilLive]);
@@ -46,57 +47,71 @@ export const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStartClick, isLoadin
 
   return (
     <div className="quiz-card card">
-      <div className="quiz-header flex-between">
-        <h3>{quiz.name}</h3>
-        <span className="quiz-status">Today's Quiz</span>
+      <div className="quiz-card-header">
+        <div className="quiz-title-wrapper">
+          <Zap size={20} className="quiz-icon-zap" />
+          <h3 className="quiz-card-title">
+            Today's Quiz: <span className="quiz-name-highlight">{quiz.name}</span>
+            {quiz.quiz_type === 'image_text' && (
+              <span className="quiz-badge-image-trivia">
+                <ImageIcon size={11} /> Image Quiz
+              </span>
+            )}
+          </h3>
+        </div>
+        {quiz.cost_in_footy_coins > 0 && (
+          <div className="quiz-cost-pill">
+            <Coins size={13} />
+            <span>{quiz.cost_in_footy_coins}</span>
+          </div>
+        )}
       </div>
 
-      <div className="quiz-details">
-        <div className="detail-row flex-between">
-          <span className="detail-label">Questions:</span>
-          <span className="detail-value">{quiz.total_questions}</span>
+      <div className="quiz-metrics-grid">
+        <div className="metric-cell">
+          <ListOrdered size={16} className="metric-icon metric-icon-slate" />
+          <span className="metric-text">{quiz.total_questions} Questions</span>
         </div>
 
-        <div className="detail-row flex-between">
-          <span className="detail-label">Duration:</span>
-          <span className="detail-value">{quiz.time_limit_seconds}s</span>
+        <div className="metric-cell">
+          <Timer size={16} className="metric-icon metric-icon-slate" />
+          <span className="metric-text">{quiz.time_limit_seconds} Seconds</span>
         </div>
 
-        <div className="detail-row flex-between">
-          <span className="detail-label">Total Points:</span>
-          <span className="detail-value">{quiz.total_points}</span>
+        <div className="metric-cell">
+          <Star size={16} className="metric-icon metric-icon-amber" />
+          <span className="metric-text">{quiz.total_points} Points</span>
         </div>
 
-        <div className="detail-row flex-between">
-          <span className="detail-label">Cost:</span>
-          <span className="detail-value">{quiz.cost_in_footy_coins} 💰</span>
-        </div>
-
-        <div className="detail-row flex-between">
-          <span className="detail-label">Expires In:</span>
-          <span className={`detail-value ${!isCurrentlyLocked && timeRemaining < 3600 ? 'text-error' : ''}`}>
-            {isCurrentlyLocked ? 'Pending Go-Live...' : formatTimeRemaining(timeRemaining)}
+        <div className="metric-cell">
+          <Clock size={16} className="metric-icon metric-icon-slate" />
+          <span className="metric-text">
+            Expires In:{' '}
+            <span className={`metric-time ${!isCurrentlyLocked && timeRemaining < 3600 ? 'urgent' : ''}`}>
+              {isCurrentlyLocked ? 'Scheduled' : formatTimeRemaining(timeRemaining)}
+            </span>
           </span>
         </div>
       </div>
 
-      {/* ── Show locked state if already played, otherwise show Start button ── */}
       {quiz.already_played ? (
-        <div className="quiz-played-banner">
-          ✅ You've completed today's quiz. Come back tomorrow!
+        <div className="quiz-status-banner completed">
+          <CheckCircle2 size={18} className="banner-icon" />
+          <span>You've completed today's quiz. Come back tomorrow!</span>
         </div>
       ) : isCurrentlyLocked ? (
-        <div className="quiz-locked-banner" style={{background: 'rgba(255, 51, 102, 0.1)', color: '#ff3366', padding: '12px', borderRadius: '8px', textAlign: 'center', fontWeight: 'bold', border: '1px solid rgba(255, 51, 102, 0.3)'}}>
-          ⏳ Goes live in: {formatTimeRemaining(timeUntilLive)}
+        <div className="quiz-status-banner locked">
+          <Hourglass size={18} className="banner-icon" />
+          <span>Goes live in: {formatTimeRemaining(timeUntilLive)}</span>
         </div>
       ) : (
-
         <button
           className="btn-primary start-quiz-btn"
           onClick={() => onStartClick(quiz)}
           disabled={isLoading}
         >
-          {isLoading ? 'Starting...' : 'Start Quiz'}
+          <ChevronRight size={18} strokeWidth={2.5} />
+          <span>{isLoading ? 'Starting Quiz...' : 'Start Quiz'}</span>
         </button>
       )}
     </div>

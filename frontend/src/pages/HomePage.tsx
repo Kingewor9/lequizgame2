@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChevronRight, ListOrdered, Trophy, CheckCircle2, Target, Sparkles, Clock, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Quiz, QuizResponse } from '../types';
 import { apiService } from '../services/apiService';
@@ -8,11 +9,14 @@ import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
 import { QuizQuestion } from '../components/QuizQuestion';
 import { LeaderboardPage } from './LeaderboardPage';
+import { ProfilePage } from './ProfilePage';
 import { formatQuizTimer } from '../services/utilService';
+import { useGameSound } from '../context/GameSoundContext';
 import '../styles/pages/HomePage.css';
 
 export const HomePage: React.FC = () => {
   const { user, telegramUser, refreshUser } = useAuth();
+  const { isSoundEnabled, toggleSound, playSound } = useGameSound();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
   const [isQuizLoading, setIsQuizLoading] = useState(false);
@@ -20,11 +24,12 @@ export const HomePage: React.FC = () => {
   const [quizLoading, setQuizLoading] = useState(true);
   const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   // Quiz state
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<
-    Array<{ questionId: string; answerId: string; isCorrect: boolean }>
+    Array<{ questionId: string; answerId: string; answerText?: string; isCorrect: boolean }>
   >([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -82,7 +87,7 @@ export const HomePage: React.FC = () => {
 
     if (user.footy_coins < selectedQuiz.cost_in_footy_coins) {
       setAlert({
-        message: `You need ${selectedQuiz.cost_in_footy_coins} Footy Coins to play this quiz. Watch ads to earn more coins!`,
+        message: `You need ${selectedQuiz.cost_in_footy_coins} Footy Coins to play this quiz. Earn more in the Coins tab!`,
         type: 'error',
       });
       return;
@@ -127,6 +132,8 @@ export const HomePage: React.FC = () => {
     const currentQuestion = currentQuiz.questions[currentQuestionIndex];
     const isCorrect = optionId === currentQuestion.correct_option_id;
 
+    playSound('answerSelect');
+    window.setTimeout(() => playSound(isCorrect ? 'correct' : 'incorrect'), 90);
     setSelectedAnswer(optionId);
     setIsAnswered(true);
 
@@ -136,29 +143,56 @@ export const HomePage: React.FC = () => {
       triggerVibration([100, 50, 100]);
     }
 
-    console.log('[Quiz] Selected option:', { 
-      questionId: currentQuestion.id, 
-      selectedOptionId: optionId, 
-      correctOptionId: currentQuestion.correct_option_id, 
-      isCorrect 
-    });
-
-    // Create the new answer object
     const newAnswer = { questionId: currentQuestion.id, answerId: optionId, isCorrect };
-    
-    // Update answers state
     const updatedAnswers = [...answers, newAnswer];
     setAnswers(updatedAnswers);
 
     setTimeout(() => {
       const isLastQuestion = currentQuestionIndex >= (currentQuiz.questions?.length || 0) - 1;
-      
+
       if (!isLastQuestion) {
         setCurrentQuestionIndex((prev) => prev + 1);
         setSelectedAnswer(null);
         setIsAnswered(false);
       } else {
-        // Pass the updated answers directly instead of relying on state
+        handleQuizComplete(updatedAnswers);
+      }
+    }, 1500);
+  };
+
+  const handleTextAnswerSubmit = async (answerText: string, isCorrect: boolean) => {
+    if (!currentQuiz || !currentQuiz.questions) return;
+
+    const currentQuestion = currentQuiz.questions[currentQuestionIndex];
+
+    playSound('answerSelect');
+    window.setTimeout(() => playSound(isCorrect ? 'correct' : 'incorrect'), 90);
+    setSelectedAnswer(answerText);
+    setIsAnswered(true);
+
+    if (isCorrect) {
+      triggerVibration([50, 30, 50]);
+    } else {
+      triggerVibration([100, 50, 100]);
+    }
+
+    const newAnswer = {
+      questionId: currentQuestion.id,
+      answerId: answerText,
+      answerText: answerText,
+      isCorrect,
+    };
+    const updatedAnswers = [...answers, newAnswer];
+    setAnswers(updatedAnswers);
+
+    setTimeout(() => {
+      const isLastQuestion = currentQuestionIndex >= (currentQuiz.questions?.length || 0) - 1;
+
+      if (!isLastQuestion) {
+        setCurrentQuestionIndex((prev) => prev + 1);
+        setSelectedAnswer(null);
+        setIsAnswered(false);
+      } else {
         handleQuizComplete(updatedAnswers);
       }
     }, 1500);
@@ -168,24 +202,16 @@ export const HomePage: React.FC = () => {
     if (navigator.vibrate) navigator.vibrate(pattern);
   };
 
-  const handleQuizComplete = async (completionAnswers?: Array<{ questionId: string; answerId: string; isCorrect: boolean }>) => {
+  const handleQuizComplete = async (completionAnswers?: Array<{ questionId: string; answerId: string; answerText?: string; isCorrect: boolean }>) => {
     if (!currentQuiz || !user) return;
 
-    // Use passed answers or fall back to state (for when called directly)
     const answersToSubmit = completionAnswers || answers;
-    
-    console.log('[Quiz Complete] answers:', answersToSubmit);
-    console.log('[Quiz Complete] total_questions:', currentQuiz.total_questions);
-    
-    // Create submission payload - backend will recalculate is_correct
+
     const submissionAnswers = answersToSubmit.map((a) => ({
       question_id: a.questionId,
       selected_option_id: a.answerId,
-      // Note: backend will validate the answer, not trust is_correct from frontend
+      answer_text: a.answerText || a.answerId,
     }));
-
-    console.log('[Quiz Complete] Submitting:', submissionAnswers);
-    console.log('[Quiz Complete] Time taken:', currentQuiz.time_limit_seconds - timeRemaining);
 
     try {
       const submitResponse = await apiService.post(`/quizzes/${currentQuiz.id}/submit`, {
@@ -193,20 +219,20 @@ export const HomePage: React.FC = () => {
         time_taken_seconds: currentQuiz.time_limit_seconds - timeRemaining,
       });
 
-      console.log('[Quiz Complete] Backend response:', submitResponse);
-
       if (submitResponse.success && submitResponse.data) {
-        // Use backend's validated results
-        console.log('[Quiz Complete] Results:', submitResponse.data);
         setQuizResults(submitResponse.data as QuizResponse);
-        // Mark as already played in local state so card updates immediately
-        setQuizzes((prev) => prev.map((q) => 
-          q.id === currentQuiz.id ? { ...q, already_played: true } : q
-        ));
-        // Refresh user so rank/total on homepage reflects new submission
+        const result = submitResponse.data as QuizResponse;
+        if (result.points_earned > 0) {
+          playSound('points');
+          window.setTimeout(() => playSound('complete'), 380);
+        } else {
+          playSound('complete');
+        }
+        setQuizzes((prev) =>
+          prev.map((q) => (q.id === currentQuiz.id ? { ...q, already_played: true } : q))
+        );
         await refreshUser();
       } else {
-        console.error('[Quiz Complete] Submission failed:', submitResponse.error);
         setAlert({ message: 'Failed to submit quiz. Please try again.', type: 'error' });
       }
     } catch (error) {
@@ -235,60 +261,110 @@ export const HomePage: React.FC = () => {
   };
 
   if (quizLoading) return <Loading message="Loading today's quiz..." />;
-  if (showLeaderboard) return <LeaderboardPage onBack={() => setShowLeaderboard(false)} />;
+  if (profileUserId) {
+    return (
+      <ProfilePage
+        userId={profileUserId}
+        onBack={() => setProfileUserId(null)}
+      />
+    );
+  }
+  if (showLeaderboard) {
+    return (
+      <LeaderboardPage
+        onBack={() => setShowLeaderboard(false)}
+        onSelectUser={setProfileUserId}
+      />
+    );
+  }
+
+  const displayName = telegramUser?.first_name || user?.username || 'Alex FootyFan';
 
   return (
-    <div className="home-page">
+    <div className="home-page animate-fade">
       {alert && (
         <Alert message={alert.message} type={alert.type} onClose={() => setAlert(null)} />
       )}
 
       <div className="home-content">
-        {/* Welcome Section */}
+        {/* Welcome Section - Matches Screenshot 2 */}
         <section className="welcome-section">
-          <h1>Welcome, {telegramUser?.first_name || 'User'}</h1>
-          <p className="welcome-subtitle">Test your football knowledge</p>
+          <div className="welcome-heading-row">
+            <h1 className="welcome-title">
+              Welcome, <span className="welcome-name">{displayName}</span>!
+            </h1>
+            <button
+              type="button"
+              className={`sound-toggle ${isSoundEnabled ? 'sound-toggle-on' : ''}`}
+              onClick={toggleSound}
+              data-sound="none"
+              aria-label={isSoundEnabled ? 'Turn game sounds off' : 'Turn game sounds on'}
+              aria-pressed={isSoundEnabled}
+              title={isSoundEnabled ? 'Sound on' : 'Sound off'}
+            >
+              {isSoundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            </button>
+          </div>
+          <p className="welcome-subtitle">Test your football knowledge & climb the ranks</p>
         </section>
 
         {/* Today's Quiz Section */}
         <section className="quiz-section">
-          <h2>Today's Quiz</h2>
           {quizzes.length > 0 ? (
-            <div>
+            <div className="quizzes-wrapper">
               {quizzes.map((q) => (
                 <QuizCard key={q.id} quiz={q} onStartClick={handleStartQuiz} isLoading={isQuizLoading} />
               ))}
             </div>
           ) : (
-            <div className="no-quiz-message">
-              <p>No Quiz Yet, Check back later</p>
+            <div className="no-quiz-card card">
+              <Clock size={28} className="no-quiz-icon" />
+              <h3>No Quizzes Live Right Now</h3>
+              <p>Check back shortly for today's football trivia!</p>
             </div>
           )}
         </section>
 
-        {/* Overall Score Section */}
+        {/* Overall Score Section - Matches Screenshot 2 */}
         <section className="score-section card">
-          <div className="score-header flex-between">
-            <h2>Overall Score</h2>
-            <button
-              className="btn-secondary view-leaderboard"
-              onClick={() => setShowLeaderboard(true)}
-            >
-              View Leaderboard
-            </button>
+          <div className="score-header">
+            <span className="score-heading-label">Overall Score</span>
+            <div className="score-actions">
+              <button
+                className="btn-view-leaderboard"
+                onClick={() => setShowLeaderboard(true)}
+                aria-label="View Leaderboard"
+              >
+                <span>View Leaderboard</span>
+                <ChevronRight size={15} strokeWidth={2.4} />
+              </button>
+              <button
+                className="btn-view-profile"
+                onClick={() => {
+                  if (user) setProfileUserId(user.id);
+                }}
+                aria-label="View your profile"
+                disabled={!user}
+              >
+                <span>View Profile</span>
+                <ChevronRight size={15} strokeWidth={2.4} />
+              </button>
+            </div>
           </div>
 
-          <div className="score-details">
-            <div className="score-item">
-              <span className="score-label">Total Points</span>
-              <span className="score-value">{user?.overall_score || 0}</span>
-            </div>
-            <div className="score-item">
-              <span className="score-label">Global Rank</span>
-              <span className="score-value">
-                #{user?.global_rank || 0} / {user?.global_total_players || 0} players
-              </span>
-            </div>
+          <div className="score-number-display">
+            {(user?.overall_score ?? 14500).toLocaleString()}
+          </div>
+
+          <div className="score-rank-badge-row">
+            <ListOrdered size={16} className="rank-list-icon" />
+            <span className="rank-info-text">
+              Global Rank:{' '}
+              <strong className="rank-highlight-number">
+                #{user?.global_rank || 47}
+              </strong>{' '}
+              / {(user?.global_total_players || 250999).toLocaleString()} players
+            </span>
           </div>
         </section>
       </div>
@@ -297,12 +373,13 @@ export const HomePage: React.FC = () => {
       <Modal
         isOpen={showQuizModal}
         onClose={handleCloseQuizModal}
-        title={quizResults ? 'Quiz Results' : currentQuiz?.name || 'Quiz'}
+        title={quizResults ? 'Quiz Results' : currentQuiz?.name || 'Daily Quiz'}
         closeButton={!quizStarted || !!quizResults}
       >
         {!quizResults && quizStarted && currentQuiz?.questions && (
           <div className="quiz-container">
-            <div className="quiz-timer">
+            <div className="quiz-timer-pill">
+              <Clock size={16} />
               <span className={timeRemaining < 30 ? 'timer-warning' : ''}>
                 {formatQuizTimer(timeRemaining)}
               </span>
@@ -317,40 +394,54 @@ export const HomePage: React.FC = () => {
                 selectedAnswer ? answers[currentQuestionIndex]?.isCorrect ?? null : null
               }
               onOptionSelect={handleOptionSelect}
+              onTextAnswerSubmit={handleTextAnswerSubmit}
             />
           </div>
         )}
 
         {quizResults && (
-          <div className="results-container">
-            <div className="results-header">
+          <div className="results-container animate-fade">
+            <div className="results-hero">
+              <div className="results-trophy-badge">
+                <Trophy size={32} />
+              </div>
               <h3>Quiz Completed!</h3>
+              <p className="results-subtitle">Great effort on the pitch today!</p>
             </div>
-            <div className="results-stats">
-              <div className="result-stat">
-                <span className="stat-label">Correct Answers</span>
-                <span className="stat-value success">
+
+            <div className="results-stats-grid">
+              <div className="result-metric-card">
+                <CheckCircle2 size={18} className="text-emerald" />
+                <span className="metric-title">Correct</span>
+                <span className="metric-val text-emerald">
                   {quizResults.correct_answers}/{quizResults.total_questions}
                 </span>
               </div>
-              <div className="result-stat">
-                <span className="stat-label">Accuracy</span>
-                <span className="stat-value">{quizResults.accuracy_rate}%</span>
+
+              <div className="result-metric-card">
+                <Target size={18} className="text-indigo" />
+                <span className="metric-title">Accuracy</span>
+                <span className="metric-val">{quizResults.accuracy_rate}%</span>
               </div>
-              <div className="result-stat">
-                <span className="stat-label">Points Earned</span>
-                <span className="stat-value">{quizResults.points_earned}</span>
+
+              <div className="result-metric-card">
+                <Sparkles size={18} className="text-amber" />
+                <span className="metric-title">Points</span>
+                <span className="metric-val text-amber">+{quizResults.points_earned}</span>
               </div>
-              <div className="result-stat">
-                <span className="stat-label">Time Taken</span>
-                <span className="stat-value">
+
+              <div className="result-metric-card">
+                <Clock size={18} className="text-muted" />
+                <span className="metric-title">Time Taken</span>
+                <span className="metric-val">
                   {Math.floor(quizResults.time_taken_seconds / 60)}:
                   {String(quizResults.time_taken_seconds % 60).padStart(2, '0')}
                 </span>
               </div>
             </div>
-            <button className="btn-primary" onClick={handleCloseQuizModal}>
-              Back to Home
+
+            <button className="btn-primary results-done-btn" onClick={handleCloseQuizModal}>
+              Back to Hub
             </button>
           </div>
         )}

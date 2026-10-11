@@ -1,6 +1,6 @@
 import React from 'react';
+import { Home, Users, Trophy, Coins, ShieldCheck } from 'lucide-react';
 import '../styles/components/Navigation.css';
-
 import { User } from '../types';
 
 interface NavigationProps {
@@ -11,40 +11,48 @@ interface NavigationProps {
 
 export const Navigation: React.FC<NavigationProps> = ({ activeTab, user, onTabChange }) => {
   return (
-    <nav className="bottom-nav">
+    <nav className="bottom-nav" aria-label="Main Navigation">
       <button
         className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}
         onClick={() => onTabChange('home')}
-        title="Home"
+        aria-label="Home"
       >
-        <span className="nav-icon">🏠</span>
+        <div className="nav-icon-container">
+          <Home size={21} strokeWidth={activeTab === 'home' ? 2.4 : 1.8} />
+        </div>
         <span className="nav-label">Home</span>
       </button>
 
       <button
         className={`nav-item ${activeTab === 'league' ? 'active' : ''}`}
         onClick={() => onTabChange('league')}
-        title="League"
+        aria-label="Leagues"
       >
-        <span className="nav-icon">🏆</span>
+        <div className="nav-icon-container">
+          <Users size={21} strokeWidth={activeTab === 'league' ? 2.4 : 1.8} />
+        </div>
         <span className="nav-label">League</span>
       </button>
 
       <button
         className={`nav-item ${activeTab === 'tournament' ? 'active' : ''}`}
         onClick={() => onTabChange('tournament')}
-        title="Tournament"
+        aria-label="Tournament"
       >
-        <span className="nav-icon">⚽</span>
+        <div className="nav-icon-container">
+          <Trophy size={21} strokeWidth={activeTab === 'tournament' ? 2.4 : 1.8} />
+        </div>
         <span className="nav-label">Tournament</span>
       </button>
 
       <button
         className={`nav-item ${activeTab === 'coins' ? 'active' : ''}`}
         onClick={() => onTabChange('coins')}
-        title="Footy Coins"
+        aria-label="Footy Coins"
       >
-        <span className="nav-icon">💰</span>
+        <div className="nav-icon-container">
+          <Coins size={21} strokeWidth={activeTab === 'coins' ? 2.4 : 1.8} />
+        </div>
         <span className="nav-label">Coins</span>
       </button>
 
@@ -52,9 +60,11 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, user, onTabCh
         <button
           className={`nav-item ${activeTab === 'admin' ? 'active' : ''}`}
           onClick={() => onTabChange('admin')}
-          title="Admin"
+          aria-label="Admin"
         >
-          <span className="nav-icon">⚙️</span>
+          <div className="nav-icon-container">
+            <ShieldCheck size={21} strokeWidth={activeTab === 'admin' ? 2.4 : 1.8} />
+          </div>
           <span className="nav-label">Admin</span>
         </button>
       )}

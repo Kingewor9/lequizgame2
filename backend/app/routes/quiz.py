@@ -51,6 +51,7 @@ def get_today_quiz():
                 'points_per_question': quiz.points_per_question,
                 'total_points': quiz.total_points,
                 'cost_in_footy_coins': quiz.cost_in_footy_coins,
+                'quiz_type': getattr(quiz, 'quiz_type', 'multiple_choice') or 'multiple_choice',
                 'expires_at': quiz.expires_at.isoformat() + 'Z',
                 'scheduled_for': (quiz.scheduled_for.isoformat() + 'Z') if getattr(quiz, 'scheduled_for', None) else None,
                 'created_at': quiz.created_at.isoformat() + 'Z',
@@ -115,9 +116,10 @@ def submit_quiz(quiz_id):
         for answer_data in answers:
             question_id = answer_data.get('question_id')
             selected_option_id = answer_data.get('selected_option_id')
+            answer_text = answer_data.get('answer_text')
             
-            if not question_id or not selected_option_id:
-                return jsonify(format_error('Missing question_id or selected_option_id')), 400
+            if not question_id:
+                return jsonify(format_error('Missing question_id')), 400
             
             # Find question in quiz
             question = None
@@ -128,20 +130,50 @@ def submit_quiz(quiz_id):
             
             if not question:
                 print(f"[DEBUG] Question {question_id} not found in quiz {quiz_id}")
-                print(f"[DEBUG] Available questions: {[q.id for q in quiz.questions]}")
                 return jsonify(format_error(f'Question not found in this quiz')), 400
             
-            # Validate the answer
-            is_correct = (selected_option_id == question.correct_option_id)
-            print(f"[DEBUG] Question {question_id}: selected={selected_option_id}, correct={question.correct_option_id}, is_correct={is_correct}")
-            if is_correct:
-                correct_count += 1
+            q_type = getattr(question, 'question_type', 'multiple_choice') or 'multiple_choice'
             
-            quiz_answers.append(QuizAnswer(
-                question_id=question_id,
-                selected_option_id=selected_option_id,
-                is_correct=is_correct
-            ))
+            if q_type == 'image_text':
+                # Text answer matching for image quiz
+                raw_user_answer = (answer_text if answer_text is not None else (selected_option_id or '')).strip()
+                raw_correct = getattr(question, 'correct_answer_text', '') or ''
+                
+                # Support comma/pipe separated acceptable aliases
+                aliases = [a.strip().lower() for a in raw_correct.replace('|', ',').split(',') if a.strip()]
+                user_norm = raw_user_answer.lower()
+                
+                is_correct = False
+                if user_norm and aliases:
+                    is_correct = any(user_norm == a for a in aliases)
+                elif user_norm and not aliases:
+                    is_correct = (user_norm == raw_correct.strip().lower())
+                
+                print(f"[DEBUG] Image Question {question_id}: user='{raw_user_answer}', correct='{raw_correct}', is_correct={is_correct}")
+                if is_correct:
+                    correct_count += 1
+                
+                quiz_answers.append(QuizAnswer(
+                    question_id=question_id,
+                    selected_option_id=None,
+                    answer_text=raw_user_answer,
+                    is_correct=is_correct
+                ))
+            else:
+                # Multiple choice validation
+                if not selected_option_id:
+                    return jsonify(format_error('Missing selected_option_id for multiple choice question')), 400
+                is_correct = (selected_option_id == question.correct_option_id)
+                print(f"[DEBUG] MC Question {question_id}: selected={selected_option_id}, correct={question.correct_option_id}, is_correct={is_correct}")
+                if is_correct:
+                    correct_count += 1
+                
+                quiz_answers.append(QuizAnswer(
+                    question_id=question_id,
+                    selected_option_id=selected_option_id,
+                    answer_text=None,
+                    is_correct=is_correct
+                ))
         
         total_count = len(answers)
         print(f"[DEBUG] Total answers: {total_count}, Correct: {correct_count}")

@@ -1,7 +1,14 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models import User, FootyCoinTransaction
-from app.utils import generate_id, format_success, format_error, calculate_global_rank
+from datetime import datetime
+from app.models import User, FootyCoinTransaction, League, LeagueTrophy, UserLeague
+from app.utils import (
+    calculate_global_rank,
+    format_error,
+    format_success,
+    generate_id,
+    record_league_trophy,
+)
 
 user_bp = Blueprint('user', __name__, url_prefix='/api/users')
 
@@ -51,6 +58,22 @@ def get_user(user_id):
         
         user_dict = user.to_dict()
         user_dict['is_admin'] = user.telegram_id in current_app.config.get('ADMIN_TELEGRAM_IDS', [])
+        ended_leagues = list(League.objects(end_date__lte=datetime.utcnow()))
+        ended_leagues_by_id = {league.id: league for league in ended_leagues}
+        ended_league_ids = list(ended_leagues_by_id)
+        current_wins = UserLeague.objects(
+            user_id=user_id, league_id__in=ended_league_ids, rank=1
+        )
+        for membership in current_wins:
+            league = ended_leagues_by_id[membership.league_id]
+            record_league_trophy(
+                user_id,
+                league.id,
+                getattr(league, 'season', 1) or 1
+            )
+        user_dict['league_wins'] = LeagueTrophy.objects(user_id=user_id).count()
+        # Tournaments are not yet persisted by the game, so there are no recorded wins.
+        user_dict['tournament_wins'] = 0
         
         return jsonify(format_success(data=user_dict)), 200
     
@@ -101,6 +124,50 @@ def spend_coins():
     
     except Exception as e:
         return jsonify(format_error(f'Error spending coins: {str(e)}')), 500
+
+
+@user_bp.route('/leaderboard/search', methods=['GET'])
+@jwt_required()
+def search_global_leaderboard():
+    """Search users by username or name and return their leaderboard rank."""
+    try:
+        q = (request.args.get('q', '') or '').strip()
+        if not q:
+            return jsonify(format_success(data=[])), 200
+
+        users = User.objects(
+            __raw__={
+                '$or': [
+                    {'first_name': {'$regex': q, '$options': 'i'}},
+                    {'last_name': {'$regex': q, '$options': 'i'}},
+                    {'username': {'$regex': q, '$options': 'i'}},
+                ]
+            }
+        )
+
+        matches = []
+        for user in users:
+            rank = User.objects(overall_score__gt=user.overall_score).count() + 1
+            user_dict = user.to_dict()
+            user_dict['is_admin'] = user.telegram_id in current_app.config.get('ADMIN_TELEGRAM_IDS', [])
+            matches.append({
+                'rank': rank,
+                'prev_rank': getattr(user, 'prev_global_rank', rank),
+                'user': user_dict,
+                'score': user.overall_score,
+            })
+
+        matches.sort(key=lambda entry: (
+            entry['rank'],
+            (entry['user'].get('first_name') or '').lower(),
+            (entry['user'].get('last_name') or '').lower(),
+            (entry['user'].get('username') or '').lower()
+        ))
+
+        return jsonify(format_success(data=matches[:10])), 200
+
+    except Exception as e:
+        return jsonify(format_error(f'Error searching leaderboard: {str(e)}')), 500
 
 
 @user_bp.route('/<user_id>/leaderboard', methods=['GET'])

@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
+import { Shield, Star, Plus, LogIn, Search, X, Lock, Globe, Users } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { UserLeague, League } from '../types';
 import { apiService } from '../services/apiService';
 import { Modal } from '../components/Modal';
 import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
 import { LeagueCard } from '../components/LeagueCard';
+import { LeagueWelcomeModal } from '../components/LeagueWelcomeModal';
 import { LeagueDetailPage } from './LeagueDetailPage';
+import { useGameSound } from '../context/GameSoundContext';
 import '../styles/pages/LeaguePage.css';
 
 export const LeaguePage: React.FC = () => {
+  const { user, telegramUser } = useAuth();
+  const { playSound } = useGameSound();
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
+  const [welcomeLeague, setWelcomeLeague] = useState<{ id: string; name: string } | null>(null);
   const [userLeagues, setUserLeagues] = useState<UserLeague[]>([]);
   const [publicLeagues, setPublicLeagues] = useState<League[]>([]);
   const [searchResults, setSearchResults] = useState<League[]>([]);
@@ -25,6 +32,7 @@ export const LeaguePage: React.FC = () => {
   const [leagueDescription, setLeagueDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [totalWeeks, setTotalWeeks] = useState<number>(4);
+  const [maxMembers, setMaxMembers] = useState('');
   const [startDate, setStartDate] = useState('');
 
   // Join form
@@ -52,10 +60,8 @@ export const LeaguePage: React.FC = () => {
     return start.toISOString().split('T')[0];
   };
 
-  // ── Today's date as min for date picker ───────────────────────────────────
   const todayISO = new Date().toISOString().split('T')[0];
 
-  // ── Refresh user leagues and public leagues ───────────────────────────────
   const refreshLeagues = async () => {
     try {
       const [myRes, publicRes] = await Promise.all([
@@ -69,7 +75,6 @@ export const LeaguePage: React.FC = () => {
     }
   };
 
-  // ── Data load ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchLeagues = async () => {
       try {
@@ -84,7 +89,6 @@ export const LeaguePage: React.FC = () => {
     fetchLeagues();
   }, []);
 
-  // ── Conditional renders AFTER all hooks ──────────────────────────────────
   if (selectedLeagueId) {
     return (
       <LeagueDetailPage
@@ -96,12 +100,12 @@ export const LeaguePage: React.FC = () => {
 
   if (isLoading) return <Loading message="Loading leagues..." />;
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
   const resetCreateForm = () => {
     setLeagueName('');
     setLeagueDescription('');
     setIsPrivate(false);
     setTotalWeeks(4);
+    setMaxMembers('');
     setStartDate('');
   };
 
@@ -115,12 +119,19 @@ export const LeaguePage: React.FC = () => {
       return;
     }
 
+    const parsedMaxMembers = maxMembers.trim();
+    if (parsedMaxMembers && Number(parsedMaxMembers) < 1) {
+      setAlert({ message: 'Maximum members must be at least 1', type: 'error' });
+      return;
+    }
+
     try {
       const response = await apiService.post('/leagues', {
         name: leagueName,
         description: leagueDescription,
         is_private: isPrivate,
         total_game_weeks: totalWeeks,
+        max_members: parsedMaxMembers ? Number(parsedMaxMembers) : null,
         start_date: startDate,
         end_date: getEndDateISO(),
       });
@@ -146,10 +157,12 @@ export const LeaguePage: React.FC = () => {
     try {
       const response = await apiService.post('/leagues/join', { code: joinCode.toUpperCase() });
       if (response.success && response.data) {
-        setAlert({ message: 'Joined league successfully!', type: 'success' });
+        const joinedLeague = response.data as { league_id: string; name?: string };
         setShowJoinModal(false);
         setJoinCode('');
         await refreshLeagues();
+        playSound('leagueWelcome');
+        setWelcomeLeague({ id: joinedLeague.league_id, name: joinedLeague.name || 'your new league' });
       } else {
         setAlert({ message: response.error || 'Failed to join league', type: 'error' });
       }
@@ -162,8 +175,11 @@ export const LeaguePage: React.FC = () => {
     try {
       const response = await apiService.post(`/leagues/${leagueId}/join-public`, {});
       if (response.success && response.data) {
-        setAlert({ message: 'Joined league successfully!', type: 'success' });
+        const joinedLeague = response.data as { league_id: string; name?: string };
         await refreshLeagues();
+        playSound('leagueWelcome');
+        const leagueName = joinedLeague.name || displayedPublicLeagues.find((league) => league.id === leagueId)?.name;
+        setWelcomeLeague({ id: joinedLeague.league_id || leagueId, name: leagueName || 'your new league' });
       } else {
         setAlert({ message: response.error || 'Failed to join league', type: 'error' });
       }
@@ -203,29 +219,61 @@ export const LeaguePage: React.FC = () => {
   const displayedPublicLeagues = hasSearched ? searchResults : publicLeagues;
   const joinedLeagueIds = new Set(userLeagues.map((ul) => ul.league_id));
   const joinableLeagues = displayedPublicLeagues.filter((l) => !joinedLeagueIds.has(l.id));
-
   const endDate = getEndDate();
 
+  const userIdentifier = telegramUser?.username 
+    ? `@${telegramUser.username}` 
+    : user?.id 
+    ? `user-${user.id.slice(0, 18)}`
+    : 'user-guest';
+
   return (
-    <div className="league-page">
+    <div className="league-page animate-fade">
+      {welcomeLeague && (
+        <LeagueWelcomeModal
+          leagueName={welcomeLeague.name}
+          onClose={() => setWelcomeLeague(null)}
+          onViewLeague={() => {
+            setWelcomeLeague(null);
+            setSelectedLeagueId(welcomeLeague.id);
+          }}
+        />
+      )}
       {alert && (
         <Alert message={alert.message} type={alert.type} onClose={() => setAlert(null)} />
       )}
 
       <div className="league-content">
-        <section className="action-buttons">
-          <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
-            ➕ Create League
+        {/* Header - Matching Screenshot 1 */}
+        <section className="leagues-header-section">
+          <h1 className="leagues-hub-title">Leagues Hub</h1>
+          <div className="user-id-badge">
+            <span className="user-id-label">User ID:</span>
+            <code className="user-id-code">{userIdentifier}</code>
+          </div>
+        </section>
+
+        {/* Action Buttons Row - Matching Screenshot 1 */}
+        <section className="leagues-actions-row">
+          <button className="btn-indigo btn-action" onClick={() => setShowCreateModal(true)}>
+            <Plus size={18} strokeWidth={2.4} />
+            <span>Create League</span>
           </button>
-          <button className="btn-secondary" onClick={() => setShowJoinModal(true)}>
-            🔑 Join with Code
+          <button className="btn-emerald btn-action" onClick={() => setShowJoinModal(true)}>
+            <LogIn size={18} strokeWidth={2.4} />
+            <span>Join League</span>
           </button>
         </section>
 
-        <section className="my-leagues-section">
-          <h2>My Leagues</h2>
+        {/* My Leagues Section - Matching Screenshot 1 */}
+        <section className="leagues-section">
+          <div className="section-heading-row">
+            <Shield size={20} className="section-icon section-icon-indigo" />
+            <h2 className="section-title">My Leagues</h2>
+          </div>
+
           {userLeagues.length > 0 ? (
-            <div className="leagues-list">
+            <div className="leagues-cards-list">
               {userLeagues.map((league) => (
                 <LeagueCard
                   key={league.id}
@@ -239,98 +287,85 @@ export const LeaguePage: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="empty-state">
-              <p>You haven't joined any leagues yet.</p>
-              <p>Create one or join a public league below!</p>
+            <div className="empty-leagues-box card">
+              <Shield size={28} className="empty-box-icon" />
+              <h3>No Leagues Joined Yet</h3>
+              <p>Create a league with friends or join one of the popular leagues below.</p>
             </div>
           )}
         </section>
 
-        <section className="discover-section">
-          <h2>Discover Leagues</h2>
-          <div className="search-bar">
-            <input
-              type="text"
-              placeholder="Search public leagues..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            />
-            {hasSearched ? (
-              <button className="btn-search btn-clear" onClick={clearSearch}>✕</button>
-            ) : (
-              <button
-                className="btn-search"
-                onClick={handleSearch}
-                disabled={!searchQuery.trim() || isSearching}
-              >
-                {isSearching ? '...' : '🔍'}
+        {/* Search Bar - Matching Screenshot 1 */}
+        <div className="league-search-container">
+          <Search size={18} className="search-input-icon" />
+          <input
+            type="text"
+            className="league-search-input"
+            placeholder="Search public leagues..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          />
+          {hasSearched ? (
+            <button className="search-clear-btn" onClick={clearSearch}>
+              <X size={16} />
+            </button>
+          ) : (
+            <button
+              className="search-submit-btn"
+              onClick={handleSearch}
+              disabled={!searchQuery.trim() || isSearching}
+            >
+              {isSearching ? '...' : <Search size={16} />}
+            </button>
+          )}
+        </div>
+
+        {/* Popular Public Leagues Section - Matching Screenshot 1 */}
+        <section className="leagues-section">
+          <div className="section-heading-row">
+            <Star size={20} className="section-icon section-icon-amber" />
+            <h2 className="section-title">
+              {hasSearched ? `Results for "${searchQuery}"` : 'Popular Public Leagues'}
+            </h2>
+            {hasSearched && (
+              <button className="btn-link-reset" onClick={clearSearch}>
+                Clear
               </button>
             )}
           </div>
 
-          <div className="public-leagues-header">
-            <h3>{hasSearched ? `Results for "${searchQuery}"` : 'Top Public Leagues'}</h3>
-            {hasSearched && (
-              <button className="btn-link" onClick={clearSearch}>Back to top leagues</button>
-            )}
-          </div>
-
           {joinableLeagues.length > 0 ? (
-            <div className="public-leagues-list">
-              {joinableLeagues.map((league) => {
-                // Inline status logic — same pattern as LeagueCard.tsx
-                const getStatus = () => {
-                  if (!league.start_date || !league.end_date) return null;
-                  const start = new Date(league.start_date);
-                  const end = new Date(league.end_date);
-                  const now = new Date();
-                  if (now < start) {
-                    const diffMs = start.getTime() - now.getTime();
-                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                    const diffMins = Math.floor(diffMs / (1000 * 60));
-                    if (diffDays > 0) return { label: `Starts in ${diffDays}d`, status: 'inactive' };
-                    if (diffHours > 0) return { label: `Starts in ${diffHours}h`, status: 'inactive' };
-                    if (diffMins > 0) return { label: `Starts in ${diffMins}m`, status: 'inactive' };
-                    return { label: 'Starts soon', status: 'inactive' };
-                  }
-                  if (now >= start && now < end) return { label: 'Active', status: 'active' };
-                  return { label: 'Ended', status: 'ended' };
-                };
-                const statusInfo = getStatus();
-
-                return (
-                  <div key={league.id} className="public-league-card card">
-                    <div className="league-info">
-                      <div className="public-league-title-row">
-                        <h4>{league.name}</h4>
-                        {statusInfo && (
-                          <span className={`badge badge-${statusInfo.status}`}>
-                            {statusInfo.label}
-                          </span>
-                        )}
-                      </div>
-                      {league.description && (
-                        <p className="description">{league.description}</p>
-                      )}
-                      <div className="league-meta">
-                        <span className="member-count">👥 {league.total_members} Members</span>
+            <div className="leagues-cards-list">
+              {joinableLeagues.map((league) => (
+                <div key={league.id} className="public-league-card card">
+                  <div className="public-league-body">
+                    <div className="public-league-header">
+                      <h4>{league.name}</h4>
+                    </div>
+                    {league.description && (
+                      <p className="public-league-desc">{league.description}</p>
+                    )}
+                    <div className="public-league-meta">
+                      <div className="stat-chip">
+                        <Users size={14} className="chip-icon chip-icon-indigo" />
+                        <span>{league.total_members} Members</span>
                       </div>
                     </div>
-                    <button
-                      className="btn-primary btn-sm"
-                      onClick={() => handleJoinPublicLeague(league.id)}
-                    >
-                      Join League
-                    </button>
                   </div>
-                );
-              })}
+                  <button
+                    className="btn-emerald btn-join-action"
+                    onClick={() => handleJoinPublicLeague(league.id)}
+                  >
+                    <LogIn size={15} />
+                    <span>Join League</span>
+                  </button>
+                </div>
+              ))}
             </div>
           ) : (
             <p className="no-leagues-text">
-              {hasSearched ? 'No leagues found. Try a different search.' : 'No public leagues yet.'}
+              {hasSearched ? 'No leagues found. Try a different query.' : 'No public leagues available right now.'}
             </p>
           )}
         </section>
@@ -339,17 +374,25 @@ export const LeaguePage: React.FC = () => {
       {/* ── Create League Modal ── */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => { setShowCreateModal(false); resetCreateForm(); }}
+        onClose={() => {
+          setShowCreateModal(false);
+          resetCreateForm();
+        }}
         title="Create a New League"
       >
-        <form className="league-form" onSubmit={(e) => { e.preventDefault(); handleCreateLeague(); }}>
-
+        <form
+          className="league-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleCreateLeague();
+          }}
+        >
           <div className="form-group">
             <label htmlFor="league-name">League Name *</label>
             <input
               id="league-name"
               type="text"
-              placeholder="Enter league name"
+              placeholder="e.g. The Champions' Circle"
               value={leagueName}
               onChange={(e) => setLeagueName(e.target.value)}
               maxLength={50}
@@ -360,7 +403,7 @@ export const LeaguePage: React.FC = () => {
             <label htmlFor="league-description">Description (Optional)</label>
             <textarea
               id="league-description"
-              placeholder="What is this league about?"
+              placeholder="Elite-level strategic drafting. For serious players only."
               value={leagueDescription}
               onChange={(e) => setLeagueDescription(e.target.value)}
               maxLength={200}
@@ -369,12 +412,11 @@ export const LeaguePage: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="total-weeks">Number of Weeks</label>
+            <label htmlFor="total-weeks">Duration (Game Weeks)</label>
             <select
               id="total-weeks"
               value={totalWeeks}
               onChange={(e) => setTotalWeeks(Number(e.target.value))}
-              className="form-select"
             >
               {[1, 2, 3, 4, 5, 6].map((w) => (
                 <option key={w} value={w}>
@@ -385,6 +427,18 @@ export const LeaguePage: React.FC = () => {
           </div>
 
           <div className="form-group">
+            <label htmlFor="max-members">Max Members (Optional)</label>
+            <input
+              id="max-members"
+              type="number"
+              min={1}
+              placeholder="e.g. 20"
+              value={maxMembers}
+              onChange={(e) => setMaxMembers(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
             <label htmlFor="start-date">Start Date *</label>
             <input
               id="start-date"
@@ -392,18 +446,17 @@ export const LeaguePage: React.FC = () => {
               value={startDate}
               min={todayISO}
               onChange={(e) => setStartDate(e.target.value)}
-              className="form-date"
             />
           </div>
 
           <div className="form-group">
-            <label>End Date</label>
-            <div className={`end-date-display ${endDate ? 'end-date-display--set' : ''}`}>
-              {endDate || 'Select a start date and number of weeks'}
+            <label>Calculated End Date</label>
+            <div className={`end-date-pill ${endDate ? 'set' : ''}`}>
+              {endDate || 'Select a start date above'}
             </div>
           </div>
 
-          <div className="form-group checkbox">
+          <div className="form-group-checkbox">
             <input
               id="private-league"
               type="checkbox"
@@ -413,15 +466,21 @@ export const LeaguePage: React.FC = () => {
             <label htmlFor="private-league">Make this league private</label>
           </div>
 
-          {isPrivate && (
-            <p className="form-hint">🔒 A 6-character invite code will be generated.</p>
-          )}
-          {!isPrivate && (
-            <p className="form-hint">🌍 Anyone can find and join this league.</p>
-          )}
+          <div className="form-privacy-note">
+            {isPrivate ? (
+              <span className="privacy-badge">
+                <Lock size={13} /> A 6-character invite code will be required to join.
+              </span>
+            ) : (
+              <span className="privacy-badge">
+                <Globe size={13} /> Anyone can find and join this league in Discover.
+              </span>
+            )}
+          </div>
 
-          <button type="submit" className="btn-primary btn-full">
-            Create League
+          <button type="submit" className="btn-indigo btn-submit-full">
+            <Plus size={16} />
+            <span>Create League</span>
           </button>
         </form>
       </Modal>
@@ -430,9 +489,15 @@ export const LeaguePage: React.FC = () => {
       <Modal
         isOpen={showJoinModal}
         onClose={() => setShowJoinModal(false)}
-        title="Join a Private League"
+        title="Join a League with Code"
       >
-        <form className="league-form" onSubmit={(e) => { e.preventDefault(); handleJoinPrivateLeague(); }}>
+        <form
+          className="league-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleJoinPrivateLeague();
+          }}
+        >
           <div className="form-group">
             <label htmlFor="join-code">6-Character League Code</label>
             <input
@@ -442,16 +507,19 @@ export const LeaguePage: React.FC = () => {
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
               maxLength={6}
-              className="code-input"
+              className="code-input-field"
             />
           </div>
-          <p className="form-hint">🔑 Ask the league creator for their invite code.</p>
+          <p className="form-hint">
+            <Lock size={13} /> Ask the league commissioner or owner for their 6-character code.
+          </p>
           <button
             type="submit"
-            className="btn-primary btn-full"
+            className="btn-emerald btn-submit-full"
             disabled={joinCode.trim().length !== 6}
           >
-            Join League
+            <LogIn size={16} />
+            <span>Join League</span>
           </button>
         </form>
       </Modal>

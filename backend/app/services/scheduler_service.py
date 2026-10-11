@@ -77,18 +77,20 @@ def generate_periodic_quiz_job():
         quiz.save()
         print(f"[SCHEDULER] Successfully saved automated quiz with ID: {quiz.id}")
         
-        # 6. Send telegram notification to channel
+        # 6. Send telegram notification to users via bot
         try:
             telegram_service = get_telegram_service()
             telegram_service.send_quiz_notification(
                 quiz.name,
                 quiz.description,
                 quiz.total_questions,
-                quiz.total_points
+                quiz.total_points,
+                async_send=True,
+                expires_at=quiz.expires_at,
             )
-            print("[SCHEDULER] Successfully sent telegram notification.")
+            print("[SCHEDULER] Successfully dispatched telegram quiz notification to users.")
         except Exception as e:
-            print(f"[SCHEDULER] Error sending quiz notification to channel: {str(e)}")
+            print(f"[SCHEDULER] Error sending quiz notification to users: {str(e)}")
             
     except Exception as e:
         print(f"[SCHEDULER] Exception mapping/saving generated quiz: {e}")
@@ -115,16 +117,17 @@ def check_scheduled_quizzes_job():
 
     for quiz in pending_quizzes:
         try:
-            success = telegram_service.send_quiz_notification(
+            quiz.notification_sent = True
+            quiz.save()
+            telegram_service.send_quiz_notification(
                 quiz.name,
                 quiz.description,
                 quiz.total_questions,
-                quiz.total_points
+                quiz.total_points,
+                async_send=True,
+                expires_at=quiz.expires_at,
             )
-            if success:
-                quiz.notification_sent = True
-                quiz.save()
-                print(f"[SCHEDULER] Fired exact timed scheduled notification for quiz: {quiz.name}")
+            print(f"[SCHEDULER] Fired exact timed scheduled notification to users for quiz: {quiz.name}")
         except Exception as e:
             print(f"[SCHEDULER] Failed to send scheduled quiz notification: {e}")
 

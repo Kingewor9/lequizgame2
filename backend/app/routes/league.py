@@ -1,9 +1,15 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models import User, League, UserLeague
-from app.utils import generate_id, format_success, format_error, generate_league_code
+from app.utils import (
+    format_error,
+    format_success,
+    generate_id,
+    generate_league_code,
+    record_league_trophy,
+)
 from app.services.telegram_service import get_telegram_service
-from datetime import datetime
+from datetime import datetime, timedelta
 
 league_bp = Blueprint('league', __name__, url_prefix='/api/leagues')
 
@@ -19,6 +25,7 @@ def user_league_dict(ul, league):
         'is_private': league.is_private or False,
         'code': (league.code if league.code else None) if ul.is_owner else None,  # only expose code to owner
         'total_members': league.total_members or 1,
+        'max_members': league.max_members,
         'start_date': (league.start_date.isoformat() + 'Z') if league.start_date else None,
         'end_date': (league.end_date.isoformat() + 'Z') if league.end_date else None,
         'rank': ul.rank or 0,
@@ -26,6 +33,16 @@ def user_league_dict(ul, league):
         'is_owner': ul.is_owner or False,
         'joined_at': (ul.joined_at.isoformat() + 'Z') if ul.joined_at else (datetime.utcnow().isoformat() + 'Z'),
     }
+
+
+def get_league_join_error(league, now):
+    if not league.start_date:
+        return 'This league is not open for new members'
+    if now < league.start_date:
+        return None
+    if league.end_date and now >= league.end_date:
+        return 'This league has ended and is closed to new members'
+    return 'This league has started and is closed to new members'
 
 
 @league_bp.route('', methods=['POST'])
@@ -42,6 +59,12 @@ def create_league():
         description = data.get('description', '').strip()
         is_private  = data.get('is_private', False)
         total_weeks = int(data.get('total_game_weeks', 4))
+        max_members_raw = data.get('max_members')
+
+        try:
+            max_members = int(max_members_raw) if max_members_raw not in (None, '') else None
+        except (TypeError, ValueError):
+            return jsonify(format_error('Maximum members must be a positive whole number')), 400
 
         # Parse start date sent from frontend (ISO format: YYYY-MM-DD)
         start_date_str = data.get('start_date', '')
@@ -63,6 +86,9 @@ def create_league():
         if total_weeks < 1 or total_weeks > 6:
             return jsonify(format_error('Total weeks must be between 1 and 6')), 400
 
+        if max_members is not None and max_members < 1:
+            return jsonify(format_error('Maximum members must be at least 1')), 400
+
         league = League(
             id=generate_id(),
             name=name,
@@ -71,6 +97,7 @@ def create_league():
             code=generate_league_code() if is_private else None,
             creator_id=user_id,
             total_members=1,
+            max_members=max_members,
             total_game_weeks=total_weeks,
             current_game_week=1,
             start_date=start_date,
@@ -178,13 +205,16 @@ def join_private_league():
             return jsonify(format_error('No league found with that code')), 404
 
         now = datetime.utcnow()
-        if league.start_date and league.end_date:
-            if league.start_date <= now < league.end_date:
-                return jsonify(format_error('Cannot join an active league. You can only join before it starts or after it ends.')), 400
+        join_error = get_league_join_error(league, now)
+        if join_error:
+            return jsonify(format_error(join_error)), 400
 
         existing = UserLeague.objects(user_id=user_id, league_id=league.id).first()
         if existing:
             return jsonify(format_error('You are already a member of this league')), 400
+
+        if league.max_members is not None and UserLeague.objects(league_id=league.id).count() >= league.max_members:
+            return jsonify(format_error('This league is already full')), 400
 
         ul = UserLeague(
             id=generate_id(),
@@ -240,13 +270,16 @@ def join_public_league(league_id):
             return jsonify(format_error('This is a private league. Use a code to join.')), 400
 
         now = datetime.utcnow()
-        if league.start_date and league.end_date:
-            if league.start_date <= now < league.end_date:
-                return jsonify(format_error('Cannot join an active league. You can only join before it starts or after it ends.')), 400
+        join_error = get_league_join_error(league, now)
+        if join_error:
+            return jsonify(format_error(join_error)), 400
 
         existing = UserLeague.objects(user_id=user_id, league_id=league.id).first()
         if existing:
             return jsonify(format_error('You are already a member of this league')), 400
+
+        if league.max_members is not None and UserLeague.objects(league_id=league.id).count() >= league.max_members:
+            return jsonify(format_error('This league is already full')), 400
 
         ul = UserLeague(
             id=generate_id(),
@@ -345,6 +378,7 @@ def get_league_detail(league_id):
     'is_private': league.is_private,
     'code': league.code if my_membership.is_owner else None,
     'total_members': league.total_members,
+    'max_members': league.max_members,
     'current_game_week': league.current_game_week,      # no more getattr needed
     'total_game_weeks': league.total_game_weeks,         # no more getattr needed
     'start_date': (league.start_date.isoformat() + 'Z') if league.start_date else None,
@@ -378,9 +412,21 @@ def remove_member(league_id, member_id):
         if not target:
             return jsonify(format_error('Member not found')), 404
 
+        league = League.objects(id=league_id).first()
+        if (
+            league
+            and league.end_date
+            and league.end_date <= datetime.utcnow()
+            and target.rank == 1
+        ):
+            record_league_trophy(
+                target.user_id,
+                league.id,
+                getattr(league, 'season', 1) or 1
+            )
+
         target.delete()
 
-        league = League.objects(id=league_id).first()
         if league and league.total_members > 0:
             league.total_members -= 1
             league.save()
@@ -409,6 +455,14 @@ def restart_league(league_id):
         if league.end_date and datetime.utcnow() < league.end_date:
             return jsonify(format_error('League has not ended yet')), 400
 
+        champion = UserLeague.objects(league_id=league.id, rank=1).first()
+        if champion:
+            record_league_trophy(
+                champion.user_id,
+                league.id,
+                getattr(league, 'season', 1) or 1
+            )
+
         # Reset all member points and ranks
         members = UserLeague.objects(league_id=league_id)
         for i, member in enumerate(members, 1):
@@ -417,7 +471,10 @@ def restart_league(league_id):
             member.save()
 
         # Reset league game week
+        league.season = (getattr(league, 'season', 1) or 1) + 1
         league.current_game_week = 1
+        league.start_date = datetime.utcnow()
+        league.end_date = league.start_date + timedelta(weeks=league.total_game_weeks or 4)
         league.save()
 
         return jsonify(format_success(message='League restarted successfully')), 200

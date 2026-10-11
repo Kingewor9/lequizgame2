@@ -1,4 +1,5 @@
 import React from 'react';
+import { ListOrdered, Star, Users, ChevronRight, Crown, LogIn } from 'lucide-react';
 import { UserLeague, League } from '../types';
 import '../styles/components/LeagueCard.css';
 
@@ -24,7 +25,8 @@ export const LeagueCard: React.FC<LeagueCardProps> = ({
   isUserLeague = false,
 }) => {
   const leagueObj = 'is_private' in league ? league : (league as any).league;
-  const total_members = 'total_members' in league ? (league as League).total_members : (league as UserLeague).league.total_members;
+  const total_members =
+    'total_members' in league ? (league as League).total_members : (league as UserLeague).league.total_members;
 
   const getLeagueStatus = () => {
     if (!leagueObj.start_date || !leagueObj.end_date) return null;
@@ -39,9 +41,9 @@ export const LeagueCard: React.FC<LeagueCardProps> = ({
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
       const diffMins = Math.floor(diffMs / (1000 * 60));
 
-      if (diffDays > 0) return { label: `Starts in ${diffDays} day${diffDays > 1 ? 's' : ''}`, status: 'inactive' };
-      if (diffHours > 0) return { label: `Starts in ${diffHours} hr${diffHours > 1 ? 's' : ''}`, status: 'inactive' };
-      if (diffMins > 0) return { label: `Starts in ${diffMins} min${diffMins > 1 ? 's' : ''}`, status: 'inactive' };
+      if (diffDays > 0) return { label: `Starts in ${diffDays}d`, status: 'inactive' };
+      if (diffHours > 0) return { label: `Starts in ${diffHours}h`, status: 'inactive' };
+      if (diffMins > 0) return { label: `Starts in ${diffMins}m`, status: 'inactive' };
       return { label: 'Starts soon', status: 'inactive' };
     }
 
@@ -55,57 +57,89 @@ export const LeagueCard: React.FC<LeagueCardProps> = ({
   const statusInfo = getLeagueStatus();
 
   return (
-    <div className={`league-card card ${isUserLeague ? 'user-league' : ''}`}>
-      <div className="league-header flex-between">
-        <div>
-          <h3>{leagueObj.name}</h3>
-          {leagueObj.description && <p className="league-description">{leagueObj.description}</p>}
-        </div>
-        <div className="league-badges-container">
-          {statusInfo && <span className={`badge badge-${statusInfo.status}`}>{statusInfo.label}</span>}
-          {isOwnLeague && <span className="badge badge-primary">OWNER</span>}
-        </div>
-      </div>
+    <div
+      className={`league-card card ${isUserLeague ? 'user-league-card' : ''}`}
+      onClick={isUserLeague ? onViewClick : undefined}
+      role={isUserLeague ? 'button' : undefined}
+      tabIndex={isUserLeague ? 0 : undefined}
+    >
+      <div className="league-card-main">
+        <div className="league-card-info">
+          <div className="league-title-row">
+            <h3 className="league-name">{leagueObj.name}</h3>
+            {isOwnLeague && (
+              <span className="badge badge-owner">
+                <Crown size={11} /> Owner
+              </span>
+            )}
+            {statusInfo && !isOwnLeague && (
+              <span className={`badge badge-${statusInfo.status}`}>{statusInfo.label}</span>
+            )}
+          </div>
 
-      {isUserLeague && (
-        <div className="league-stats">
-          <div className="stat-item flex-between">
-            <span className="stat-label">Your Rank:</span>
-            <span className="stat-value">#{userRank}</span>
-          </div>
-          <div className="stat-item flex-between">
-            <span className="stat-label">Your Points:</span>
-            <span className="stat-value">{userPoints}</span>
-          </div>
-          <div className="stat-item flex-between">
-            <span className="stat-label">Members:</span>
-            <span className="stat-value">{total_members}</span>
-          </div>
-        </div>
-      )}
+          {leagueObj.description && (
+            <p className="league-description">{leagueObj.description}</p>
+          )}
 
-      {!isUserLeague && (
-        <div className="league-info">
-          <div className="info-item flex-between">
-            <span className="info-label">Members:</span>
-            <span className="info-value">{total_members}</span>
-          </div>
-          <div className="info-item flex-between">
-            <span className="info-label">Type:</span>
-            <span className="info-value">{leagueObj.is_private ? 'Private' : 'Public'}</span>
-          </div>
+          {isUserLeague ? (
+            <div className="league-stats-row">
+              {userRank !== undefined && (
+                <div className="stat-chip">
+                  <ListOrdered size={14} className="chip-icon chip-icon-emerald" />
+                  <span>
+                    Rank: <strong>#{userRank}</strong>
+                  </span>
+                </div>
+              )}
+              {userPoints !== undefined && (
+                <div className="stat-chip">
+                  <Star size={14} className="chip-icon chip-icon-amber" />
+                  <span>
+                    Pts: <strong>{(userPoints || 0).toLocaleString()}</strong>
+                  </span>
+                </div>
+              )}
+              <div className="stat-chip">
+                <Users size={14} className="chip-icon chip-icon-indigo" />
+                <span>{total_members}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="league-meta-row">
+              <div className="stat-chip">
+                <Users size={14} className="chip-icon chip-icon-indigo" />
+                <span>{total_members} members</span>
+              </div>
+              <span className="league-type-label">
+                {leagueObj.is_private ? 'Private League' : 'Public League'}
+              </span>
+            </div>
+          )}
         </div>
-      )}
 
-      <div className="league-actions">
-        {showJoinButton && (
-          <button className="btn-primary btn-join" onClick={onJoinClick}>
-            Join League
+        {isUserLeague && (
+          <button
+            className="league-arrow-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewClick?.();
+            }}
+            aria-label="View league standings"
+          >
+            <ChevronRight size={18} strokeWidth={2.4} />
           </button>
         )}
-        {(isUserLeague || isOwnLeague) && (
-          <button className="btn-secondary btn-view" onClick={onViewClick}>
-            View Details
+
+        {showJoinButton && (
+          <button
+            className="btn-primary btn-join-league"
+            onClick={(e) => {
+              e.stopPropagation();
+              onJoinClick?.();
+            }}
+          >
+            <LogIn size={15} />
+            <span>Join</span>
           </button>
         )}
       </div>

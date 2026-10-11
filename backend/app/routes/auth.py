@@ -1,17 +1,89 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token
-from app.models import User
-from app.utils import generate_id, format_success, format_error
+from app.models import FootyCoinTransaction, User
+from app.utils import generate_id, format_success, format_error, verify_telegram_auth
+from app.services.telegram_service import get_telegram_service
 from datetime import datetime
+import json
+import secrets
+from urllib.parse import parse_qsl
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
+
+REFERRAL_REWARD = 10
+
+
+def _get_verified_referral_code(init_data, telegram_id):
+    """Return a referral code only when Telegram signed the Mini App launch data."""
+    if not init_data:
+        return None
+
+    fields = dict(parse_qsl(init_data, keep_blank_values=True))
+    start_param = fields.get('start_param', '')
+    if not start_param.startswith('ref_'):
+        return None
+
+    bot_token = current_app.config.get('TELEGRAM_BOT_TOKEN', '')
+    if not verify_telegram_auth(init_data, bot_token):
+        raise ValueError('Could not verify the Telegram referral link.')
+
+    try:
+        signed_user = json.loads(fields.get('user', '{}'))
+    except (TypeError, json.JSONDecodeError) as error:
+        raise ValueError('Could not verify the Telegram referral link.') from error
+
+    if str(signed_user.get('id')) != str(telegram_id):
+        raise ValueError('Could not verify the Telegram referral link.')
+
+    referral_code = start_param[4:]
+    if not referral_code or len(referral_code) > 64:
+        return None
+    return referral_code
+
+
+def _complete_referral_reward(user):
+    """Credit a linked invite once, even if Telegram login is retried."""
+    referrer_id = getattr(user, 'referred_by_id', None)
+    if not referrer_id:
+        return
+
+    referrer = User.objects(id=referrer_id).first()
+    if not referrer:
+        return
+
+    rewarded = User.objects(
+        id=referrer_id,
+        referred_user_ids__ne=user.id,
+    ).update_one(
+        add_to_set__referred_user_ids=user.id,
+        inc__footy_coins=REFERRAL_REWARD,
+        set__updated_at=datetime.utcnow(),
+    )
+    if not rewarded:
+        return
+
+    try:
+        FootyCoinTransaction(
+            id=f'referral_{user.id}',
+            user_id=referrer_id,
+            type='earned',
+            amount=REFERRAL_REWARD,
+            reason='Successful referral',
+        ).save()
+    except Exception:
+        current_app.logger.exception('Could not record referral coin transaction')
+
+    get_telegram_service().send_bulk_notifications(
+        [referrer.telegram_id],
+        f'🎉 Your invite just joined Footy IQ! {REFERRAL_REWARD} Footy Coins have been added to your balance.',
+    )
 
 
 @auth_bp.route('/telegram-login', methods=['POST'])
 def telegram_login():
     """Authenticate user via Telegram"""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         
         # Validate required fields
         required_fields = ['telegram_id', 'first_name']
@@ -24,6 +96,9 @@ def telegram_login():
         last_name = data.get('last_name')
         username = data.get('username')
         photo_url = data.get('photo_url')
+        referral_code = _get_verified_referral_code(
+            data.get('init_data'), telegram_id
+        )
         
         # Check if user exists
         user = User.objects(telegram_id=telegram_id).first()
@@ -40,9 +115,21 @@ def telegram_login():
                 footy_coins=0,
                 overall_score=0,
                 global_rank=0,
-                global_total_players=0
+                global_total_players=0,
+                referral_code=secrets.token_urlsafe(9),
             )
             user.save()
+
+        if referral_code and not getattr(user, 'referred_by_id', None):
+            referrer = User.objects(referral_code=referral_code).first()
+            if referrer and referrer.id != user.id:
+                User.objects(
+                    id=user.id,
+                    referred_by_id__in=[None, ''],
+                ).update_one(set__referred_by_id=referrer.id)
+                user.reload()
+
+        _complete_referral_reward(user)
         
         # Generate JWT token
         access_token = create_access_token(identity=user.id)
@@ -60,6 +147,8 @@ def telegram_login():
             message='Login successful'
         )), 200
     
+    except ValueError as e:
+        return jsonify(format_error(str(e))), 400
     except Exception as e:
         return jsonify(format_error(f'Authentication failed: {str(e)}')), 500
 
