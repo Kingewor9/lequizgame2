@@ -119,6 +119,14 @@ def telegram_login():
                 referral_code=secrets.token_urlsafe(9),
             )
             user.save()
+        else:
+            # Telegram profile details can change after the account is created.
+            user.first_name = first_name
+            user.last_name = last_name
+            user.username = username
+            user.photo_url = photo_url
+            user.updated_at = datetime.utcnow()
+            user.save()
 
         if referral_code and not getattr(user, 'referred_by_id', None):
             referrer = User.objects(referral_code=referral_code).first()

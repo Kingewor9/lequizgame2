@@ -212,6 +212,7 @@ class League(Document):
     end_date = DateTimeField(default=datetime.utcnow)
 
     created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
 
     def to_dict(self):
         return {
@@ -227,6 +228,7 @@ class League(Document):
             'current_game_week': self.current_game_week,
             'start_date': (self.start_date.isoformat() + 'Z') if self.start_date else None,
             'end_date': (self.end_date.isoformat() + 'Z') if self.end_date else None,
+            'updated_at': self.updated_at.isoformat() + 'Z' if self.updated_at else None,
         }
 
 

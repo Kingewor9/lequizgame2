@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models import User, Quiz, QuizResponse, QuizAnswer, FootyCoinTransaction
 from app.utils import generate_id, format_success, format_error, calculate_quiz_accuracy
@@ -96,12 +96,13 @@ def submit_quiz(quiz_id):
         if not user:
             return jsonify(format_error('User not found')), 404
 
-        # ── Block replay ──────────────────────────────────────────────────────
+        # Return the persisted result when a client retries after a lost response.
         already_played = QuizResponse.objects(user_id=user_id, quiz_id=quiz_id).first()
         if already_played:
-            return jsonify(format_error(
-                'You have already completed this quiz. Come back tomorrow!'
-            )), 400
+            return jsonify(format_success(
+                data=already_played.to_dict(),
+                message='Quiz submitted successfully'
+            )), 200
         
         answers = data.get('answers', [])
         time_taken_seconds = data.get('time_taken_seconds', 0)
@@ -250,4 +251,5 @@ def submit_quiz(quiz_id):
         )), 200
     
     except Exception as e:
+        current_app.logger.exception('Error submitting quiz %s', quiz_id)
         return jsonify(format_error(f'Error submitting quiz: {str(e)}')), 500
