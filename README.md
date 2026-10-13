@@ -125,6 +125,7 @@ Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` in the backend environmen
 ### Quizzes
 - `GET /api/quizzes/today` - Get today's quiz
 - `GET /api/quizzes/<id>` - Get full quiz with questions
+- `POST /api/quizzes/<id>/start` - Record a player's quiz start
 - `POST /api/quizzes/<id>/submit` - Submit quiz answers
 
 ### Leagues
@@ -138,6 +139,9 @@ Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` in the backend environmen
 - `GET /api/users/<id>` - Get user profile
 - `POST /api/users/spend-coins` - Spend footy coins
 - `GET /api/users/<id>/leaderboard` - Get global leaderboard
+
+### Admin
+- `GET /api/admin/analytics` - Get player, league, and quiz analytics (admin only; daily metrics use UTC)
 
 ### Footy Coins
 - `GET /api/footy-coins/referrals` - Get your invite link and successful referral count

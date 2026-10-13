@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token
-from app.models import FootyCoinTransaction, User
+from app.models import AppLaunch, FootyCoinTransaction, User
 from app.utils import generate_id, format_success, format_error, verify_telegram_auth
 from app.services.telegram_service import get_telegram_service
 from datetime import datetime
@@ -164,6 +164,12 @@ def telegram_login():
                     user.id,
                 )
             else:
+                AppLaunch.objects(launch_id=launch_id).update_one(
+                    upsert=True,
+                    set_on_insert__id=launch_id,
+                    set_on_insert__user_id=user.id,
+                    set_on_insert__launched_at=datetime.utcnow(),
+                )
                 claimed_launch = User.objects(
                     id=user.id,
                     last_welcome_launch_id__ne=launch_id,

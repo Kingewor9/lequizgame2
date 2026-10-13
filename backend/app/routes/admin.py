@@ -1,6 +1,17 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models import Quiz, Question, Option, FootyCoinTask, User
+from app.models import (
+    AppLaunch,
+    League,
+    Quiz,
+    QuizAttempt,
+    QuizResponse,
+    Question,
+    Option,
+    FootyCoinTask,
+    User,
+    UserLeague,
+)
 from app.utils import generate_id, format_success, format_error
 from app.services.telegram_service import get_telegram_service
 from datetime import datetime, timedelta
@@ -25,6 +36,75 @@ def admin_required(fn):
             
         return fn(*args, **kwargs)
     return wrapper
+
+
+@admin_bp.route('/analytics', methods=['GET'])
+@admin_required
+def get_analytics():
+    """Get current platform totals and UTC daily engagement metrics."""
+    try:
+        now = datetime.utcnow()
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_attempts = QuizAttempt.objects(started_at__gte=start_of_day)
+        completed_today_attempts = today_attempts.filter(completed_at__ne=None)
+
+        active_quizzes = Quiz.objects(is_active=True, expires_at__gt=now)
+        active_quiz_count = sum(
+            1 for quiz in active_quizzes
+            if not quiz.scheduled_for or quiz.scheduled_for <= now
+        )
+
+        quiz_starters_today = set(today_attempts.distinct('user_id'))
+        quiz_completions_today = QuizResponse.objects(
+            completed_at__gte=start_of_day,
+            completed_at__lt=now,
+        )
+        active_players_today = quiz_starters_today | set(
+            quiz_completions_today.distinct('user_id')
+        )
+        active_players_today.update(AppLaunch.objects(
+            launched_at__gte=start_of_day,
+            launched_at__lt=now,
+        ).distinct('user_id'))
+        league_creator_count = len(set(League.objects.distinct('creator_id')))
+
+        total_quiz_starts_today = today_attempts.count()
+        completed_quiz_starts_today = completed_today_attempts.count()
+        completion_rate = (
+            round(completed_quiz_starts_today / total_quiz_starts_today * 100, 1)
+            if total_quiz_starts_today
+            else 0
+        )
+
+        return jsonify(format_success(data={
+            'generated_at': now.isoformat() + 'Z',
+            'total_players': User.objects.count(),
+            'daily_active_users': len(active_players_today),
+            'new_users_today': User.objects(
+                created_at__gte=start_of_day,
+                created_at__lt=now,
+            ).count(),
+            'league_members_joined_today': UserLeague.objects(
+                joined_at__gte=start_of_day,
+                joined_at__lt=now,
+            ).count(),
+            'total_league_memberships': UserLeague.objects.count(),
+            'leagues_created': League.objects.count(),
+            'league_creators': league_creator_count,
+            'leagues_created_today': League.objects(
+                created_at__gte=start_of_day,
+                created_at__lt=now,
+            ).count(),
+            'active_quizzes': active_quiz_count,
+            'quiz_players_today': len(quiz_starters_today),
+            'quiz_starts_today': total_quiz_starts_today,
+            'quiz_completions_today': quiz_completions_today.count(),
+            'quiz_completion_rate': completion_rate,
+        })), 200
+
+    except Exception as error:
+        current_app.logger.exception('Could not load admin analytics')
+        return jsonify(format_error(f'Could not load analytics: {str(error)}')), 500
 
 
 @admin_bp.route('/broadcast', methods=['POST'])

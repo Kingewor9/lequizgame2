@@ -108,6 +108,15 @@ export const HomePage: React.FC = () => {
 
       const quizResponse = await apiService.get(`/quizzes/${selectedQuiz.id}`);
       if (quizResponse.success && quizResponse.data) {
+        const startResponse = await apiService.post(`/quizzes/${selectedQuiz.id}/start`, {});
+        if (!startResponse.success) {
+          setAlert({
+            message: startResponse.error || 'Could not start quiz. Please try again.',
+            type: 'error',
+          });
+          return;
+        }
+
         setCurrentQuiz(quizResponse.data as Quiz);
         setQuizStarted(true);
         setCurrentQuestionIndex(0);

@@ -1,6 +1,13 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models import User, Quiz, QuizResponse, QuizAnswer, FootyCoinTransaction
+from app.models import (
+    User,
+    Quiz,
+    QuizAttempt,
+    QuizResponse,
+    QuizAnswer,
+    FootyCoinTransaction,
+)
 from app.utils import generate_id, format_success, format_error, calculate_quiz_accuracy
 from datetime import datetime
 
@@ -78,6 +85,33 @@ def get_quiz(quiz_id):
     
     except Exception as e:
         return jsonify(format_error(f'Error fetching quiz: {str(e)}')), 500
+
+
+@quiz_bp.route('/<quiz_id>/start', methods=['POST'])
+@jwt_required()
+def start_quiz(quiz_id):
+    """Record that the authenticated player has started a quiz."""
+    try:
+        user_id = get_jwt_identity()
+        quiz = Quiz.objects(id=quiz_id, is_active=True).first()
+        if not quiz or quiz.expires_at <= datetime.utcnow():
+            return jsonify(format_error('Quiz is not currently available')), 404
+        if quiz.scheduled_for and quiz.scheduled_for > datetime.utcnow():
+            return jsonify(format_error('Quiz is not currently available')), 404
+
+        if QuizResponse.objects(user_id=user_id, quiz_id=quiz_id).first():
+            return jsonify(format_error('You have already completed this quiz')), 409
+
+        QuizAttempt.objects(user_id=user_id, quiz_id=quiz_id).update_one(
+            upsert=True,
+            set_on_insert__id=generate_id(),
+            set_on_insert__started_at=datetime.utcnow(),
+        )
+        return jsonify(format_success(message='Quiz start recorded')), 200
+
+    except Exception as e:
+        current_app.logger.exception('Could not record quiz start')
+        return jsonify(format_error(f'Could not record quiz start: {str(e)}')), 500
 
 
 @quiz_bp.route('/<quiz_id>/submit', methods=['POST'])
@@ -200,6 +234,12 @@ def submit_quiz(quiz_id):
             time_taken_seconds=time_taken_seconds
         )
         response.save()
+        QuizAttempt.objects(user_id=user_id, quiz_id=quiz_id).update_one(
+            upsert=True,
+            set_on_insert__id=generate_id(),
+            set__completed_at=datetime.utcnow(),
+            set_on_insert__started_at=datetime.utcnow(),
+        )
         
         # Save career milestones crossed by this score increase.
         from app.models import MilestoneAchievement

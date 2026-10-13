@@ -51,6 +51,23 @@ class User(Document):
         }
 
 
+class AppLaunch(Document):
+    """A verified app launch used to calculate daily active players."""
+    meta = {
+        'collection': 'app_launches',
+        'indexes': [
+            {'fields': ['launch_id'], 'unique': True},
+            'user_id',
+            'launched_at',
+        ]
+    }
+
+    id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
+    launch_id = StringField(required=True)
+    user_id = StringField(required=True)
+    launched_at = DateTimeField(default=datetime.utcnow)
+
+
 class Option(EmbeddedDocument):
     """Option embedded document"""
     id = StringField(required=True, default=lambda: str(uuid.uuid4()))
@@ -187,6 +204,24 @@ class QuizResponse(Document):
             'completed_at': self.completed_at.isoformat() + 'Z',
             'created_at': self.created_at.isoformat() + 'Z',
         }
+
+
+class QuizAttempt(Document):
+    """Tracks quiz starts and completions for participation analytics."""
+    meta = {
+        'collection': 'quiz_attempts',
+        'indexes': [
+            {'fields': ['user_id', 'quiz_id'], 'unique': True},
+            'started_at',
+            'completed_at',
+        ]
+    }
+
+    id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = StringField(required=True)
+    quiz_id = StringField(required=True)
+    started_at = DateTimeField(default=datetime.utcnow)
+    completed_at = DateTimeField(null=True, default=None)
 
 
 class League(Document):

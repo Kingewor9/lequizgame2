@@ -441,7 +441,7 @@
 
 .admin-destinations {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
 }
 
@@ -468,6 +468,12 @@
         var(--surface-low);
 }
 
+.admin-destination-analytics {
+    background:
+        radial-gradient(ellipse at 100% 0, rgba(56, 189, 248, 0.12), transparent 52%),
+        var(--surface-low);
+}
+
 .admin-destination:hover {
     transform: translateY(-3px);
     border-color: rgba(16, 185, 129, 0.42);
@@ -476,6 +482,10 @@
 
 .admin-destination-quiz:hover {
     border-color: rgba(245, 158, 11, 0.45);
+}
+
+.admin-destination-analytics:hover {
+    border-color: rgba(56, 189, 248, 0.45);
 }
 
 .admin-destination-index {
@@ -502,6 +512,12 @@
     border-color: rgba(245, 158, 11, 0.25);
     background: rgba(245, 158, 11, 0.1);
     color: var(--color-amber-light);
+}
+
+.admin-destination-analytics .admin-destination-icon {
+    border-color: rgba(56, 189, 248, 0.25);
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--color-sky);
 }
 
 .admin-destination-copy {
@@ -538,11 +554,19 @@
     color: var(--color-amber-light);
 }
 
+.admin-destination-analytics .admin-destination-action {
+    color: var(--color-sky);
+}
+
 .admin-destination-action svg {
     transform: rotate(180deg);
 }
 
 @media (max-width: 600px) {
+    .admin-destinations {
+        grid-template-columns: 1fr;
+    }
+
     .format-toggle-btn {
         flex: 1 1 100%;
     }

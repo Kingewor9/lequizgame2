@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { apiService } from '../services/apiService';
 import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
-import { ArrowLeft, Image as ImageIcon, ListFilter, Eye, Megaphone, Send } from 'lucide-react';
+import { ArrowLeft, BarChart3, Image as ImageIcon, ListFilter, Eye, Megaphone, Send } from 'lucide-react';
 import '../styles/pages/AdminPage.css';
 import { BroadcastPage } from './BroadcastPage';
+import { AnalyticsPage } from './AnalyticsPage';
 
 interface QuestionDraft {
     id: string;
@@ -482,7 +483,7 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     );
 };
 
-type AdminDestination = 'menu' | 'quiz' | 'broadcast';
+type AdminDestination = 'menu' | 'quiz' | 'broadcast' | 'analytics';
 
 export const AdminPage: React.FC = () => {
     const [destination, setDestination] = useState<AdminDestination>('menu');
@@ -495,12 +496,16 @@ export const AdminPage: React.FC = () => {
         return <BroadcastPage onBack={() => setDestination('menu')} />;
     }
 
+    if (destination === 'analytics') {
+        return <AnalyticsPage onBack={() => setDestination('menu')} />;
+    }
+
     return (
         <main className="admin-page admin-hub">
             <header className="admin-header">
                 <span className="admin-hub-kicker">CONTROL ROOM / 01</span>
                 <h1 className="admin-title">Admin panel</h1>
-                <p className="admin-subtitle">Choose what you want to send to the Footy IQ community.</p>
+                <p className="admin-subtitle">Create quizzes, reach players, and track how the game is growing.</p>
             </header>
 
             <section className="admin-destinations" aria-label="Admin actions">
@@ -530,6 +535,20 @@ export const AdminPage: React.FC = () => {
                         <span>Send an announcement directly to all players via the bot.</span>
                     </span>
                     <span className="admin-destination-action">Compose broadcast <ArrowLeft size={15} /></span>
+                </button>
+
+                <button
+                    type="button"
+                    className="admin-destination admin-destination-analytics"
+                    onClick={() => setDestination('analytics')}
+                >
+                    <span className="admin-destination-index">03 / INSIGHTS</span>
+                    <span className="admin-destination-icon"><BarChart3 size={22} /></span>
+                    <span className="admin-destination-copy">
+                        <strong>Game analytics</strong>
+                        <span>Explore player activity, league growth, and quiz performance.</span>
+                    </span>
+                    <span className="admin-destination-action">Open analytics <ArrowLeft size={15} /></span>
                 </button>
             </section>
         </main>
