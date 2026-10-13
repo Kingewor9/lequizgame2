@@ -1,7 +1,14 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
-from app.models import User, FootyCoinTransaction, League, LeagueTrophy, UserLeague
+from app.models import (
+    User,
+    FootyCoinTransaction,
+    League,
+    LeagueTrophy,
+    MilestoneAchievement,
+    UserLeague,
+)
 from app.utils import (
     calculate_global_rank,
     format_error,
@@ -11,6 +18,41 @@ from app.utils import (
 )
 
 user_bp = Blueprint('user', __name__, url_prefix='/api/users')
+
+
+@user_bp.route('/milestones/claim', methods=['POST'])
+@jwt_required()
+def claim_milestone_notification():
+    """Return and mark the next unseen career milestone for the signed-in user."""
+    try:
+        user_id = get_jwt_identity()
+
+        for _ in range(3):
+            pending_milestones = MilestoneAchievement.objects(
+                user_id=user_id,
+                shown_at=None,
+            ).order_by('achieved_at').limit(20)
+
+            for milestone in pending_milestones:
+                claimed = MilestoneAchievement.objects(
+                    id=milestone.id,
+                    user_id=user_id,
+                    shown_at=None,
+                ).update_one(set__shown_at=datetime.utcnow())
+                if claimed:
+                    return jsonify(format_success(data={
+                        'milestone': {
+                            'id': milestone.id,
+                            'title': milestone.title,
+                            'points': milestone.points,
+                        }
+                    })), 200
+
+        return jsonify(format_success(data={'milestone': None})), 200
+
+    except Exception as e:
+        current_app.logger.exception('Error claiming milestone notification')
+        return jsonify(format_error(f'Error claiming milestone: {str(e)}')), 500
 
 
 def _record_ended_league_wins(user_id):

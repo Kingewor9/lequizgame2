@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Award, ChevronLeft, Crown, Medal, Trophy } from 'lucide-react';
+import { Award, ChevronLeft, Crown, Medal, Shield, Trophy } from 'lucide-react';
 import { Loading } from '../components/Loading';
 import { apiService } from '../services/apiService';
 import { User } from '../types';
+import { CAREER_MILESTONES, getCurrentMilestone } from '../constants/milestones';
 import '../styles/pages/ProfilePage.css';
 
 interface PlayerProfile extends User {
@@ -79,6 +80,22 @@ export const ProfilePage: React.FC<Props> = ({ userId, onBack }) => {
     .filter(Boolean)
     .join('')
     .toUpperCase() || 'U';
+  const currentMilestone = getCurrentMilestone(profile.overall_score);
+  const nextMilestone = CAREER_MILESTONES.find(
+    (milestone) => milestone.points > profile.overall_score
+  );
+  const previousMilestonePoints = currentMilestone?.points || 0;
+  const nextMilestonePoints = nextMilestone?.points || previousMilestonePoints;
+  const milestoneProgress = nextMilestone
+    ? Math.min(100, Math.max(
+      0,
+      ((profile.overall_score - previousMilestonePoints)
+        / (nextMilestonePoints - previousMilestonePoints)) * 100
+    ))
+    : 100;
+  const pointsToNextMilestone = nextMilestone
+    ? Math.max(0, nextMilestone.points - profile.overall_score)
+    : 0;
 
   return (
     <div className="profile-page animate-fade">
@@ -139,6 +156,38 @@ export const ProfilePage: React.FC<Props> = ({ userId, onBack }) => {
         </div>
       </section>
 
+      <section className="profile-milestone card" aria-label="Career milestone progress">
+        <div className="profile-milestone-heading">
+          <div>
+            <span className="profile-section-label">CAREER MILESTONE</span>
+            <h2>{currentMilestone?.title || 'Your journey starts here'}</h2>
+          </div>
+          <span className="profile-milestone-badge" aria-hidden="true">
+            <Shield size={20} />
+          </span>
+        </div>
+        <div
+          className="profile-milestone-track"
+          role="progressbar"
+          aria-label={nextMilestone ? `Progress to ${nextMilestone.title}` : 'All milestones achieved'}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(milestoneProgress)}
+        >
+          <span style={{ width: `${milestoneProgress}%` }} />
+        </div>
+        <div className="profile-milestone-foot">
+          {nextMilestone ? (
+            <>
+              <span><strong>{pointsToNextMilestone.toLocaleString()}</strong> points to {nextMilestone.title}</span>
+              <span>{milestoneProgress.toFixed(0)}%</span>
+            </>
+          ) : (
+            <span>Every milestone achieved. You&apos;re a Legend.</span>
+          )}
+        </div>
+      </section>
+
       <section className="profile-achievements">
         <div className="profile-section-heading">
           <div>
@@ -159,6 +208,12 @@ export const ProfilePage: React.FC<Props> = ({ userId, onBack }) => {
             <span className="achievement-count">{profile.tournament_wins}</span>
             <span className="achievement-label">Tournament wins</span>
             <span className="achievement-detail">Official tournaments</span>
+          </article>
+          <article className="profile-achievement-card profile-milestone-award">
+            <div className="achievement-icon"><Shield size={20} /></div>
+            <span className="achievement-count">{currentMilestone?.title || '—'}</span>
+            <span className="achievement-label">Current milestone</span>
+            <span className="achievement-detail">Career reputation</span>
           </article>
         </div>
       </section>

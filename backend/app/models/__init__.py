@@ -284,6 +284,24 @@ class LeagueTrophy(Document):
     shown_at = DateTimeField(null=True, default=None)
 
 
+class MilestoneAchievement(Document):
+    """A user's one-time notification for reaching a career milestone."""
+    meta = {
+        'collection': 'milestone_achievements',
+        'indexes': [
+            {'fields': ['user_id', 'points'], 'unique': True},
+            {'fields': ['user_id', 'shown_at', 'achieved_at']},
+        ]
+    }
+
+    id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = StringField(required=True)
+    title = StringField(required=True)
+    points = IntField(required=True)
+    achieved_at = DateTimeField(default=datetime.utcnow)
+    shown_at = DateTimeField(null=True, default=None)
+
+
 class FootyCoinTransaction(Document):
     """Footy coin transaction log"""
     meta = {

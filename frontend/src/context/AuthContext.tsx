@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { User, TelegramUser } from '../types';
 import { apiService } from '../services/apiService';
+import { MilestoneNotification } from '../constants/milestones';
 
 const appLaunchId = crypto.randomUUID();
 
@@ -10,8 +11,11 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  milestoneNotification: MilestoneNotification | null;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  claimMilestoneNotification: () => Promise<void>;
+  dismissMilestoneNotification: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,6 +25,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [milestoneNotification, setMilestoneNotification] = useState<MilestoneNotification | null>(null);
+  const activeMilestoneRef = useRef<MilestoneNotification | null>(null);
+  const milestoneClaimRequest = useRef<Promise<void> | null>(null);
+
+  const claimMilestoneNotification = async () => {
+    if (activeMilestoneRef.current) return;
+    if (milestoneClaimRequest.current) return milestoneClaimRequest.current;
+
+    const request = (async () => {
+      const response = await apiService.post<{ milestone: MilestoneNotification | null }>(
+        '/users/milestones/claim',
+        {}
+      );
+      if (response.success && response.data) {
+        activeMilestoneRef.current = response.data.milestone;
+        setMilestoneNotification(response.data.milestone);
+      } else {
+        console.error(
+          'Could not claim milestone notification:',
+          response.error || 'Unexpected API response'
+        );
+      }
+    })();
+
+    milestoneClaimRequest.current = request;
+    try {
+      await request;
+    } finally {
+      milestoneClaimRequest.current = null;
+    }
+  };
+
+  const dismissMilestoneNotification = () => {
+    activeMilestoneRef.current = null;
+    setMilestoneNotification(null);
+  };
 
   useEffect(() => {
     const initializeTelegramAuth = async () => {
@@ -83,6 +123,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           localStorage.setItem('telegram_id', parsedUser.id.toString());
           localStorage.setItem('user_data', JSON.stringify(data));
           setError(null);
+          await claimMilestoneNotification();
         } else {
           setError(response.error || 'Authentication failed');
         }
@@ -100,6 +141,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     setUser(null);
     setTelegramUser(null);
+    activeMilestoneRef.current = null;
+    setMilestoneNotification(null);
     // Clear all stored auth data including JWT token
     localStorage.removeItem('access_token');
     localStorage.removeItem('telegram_id');
@@ -116,6 +159,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (response.success && response.data) {
         setUser(response.data as User);
         localStorage.setItem('user_data', JSON.stringify(response.data));
+        await claimMilestoneNotification();
       }
     } catch (err) {
       console.error('Error refreshing user:', err);
@@ -123,7 +167,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, telegramUser, isAuthenticated: !!user, isLoading, error, logout, refreshUser }}>
+    <AuthContext.Provider value={{
+      user,
+      telegramUser,
+      isAuthenticated: !!user,
+      isLoading,
+      error,
+      milestoneNotification,
+      logout,
+      refreshUser,
+      claimMilestoneNotification,
+      dismissMilestoneNotification,
+    }}>
       {children}
     </AuthContext.Provider>
   );

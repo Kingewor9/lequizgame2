@@ -201,9 +201,19 @@ def submit_quiz(quiz_id):
         )
         response.save()
         
-        # Update user stats
+        # Save career milestones crossed by this score increase.
+        from app.models import MilestoneAchievement
+        from app.utils import CAREER_MILESTONES
+        previous_score = user.overall_score
         user.overall_score += points_earned
         user.save()
+        for milestone_title, milestone_points in CAREER_MILESTONES:
+            if previous_score < milestone_points <= user.overall_score:
+                MilestoneAchievement(
+                    user_id=user.id,
+                    title=milestone_title,
+                    points=milestone_points,
+                ).save()
         
         # ── Add points to active leagues ──────────────────────────────────────
         # Find all active leagues the user is in

@@ -7,6 +7,17 @@ import random
 import string
 from urllib.parse import parse_qsl
 
+CAREER_MILESTONES = (
+    ('Rookie', 1_000),
+    ('Prospect', 5_000),
+    ('Academy Graduate', 10_000),
+    ('First Team', 50_000),
+    ('Playmaker', 100_000),
+    ('Worldclass', 250_000),
+    ('Hall of Famer', 500_000),
+    ('Legend', 1_000_000),
+)
+
 
 def generate_id() -> str:
     """Generate a unique ID using UUID4"""

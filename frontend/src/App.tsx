@@ -8,13 +8,22 @@ import { FootyCoinPage } from './pages/FootyCoinPage';
 import { AdminPage } from './pages/AdminPage';
 import { Loading } from './components/Loading';
 import { LeagueWinModal } from './components/LeagueWinModal';
+import { MilestoneModal } from './components/MilestoneModal';
 import { GameSoundProvider, useGameSound } from './context/GameSoundContext';
 import { apiService } from './services/apiService';
 import { ApiResponse, LeagueWinNotification } from './types';
 import './styles/global.css';
 
 const AppContent: React.FC = () => {
-  const { isLoading, isAuthenticated, error, user } = useAuth();
+  const {
+    isLoading,
+    isAuthenticated,
+    error,
+    user,
+    milestoneNotification,
+    claimMilestoneNotification,
+    dismissMilestoneNotification,
+  } = useAuth();
   const { playSound } = useGameSound();
   const [activeTab, setActiveTab] = useState<'home' | 'league' | 'tournament' | 'coins' | 'admin'>('home');
   const [leagueWin, setLeagueWin] = useState<LeagueWinNotification | null>(null);
@@ -140,6 +149,15 @@ const AppContent: React.FC = () => {
           win={leagueWin}
           onClose={dismissLeagueWin}
           onViewLeague={viewWinningLeague}
+        />
+      )}
+      {milestoneNotification && (
+        <MilestoneModal
+          milestone={milestoneNotification}
+          onClose={() => {
+            dismissMilestoneNotification();
+            void claimMilestoneNotification();
+          }}
         />
       )}
     </div>
