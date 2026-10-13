@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Award, ChevronLeft, Crown, Medal, Shield, Trophy } from 'lucide-react';
 import { Loading } from '../components/Loading';
+import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/apiService';
 import { User } from '../types';
 import { CAREER_MILESTONES, getCurrentMilestone } from '../constants/milestones';
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export const ProfilePage: React.FC<Props> = ({ userId, onBack }) => {
+  const { user: currentUser } = useAuth();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +98,9 @@ export const ProfilePage: React.FC<Props> = ({ userId, onBack }) => {
   const pointsToNextMilestone = nextMilestone
     ? Math.max(0, nextMilestone.points - profile.overall_score)
     : 0;
+  const milestoneEmptyState = currentUser?.id === profile.id
+    ? 'Your journey starts here'
+    : `${profile.first_name || 'This player'}'s journey starts here`;
 
   return (
     <div className="profile-page animate-fade">
@@ -160,7 +165,7 @@ export const ProfilePage: React.FC<Props> = ({ userId, onBack }) => {
         <div className="profile-milestone-heading">
           <div>
             <span className="profile-section-label">CAREER MILESTONE</span>
-            <h2>{currentMilestone?.title || 'Your journey starts here'}</h2>
+            <h2>{currentMilestone?.title || milestoneEmptyState}</h2>
           </div>
           <span className="profile-milestone-badge" aria-hidden="true">
             <Shield size={20} />
