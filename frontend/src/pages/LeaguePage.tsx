@@ -12,7 +12,12 @@ import { LeagueDetailPage } from './LeagueDetailPage';
 import { useGameSound } from '../context/GameSoundContext';
 import '../styles/pages/LeaguePage.css';
 
-export const LeaguePage: React.FC = () => {
+interface Props {
+  openLeagueId?: string | null;
+  onLeagueOpened?: () => void;
+}
+
+export const LeaguePage: React.FC<Props> = ({ openLeagueId, onLeagueOpened }) => {
   const { user, telegramUser } = useAuth();
   const { playSound } = useGameSound();
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
@@ -88,6 +93,12 @@ export const LeaguePage: React.FC = () => {
     };
     fetchLeagues();
   }, []);
+
+  useEffect(() => {
+    if (!openLeagueId) return;
+    setSelectedLeagueId(openLeagueId);
+    onLeagueOpened?.();
+  }, [openLeagueId, onLeagueOpened]);
 
   if (selectedLeagueId) {
     return (

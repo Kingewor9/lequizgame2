@@ -1,0 +1,291 @@
+.league-win-overlay {
+  position: fixed;
+  z-index: 1300;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 20px;
+  background: rgba(3, 6, 11, 0.84);
+  backdrop-filter: blur(10px);
+  animation: league-win-fade 220ms ease both;
+}
+
+.league-win-card {
+  position: relative;
+  display: flex;
+  width: min(100%, 420px);
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  padding: 37px 28px 25px;
+  border: 1px solid rgba(251, 191, 36, 0.27);
+  border-radius: 25px;
+  background:
+    radial-gradient(ellipse at 50% 13%, rgba(245, 158, 11, 0.17), transparent 42%),
+    radial-gradient(ellipse at 0% 100%, rgba(16, 185, 129, 0.1), transparent 48%),
+    linear-gradient(150deg, rgba(255, 255, 255, 0.045), transparent 55%),
+    var(--surface-card);
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.65),
+    0 0 55px rgba(245, 158, 11, 0.08),
+    inset 0 1px rgba(255, 255, 255, 0.08);
+  text-align: center;
+  animation: league-win-enter 480ms cubic-bezier(0.18, 0.82, 0.24, 1) both;
+}
+
+.league-win-card::before,
+.league-win-card::after {
+  position: absolute;
+  width: 190px;
+  height: 190px;
+  border: 1px solid rgba(251, 191, 36, 0.08);
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
+}
+
+.league-win-card::before {
+  top: -145px;
+  left: -115px;
+}
+
+.league-win-card::after {
+  right: -135px;
+  bottom: -150px;
+}
+
+.league-win-confetti {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.league-win-confetti-piece {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  width: 7px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--confetti-color, #fbbf24);
+  opacity: 0;
+  animation: league-win-confetti-fall 1.65s ease-in var(--confetti-delay, 0s) both;
+}
+
+.league-win-confetti-piece:nth-child(4n + 1) {
+  --confetti-color: #fbbf24;
+  --confetti-drift: -155px;
+  --confetti-delay: 80ms;
+}
+
+.league-win-confetti-piece:nth-child(4n + 2) {
+  --confetti-color: #34d399;
+  --confetti-drift: 142px;
+  --confetti-delay: 210ms;
+  width: 5px;
+  height: 9px;
+}
+
+.league-win-confetti-piece:nth-child(4n + 3) {
+  --confetti-color: #f8fafc;
+  --confetti-drift: -92px;
+  --confetti-delay: 340ms;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.league-win-confetti-piece:nth-child(4n) {
+  --confetti-color: #fb7185;
+  --confetti-drift: 186px;
+  --confetti-delay: 150ms;
+}
+
+.league-win-confetti-piece:nth-child(2n) {
+  margin-left: -105px;
+}
+
+.league-win-confetti-piece:nth-child(3n) {
+  margin-left: 75px;
+}
+
+.league-win-confetti-piece:nth-child(5n) {
+  margin-left: -175px;
+}
+
+.league-win-confetti-piece:nth-child(7n) {
+  margin-left: 150px;
+}
+
+.league-win-close {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  width: 35px;
+  height: 35px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 11px;
+  background: rgba(4, 10, 16, 0.48);
+  color: var(--text-secondary);
+}
+
+.league-win-close:hover {
+  color: var(--text-primary);
+}
+
+.league-win-medallion {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 130px;
+  height: 130px;
+  place-items: center;
+  margin: 0 0 19px;
+  border: 1px solid rgba(251, 191, 36, 0.24);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.025) 71%),
+    rgba(9, 13, 22, 0.58);
+  box-shadow: 0 0 36px rgba(245, 158, 11, 0.11), inset 0 0 25px rgba(245, 158, 11, 0.07);
+  color: #fbbf24;
+}
+
+.league-win-medallion-ring {
+  position: absolute;
+  inset: 9px;
+  border: 1px dashed rgba(251, 191, 36, 0.38);
+  border-radius: 50%;
+  animation: league-win-orbit 16s linear infinite;
+}
+
+.league-win-trophy {
+  width: 63px;
+  height: 63px;
+  filter: drop-shadow(0 0 15px rgba(251, 191, 36, 0.48));
+  animation: league-win-trophy-float 2.2s ease-in-out infinite;
+}
+
+.league-win-kicker {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 9px;
+  color: #fbbf24;
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+
+.league-win-card h2 {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  font-size: clamp(1.35rem, 6vw, 1.8rem);
+  font-weight: 850;
+  letter-spacing: -0.055em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.league-win-message {
+  position: relative;
+  z-index: 1;
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-size: 0.87rem;
+  line-height: 1.6;
+}
+
+.league-win-league-name {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  margin-top: 4px;
+  color: #fcd34d;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.league-win-action {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  min-height: 50px;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 25px;
+  border: 1px solid rgba(251, 191, 36, 0.42);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fbbf24, #d97706);
+  color: #211405;
+  font-weight: 850;
+  box-shadow: 0 10px 28px rgba(217, 119, 6, 0.24);
+}
+
+.league-win-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 13px 32px rgba(217, 119, 6, 0.34);
+}
+
+.league-win-later {
+  position: relative;
+  z-index: 1;
+  min-height: 38px;
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.77rem;
+}
+
+.league-win-later:hover {
+  color: var(--text-primary);
+}
+
+@keyframes league-win-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes league-win-enter {
+  from { opacity: 0; transform: translateY(18px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes league-win-trophy-float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-7px) rotate(3deg); }
+}
+
+@keyframes league-win-orbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes league-win-confetti-fall {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0); }
+  12% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--confetti-drift), 310px, 0) rotate(620deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .league-win-overlay,
+  .league-win-card,
+  .league-win-medallion-ring,
+  .league-win-trophy,
+  .league-win-confetti-piece {
+    animation: none;
+  }
+}

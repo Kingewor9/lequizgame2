@@ -302,6 +302,40 @@ class TelegramBotService:
         except Exception as e:
             print(f"[TELEGRAM] Error sending league notification to {owner_telegram_id}: {str(e)}")
             return False
+
+    def send_welcome_message(self, user_telegram_id: int, user_first_name: str):
+        """Send a plain-text welcome message when a user launches the Mini App."""
+        if not self.bot_token:
+            print("[TELEGRAM] Bot token not configured; welcome message was not sent")
+            return False
+
+        first_name = (user_first_name or '').strip()
+        text = (
+            f"👋 Welcome back, {first_name}! ⚽\n\n"
+            "Ready to test your football knowledge? Jump into Footy IQ and keep the game going!"
+        ) if first_name else (
+            "👋 Welcome back to Footy IQ! ⚽\n\n"
+            "Ready to test your football knowledge? Jump into the app and keep the game going!"
+        )
+
+        try:
+            response = requests.post(
+                f'{self.api_base}/sendMessage',
+                json={'chat_id': user_telegram_id, 'text': text},
+                timeout=10,
+            )
+            if response.status_code == 200:
+                print(f"[TELEGRAM] Welcome message sent to user {user_telegram_id}")
+                return True
+
+            print(
+                f"[TELEGRAM] Failed to send welcome message to {user_telegram_id}: "
+                f"{response.text}"
+            )
+            return False
+        except requests.RequestException as error:
+            print(f"[TELEGRAM] Error sending welcome message to {user_telegram_id}: {error}")
+            return False
     
     def send_bulk_notifications(self, user_telegram_ids: list, message_text: str, inline_button=None):
         """

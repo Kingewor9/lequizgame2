@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User, TelegramUser } from '../types';
 import { apiService } from '../services/apiService';
 
+const appLaunchId = crypto.randomUUID();
+
 interface AuthContextType {
   user: User | null;
   telegramUser: TelegramUser | null;
@@ -62,6 +64,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             username: parsedUser.username,
             photo_url: parsedUser.photo_url,
             init_data: initData,
+            launch_id: appLaunchId,
           },
           (attempt, delay) => {
             console.log(`Retrying authentication (attempt ${attempt})... Waiting ${(delay / 1000).toFixed(1)}s`);

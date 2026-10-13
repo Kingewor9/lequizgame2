@@ -144,6 +144,14 @@ export interface LeagueRanking {
   user: User;
 }
 
+export interface LeagueWinNotification {
+  id: string;
+  league_id: string;
+  league_name: string;
+  season: number;
+  awarded_at: string;
+}
+
 // Footy Coin Data
 export interface FootyCoinTransaction {
   id: string;

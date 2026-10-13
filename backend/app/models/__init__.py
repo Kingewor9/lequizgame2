@@ -28,6 +28,7 @@ class User(Document):
     referral_code = StringField(unique=True, sparse=True)
     referred_by_id = StringField()
     referred_user_ids = ListField(StringField(), default=list)
+    last_welcome_launch_id = StringField()
 
     created_at = DateTimeField(default=datetime.utcnow)
     updated_at = DateTimeField(default=datetime.utcnow)
@@ -270,7 +271,8 @@ class LeagueTrophy(Document):
     meta = {
         'collection': 'league_trophies',
         'indexes': [
-            {'fields': ['user_id', 'league_id', 'season'], 'unique': True}
+            {'fields': ['user_id', 'league_id', 'season'], 'unique': True},
+            {'fields': ['user_id', 'shown_at', 'awarded_at']}
         ]
     }
 
@@ -279,6 +281,7 @@ class LeagueTrophy(Document):
     league_id = StringField(required=True)
     season = IntField(default=1)
     awarded_at = DateTimeField(default=datetime.utcnow)
+    shown_at = DateTimeField(null=True, default=None)
 
 
 class FootyCoinTransaction(Document):

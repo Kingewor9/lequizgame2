@@ -6,6 +6,7 @@ from app.services.telegram_service import get_telegram_service
 from datetime import datetime
 import json
 import secrets
+from uuid import UUID
 from urllib.parse import parse_qsl
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
@@ -39,6 +40,20 @@ def _get_verified_referral_code(init_data, telegram_id):
     if not referral_code or len(referral_code) > 64:
         return None
     return referral_code
+
+
+def _is_verified_telegram_launch(init_data, telegram_id):
+    bot_token = current_app.config.get('TELEGRAM_BOT_TOKEN', '')
+    if not verify_telegram_auth(init_data, bot_token):
+        return False
+
+    try:
+        fields = dict(parse_qsl(init_data, keep_blank_values=True))
+        signed_user = json.loads(fields.get('user', '{}'))
+    except (TypeError, json.JSONDecodeError):
+        return False
+
+    return str(signed_user.get('id')) == str(telegram_id)
 
 
 def _complete_referral_reward(user):
@@ -138,6 +153,36 @@ def telegram_login():
                 user.reload()
 
         _complete_referral_reward(user)
+
+        launch_id = data.get('launch_id')
+        if launch_id and _is_verified_telegram_launch(data.get('init_data'), telegram_id):
+            try:
+                launch_id = str(UUID(launch_id))
+            except (TypeError, ValueError, AttributeError):
+                current_app.logger.warning(
+                    'Skipping Telegram welcome for user %s because launch ID is invalid',
+                    user.id,
+                )
+            else:
+                claimed_launch = User.objects(
+                    id=user.id,
+                    last_welcome_launch_id__ne=launch_id,
+                ).update_one(set__last_welcome_launch_id=launch_id)
+                if claimed_launch:
+                    sent = get_telegram_service().send_welcome_message(
+                        user.telegram_id,
+                        user.first_name,
+                    )
+                    if not sent:
+                        current_app.logger.warning(
+                            'Telegram welcome could not be delivered to user %s',
+                            user.id,
+                        )
+        elif launch_id:
+            current_app.logger.warning(
+                'Skipping Telegram welcome for user %s because launch data could not be verified',
+                user.id,
+            )
         
         # Generate JWT token
         access_token = create_access_token(identity=user.id)

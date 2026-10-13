@@ -13,6 +13,24 @@ from app.utils import (
 user_bp = Blueprint('user', __name__, url_prefix='/api/users')
 
 
+def _record_ended_league_wins(user_id):
+    now = datetime.utcnow()
+    ended_leagues = list(League.objects(end_date__lte=now))
+    ended_leagues_by_id = {league.id: league for league in ended_leagues}
+    ended_league_ids = list(ended_leagues_by_id)
+    current_wins = UserLeague.objects(
+        user_id=user_id, league_id__in=ended_league_ids, rank=1
+    )
+
+    for membership in current_wins:
+        league = ended_leagues_by_id[membership.league_id]
+        record_league_trophy(
+            user_id,
+            league.id,
+            getattr(league, 'season', 1) or 1
+        )
+
+
 @user_bp.route('/leaderboard/global', methods=['GET'])
 @jwt_required()
 def get_global_leaderboard():
@@ -40,6 +58,53 @@ def get_global_leaderboard():
         return jsonify(format_error(f'Error fetching global leaderboard: {str(e)}')), 500
 
 
+@user_bp.route('/league-wins/claim', methods=['POST'])
+@jwt_required()
+def claim_league_win():
+    """Return and mark the next unseen league-season win for the signed-in user."""
+    try:
+        user_id = get_jwt_identity()
+        _record_ended_league_wins(user_id)
+
+        for _ in range(3):
+            pending_wins = LeagueTrophy.objects(
+                user_id=user_id, shown_at=None
+            ).order_by('awarded_at').limit(20)
+
+            for trophy in pending_wins:
+                league = League.objects(id=trophy.league_id).first()
+                if not league:
+                    current_app.logger.warning(
+                        'Skipping league trophy %s because league %s no longer exists',
+                        trophy.id,
+                        trophy.league_id,
+                    )
+                    LeagueTrophy.objects(
+                        id=trophy.id, user_id=user_id, shown_at=None
+                    ).update_one(set__shown_at=datetime.utcnow())
+                    continue
+
+                claimed = LeagueTrophy.objects(
+                    id=trophy.id, user_id=user_id, shown_at=None
+                ).update_one(set__shown_at=datetime.utcnow())
+                if claimed:
+                    return jsonify(format_success(data={
+                        'win': {
+                            'id': trophy.id,
+                            'league_id': league.id,
+                            'league_name': league.name,
+                            'season': trophy.season,
+                            'awarded_at': trophy.awarded_at.isoformat() + 'Z',
+                        }
+                    })), 200
+
+        return jsonify(format_success(data={'win': None})), 200
+
+    except Exception as e:
+        current_app.logger.exception('Error claiming league win notification')
+        return jsonify(format_error(f'Error claiming league win: {str(e)}')), 500
+
+
 @user_bp.route('/<user_id>', methods=['GET'])
 @jwt_required()
 def get_user(user_id):
@@ -58,19 +123,7 @@ def get_user(user_id):
         
         user_dict = user.to_dict()
         user_dict['is_admin'] = user.telegram_id in current_app.config.get('ADMIN_TELEGRAM_IDS', [])
-        ended_leagues = list(League.objects(end_date__lte=datetime.utcnow()))
-        ended_leagues_by_id = {league.id: league for league in ended_leagues}
-        ended_league_ids = list(ended_leagues_by_id)
-        current_wins = UserLeague.objects(
-            user_id=user_id, league_id__in=ended_league_ids, rank=1
-        )
-        for membership in current_wins:
-            league = ended_leagues_by_id[membership.league_id]
-            record_league_trophy(
-                user_id,
-                league.id,
-                getattr(league, 'season', 1) or 1
-            )
+        _record_ended_league_wins(user_id)
         user_dict['league_wins'] = LeagueTrophy.objects(user_id=user_id).count()
         # Tournaments are not yet persisted by the game, so there are no recorded wins.
         user_dict['tournament_wins'] = 0
