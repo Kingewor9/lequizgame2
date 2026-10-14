@@ -7,11 +7,61 @@ from app.models import (
     QuizResponse,
     QuizAnswer,
     FootyCoinTransaction,
+    Tournament,
+    TournamentFixture,
+    TournamentRegistration,
+    TournamentSubmission,
 )
 from app.utils import generate_id, format_success, format_error, calculate_quiz_accuracy
 from datetime import datetime
 
 quiz_bp = Blueprint('quiz', __name__, url_prefix='/api/quizzes')
+
+
+def _tournament_quiz_available(quiz, user_id):
+    if getattr(quiz, 'destination', 'game') != 'tournament':
+        return None, None, None
+
+    tournament = Tournament.objects(id=quiz.tournament_id).first()
+    if not tournament:
+        return None, None, 'Tournament not found'
+
+    from app.services.tournament_service import sync_tournament
+
+    sync_tournament(tournament)
+    tournament.reload()
+    registration = TournamentRegistration.objects(
+        tournament_id=tournament.id,
+        user_id=user_id,
+    ).first()
+    if not registration:
+        return None, None, 'You are not registered for this tournament'
+    now = datetime.utcnow()
+    if tournament.status != 'active':
+        return None, None, 'Tournament quiz is not currently available'
+
+    current_gameweek = int((now - tournament.start_at).total_seconds() // 86400) + 1
+    if current_gameweek != quiz.tournament_gameweek:
+        return None, None, 'This tournament quiz is not for the current gameweek'
+    if quiz.scheduled_for and quiz.scheduled_for > now:
+        return None, None, 'Tournament quiz has not started yet'
+    if not quiz.is_active or quiz.expires_at <= now:
+        return None, None, 'Tournament quiz is no longer available'
+
+    fixture = TournamentFixture.objects(
+        tournament_id=tournament.id,
+        gameweek=current_gameweek,
+        __raw__={
+            '$or': [
+                {'player_one_id': user_id},
+                {'player_two_id': user_id},
+            ],
+        },
+    ).first()
+    if not fixture:
+        return None, None, 'No fixture is scheduled for you in this gameweek'
+    return tournament, fixture, None
+
 
 def update_global_rankings():
     """
@@ -37,7 +87,10 @@ def get_today_quiz():
         now = datetime.utcnow()
         
         # Get all quizzes that expire in the future (today's quizzes)
-        quizzes = list(Quiz.objects(expires_at__gt=now, is_active=True).order_by('-created_at'))
+        quizzes = [
+            quiz for quiz in Quiz.objects(expires_at__gt=now, is_active=True).order_by('-created_at')
+            if getattr(quiz, 'destination', 'game') != 'tournament'
+        ]
         
         if not quizzes:
             return jsonify(format_success(data=[], message='No quizzes available')), 200
@@ -45,9 +98,7 @@ def get_today_quiz():
         quizzes_data = []
         for quiz in quizzes:
             # Check if this user has already submitted a response for this quiz
-            already_played = QuizResponse.objects(
-                user_id=user_id, quiz_id=quiz.id
-            ).first() is not None
+            already_played = QuizResponse.objects(user_id=user_id, quiz_id=quiz.id).first() is not None
             
             quizzes_data.append({
                 'id': quiz.id,
@@ -58,6 +109,7 @@ def get_today_quiz():
                 'points_per_question': quiz.points_per_question,
                 'total_points': quiz.total_points,
                 'cost_in_footy_coins': quiz.cost_in_footy_coins,
+                'destination': 'game',
                 'quiz_type': getattr(quiz, 'quiz_type', 'multiple_choice') or 'multiple_choice',
                 'expires_at': quiz.expires_at.isoformat() + 'Z',
                 'scheduled_for': (quiz.scheduled_for.isoformat() + 'Z') if getattr(quiz, 'scheduled_for', None) else None,
@@ -80,6 +132,14 @@ def get_quiz(quiz_id):
         
         if not quiz:
             return jsonify(format_error('Quiz not found')), 404
+
+        if getattr(quiz, 'destination', 'game') == 'tournament':
+            _, _, error = _tournament_quiz_available(
+                quiz,
+                get_jwt_identity(),
+            )
+            if error:
+                return jsonify(format_error(error)), 403
         
         return jsonify(format_success(data=quiz.to_dict())), 200
     
@@ -99,7 +159,19 @@ def start_quiz(quiz_id):
         if quiz.scheduled_for and quiz.scheduled_for > datetime.utcnow():
             return jsonify(format_error('Quiz is not currently available')), 404
 
-        if QuizResponse.objects(user_id=user_id, quiz_id=quiz_id).first():
+        if getattr(quiz, 'destination', 'game') == 'tournament':
+            _, fixture, error = _tournament_quiz_available(quiz, user_id)
+            if error:
+                return jsonify(format_error(error)), 403
+            if fixture.status != 'scheduled':
+                return jsonify(format_error('Your tournament fixture is already complete')), 409
+            already_played = TournamentSubmission.objects(
+                user_id=user_id,
+                quiz_id=quiz_id,
+            ).first()
+        else:
+            already_played = QuizResponse.objects(user_id=user_id, quiz_id=quiz_id).first()
+        if already_played:
             return jsonify(format_error('You have already completed this quiz')), 409
 
         QuizAttempt.objects(user_id=user_id, quiz_id=quiz_id).update_one(
@@ -125,19 +197,33 @@ def submit_quiz(quiz_id):
         quiz = Quiz.objects(id=quiz_id).first()
         if not quiz:
             return jsonify(format_error('Quiz not found')), 404
+
+        is_tournament_quiz = getattr(quiz, 'destination', 'game') == 'tournament'
+        existing_model = TournamentSubmission if is_tournament_quiz else QuizResponse
+        existing_response = existing_model.objects(
+            user_id=user_id,
+            quiz_id=quiz_id,
+        ).first()
+        if existing_response:
+            return jsonify(format_success(
+                data=existing_response.to_dict(),
+                message='Quiz submitted successfully',
+            )), 200
+
+        tournament = None
+        fixture = None
+        if is_tournament_quiz:
+            tournament, fixture, error = _tournament_quiz_available(quiz, user_id)
+            if error:
+                return jsonify(format_error(error)), 403
+            if fixture.status != 'scheduled':
+                return jsonify(format_error('Your tournament fixture is already complete')), 409
         
         user = User.objects(id=user_id).first()
         if not user:
             return jsonify(format_error('User not found')), 404
 
         # Return the persisted result when a client retries after a lost response.
-        already_played = QuizResponse.objects(user_id=user_id, quiz_id=quiz_id).first()
-        if already_played:
-            return jsonify(format_success(
-                data=already_played.to_dict(),
-                message='Quiz submitted successfully'
-            )), 200
-        
         answers = data.get('answers', [])
         time_taken_seconds = data.get('time_taken_seconds', 0)
         
@@ -218,6 +304,39 @@ def submit_quiz(quiz_id):
         points_per_question = quiz.total_points / quiz.total_questions
         points_earned = int(correct_count * points_per_question)
         print(f"[DEBUG] Points: {points_per_question} per question, {points_earned} total")
+
+        if is_tournament_quiz and tournament:
+            submission = TournamentSubmission(
+                id=generate_id(),
+                user_id=user_id,
+                tournament_id=tournament.id,
+                quiz_id=quiz.id,
+                gameweek=quiz.tournament_gameweek,
+                answers=quiz_answers,
+                total_questions=total_count,
+                correct_answers=correct_count,
+                incorrect_answers=total_count - correct_count,
+                points_earned=points_earned,
+                accuracy_rate=accuracy,
+                time_taken_seconds=time_taken_seconds,
+            )
+            try:
+                submission.save()
+            except Exception:
+                current_app.logger.exception('Could not save tournament quiz result')
+                return jsonify(format_error('Could not save tournament quiz result')), 500
+
+            from app.services.tournament_service import (
+                notify_opponent_score,
+                sync_tournament,
+            )
+
+            notify_opponent_score(submission)
+            sync_tournament(tournament)
+            return jsonify(format_success(
+                data=submission.to_dict(),
+                message='Tournament quiz submitted successfully',
+            )), 201
         
         
         # Save quiz response

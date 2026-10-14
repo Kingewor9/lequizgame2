@@ -53,9 +53,69 @@ export interface Quiz {
   cost_in_footy_coins: number;
   expires_at: string;
   scheduled_for?: string;
+  destination?: 'game' | 'tournament';
+  tournament_id?: string;
+  tournament_gameweek?: number;
   created_at: string;
   questions?: Question[];
   already_played?: boolean;
+}
+
+export type TournamentType = 'league' | 'group_knockout';
+export type TournamentStatus = 'registration' | 'active' | 'completed' | 'draft' | 'cancelled';
+
+export interface Tournament {
+  id: string;
+  name: string;
+  description: string;
+  tournament_type: TournamentType;
+  entry_fee: number;
+  max_players: number;
+  registered_count: number;
+  start_at: string;
+  status: TournamentStatus;
+  total_gameweeks: number;
+  winner_user_ids: string[];
+  registered?: boolean;
+  available?: boolean;
+}
+
+export interface TournamentPlayer {
+  id: string;
+  name: string;
+  photo_url?: string;
+}
+
+export interface TournamentFixture {
+  id: string;
+  gameweek: number;
+  scheduled_at: string;
+  closes_at: string;
+  status: 'scheduled' | 'completed' | 'bye';
+  result?: 'win' | 'draw' | 'forfeit' | 'bye' | null;
+  winner_user_id?: string | null;
+  player: TournamentPlayer | null;
+  opponent: TournamentPlayer | null;
+  player_score: number | null;
+  opponent_score: number | null;
+  player_submitted: boolean;
+  opponent_submitted: boolean;
+}
+
+export interface TournamentStanding {
+  user_id: string;
+  name: string;
+  photo_url?: string;
+  rank: number;
+  points: number;
+  matches_played: number;
+  gameweeks_played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  points_for: number;
+  points_against: number;
+  point_difference: number;
 }
 
 export interface Question {
@@ -82,6 +142,7 @@ export interface QuizResponse {
   id: string;
   user_id: string;
   quiz_id: string;
+  gameweek?: number;
   answers: UserAnswer[];
   total_questions: number;
   correct_answers: number;

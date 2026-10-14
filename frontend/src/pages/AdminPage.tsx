@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiService } from '../services/apiService';
 import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
-import { ArrowLeft, BarChart3, Image as ImageIcon, ListFilter, Eye, Megaphone, Send } from 'lucide-react';
+import { ArrowLeft, BarChart3, CalendarClock, Coins, Image as ImageIcon, ListFilter, Eye, Megaphone, Send, Trophy, Users } from 'lucide-react';
 import '../styles/pages/AdminPage.css';
 import { BroadcastPage } from './BroadcastPage';
 import { AnalyticsPage } from './AnalyticsPage';
@@ -15,6 +15,15 @@ interface QuestionDraft {
     correct_answer_text: string;
     options: [string, string, string, string];
     correct_option_index: number;
+}
+
+interface AdminTournament {
+    id: string;
+    name: string;
+    tournament_type: 'league' | 'group_knockout';
+    status: string;
+    start_at: string;
+    registered_count: number;
 }
 
 const AdminImagePreview: React.FC<{ imageUrl: string; questionNumber: number }> = ({ imageUrl, questionNumber }) => {
@@ -55,10 +64,49 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [pointsPerQuestion, setPointsPerQuestion] = useState<number>(10);
     const [costInCoins, setCostInCoins] = useState<number>(0);
     const [expiresInHours, setExpiresInHours] = useState<number>(24);
+    const [quizDestination, setQuizDestination] = useState<'game' | 'tournament'>('game');
+    const [tournaments, setTournaments] = useState<AdminTournament[]>([]);
+    const [selectedTournamentId, setSelectedTournamentId] = useState('');
+    const [tournamentListLoading, setTournamentListLoading] = useState(false);
     
     // Publish State
     const [publishMode, setPublishMode] = useState<'now' | 'schedule'>('now');
     const [scheduledFor, setScheduledFor] = useState('');
+
+    useEffect(() => {
+        if (quizDestination !== 'tournament') return;
+        setTournamentListLoading(true);
+        apiService.get('/admin/tournaments')
+            .then((response) => {
+                if (response.success && Array.isArray(response.data)) {
+                    setTournaments(response.data as AdminTournament[]);
+                } else {
+                    setAlert({
+                        message: response.error || 'Could not load tournaments for quiz routing.',
+                        type: 'error',
+                    });
+                }
+            })
+            .catch((error) => {
+                console.error('Could not load tournaments for quiz routing:', error);
+                setAlert({ message: 'Could not load tournaments for quiz routing.', type: 'error' });
+            })
+            .finally(() => setTournamentListLoading(false));
+    }, [quizDestination]);
+
+    useEffect(() => {
+        if (quizDestination !== 'tournament') return;
+        const tournament = tournaments.find((item) => item.id === selectedTournamentId);
+        if (!tournament) return;
+        const startDate = new Date(tournament.start_at);
+        const earliestQuizTime = startDate > new Date() ? startDate : new Date();
+        const localDate = new Date(earliestQuizTime.getTime() - earliestQuizTime.getTimezoneOffset() * 60000)
+            .toISOString()
+            .slice(0, 16);
+        setScheduledFor(localDate);
+        setPublishMode('schedule');
+        setCostInCoins(0);
+    }, [quizDestination, selectedTournamentId, tournaments]);
 
     // Dynamic Questions State
     const [questions, setQuestions] = useState<QuestionDraft[]>([{
@@ -121,6 +169,12 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const validateForm = () => {
         if (!quizName.trim()) return 'Quiz name is required.';
         if (questions.length === 0) return 'At least one question is required.';
+        if (quizDestination === 'tournament' && !selectedTournamentId) {
+            return 'Choose the tournament this quiz belongs to.';
+        }
+        if (quizDestination === 'tournament' && costInCoins !== 0) {
+            return 'Tournament quizzes are included in the tournament entry fee.';
+        }
 
         for (const [idx, q] of questions.entries()) {
             if (!q.question_text.trim()) return `Question ${idx + 1} is missing the question prompt.`;
@@ -169,7 +223,9 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 time_limit_seconds: timeLimit,
                 points_per_question: pointsPerQuestion,
                 total_points: pointsPerQuestion * questions.length,
-                cost_in_footy_coins: costInCoins,
+                cost_in_footy_coins: quizDestination === 'tournament' ? 0 : costInCoins,
+                destination: quizDestination,
+                tournament_id: quizDestination === 'tournament' ? selectedTournamentId : null,
                 expires_at: expires_at_date.toISOString(),
                 scheduled_for: publishMode === 'schedule' && scheduledFor ? new Date(scheduledFor).toISOString() : null,
                 questions: questions.map((q, idx) => ({
@@ -186,7 +242,12 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             const response = await apiService.post('/admin/quizzes/bulk', payload);
 
             if (response.success) {
-                setAlert({ message: 'Quiz successfully created and sent to users!', type: 'success' });
+                setAlert({
+                    message: quizDestination === 'tournament'
+                        ? 'Tournament quiz created and routed to its registered players.'
+                        : 'Quiz successfully created and sent to users!',
+                    type: 'success',
+                });
                 // Reset form
                 setQuizName('');
                 setQuizDescription('');
@@ -258,6 +319,58 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     </div>
 
                     <div className="input-group">
+                        <label>Quiz Destination</label>
+                        <div className="quiz-format-toggle-bar" role="group" aria-label="Quiz destination">
+                            <button
+                                type="button"
+                                className={`format-toggle-btn ${quizDestination === 'game' ? 'active' : ''}`}
+                                onClick={() => setQuizDestination('game')}
+                            >
+                                <Send size={18} />
+                                <span>Main Game</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={`format-toggle-btn ${quizDestination === 'tournament' ? 'active' : ''}`}
+                                onClick={() => setQuizDestination('tournament')}
+                            >
+                                <Trophy size={18} />
+                                <span>Tournament</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {quizDestination === 'tournament' && (
+                        <div className="input-group">
+                            <label htmlFor="quiz-tournament">Send to tournament</label>
+                            <select
+                                id="quiz-tournament"
+                                className="cyber-input"
+                                value={selectedTournamentId}
+                                onChange={(event) => setSelectedTournamentId(event.target.value)}
+                                disabled={tournamentListLoading}
+                                required
+                            >
+                                <option value="">
+                                    {tournamentListLoading ? 'Loading tournaments…' : 'Select a tournament'}
+                                </option>
+                                {tournaments.map((tournament) => {
+                                    const supported = tournament.tournament_type === 'league'
+                                        && ['registration', 'active'].includes(tournament.status);
+                                    return (
+                                        <option key={tournament.id} value={tournament.id} disabled={!supported}>
+                                            {tournament.name} · {supported ? '1v1 League' : 'Unavailable draft'}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                            <span className="input-hint">
+                                Tournament quizzes are isolated from the main game and do not have a separate coin fee.
+                            </span>
+                        </div>
+                    )}
+
+                    <div className="input-group">
                         <label>Quiz Title</label>
                         <input
                             type="text"
@@ -300,16 +413,23 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 min="1"
                             />
                         </div>
-                        <div className="input-group">
-                            <label>Coin Cost (To play)</label>
-                            <input
-                                type="number"
-                                value={costInCoins}
-                                onChange={(e) => setCostInCoins(Number(e.target.value))}
-                                className="cyber-input"
-                                min="0"
-                            />
-                        </div>
+                        {quizDestination === 'game' ? (
+                            <div className="input-group">
+                                <label>Coin Cost (To play)</label>
+                                <input
+                                    type="number"
+                                    value={costInCoins}
+                                    onChange={(e) => setCostInCoins(Number(e.target.value))}
+                                    className="cyber-input"
+                                    min="0"
+                                />
+                            </div>
+                        ) : (
+                            <div className="input-group">
+                                <label>Quiz Cost</label>
+                                <div className="admin-quiz-cost-note"><Coins size={17} /> Included in entry fee</div>
+                            </div>
+                        )}
                         <div className="input-group">
                             <label>Expires In (Hours)</label>
                             <input
@@ -483,13 +603,174 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     );
 };
 
-type AdminDestination = 'menu' | 'quiz' | 'broadcast' | 'analytics';
+const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [tournamentType, setTournamentType] = useState<'league' | 'group_knockout'>('league');
+    const [entryFee, setEntryFee] = useState(0);
+    const [startAt, setStartAt] = useState(() => {
+        const local = new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000);
+        return local.toISOString().slice(0, 16);
+    });
+    const [isSaving, setIsSaving] = useState(false);
+    const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
+
+    const handleSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!name.trim()) {
+            setAlert({ message: 'Tournament name is required.', type: 'error' });
+            return;
+        }
+        if (!startAt || new Date(startAt) <= new Date()) {
+            setAlert({ message: 'Choose a start date and time in the future.', type: 'error' });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const response = await apiService.post('/admin/tournaments', {
+                name: name.trim(),
+                description: description.trim(),
+                tournament_type: tournamentType,
+                entry_fee: entryFee,
+                start_at: new Date(startAt).toISOString(),
+            });
+            if (!response.success) {
+                setAlert({ message: response.error || 'Could not create tournament.', type: 'error' });
+                return;
+            }
+            setAlert({
+                message: tournamentType === 'league'
+                    ? 'Tournament created. Registration closes at its scheduled start time.'
+                    : 'Tournament saved as a draft. Group and knockout rules are not enabled yet.',
+                type: 'success',
+            });
+            setName('');
+            setDescription('');
+            setEntryFee(0);
+        } catch (error) {
+            console.error('Could not create tournament:', error);
+            setAlert({ message: 'Network error. Tournament was not created.', type: 'error' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <main className="admin-page">
+            <button type="button" className="btn-back-admin" onClick={onBack}>
+                <ArrowLeft size={16} /> Back to Admin
+            </button>
+            <header className="admin-header">
+                <span className="admin-hub-kicker">COMPETITIONS / SETUP</span>
+                <h1 className="admin-title">Create tournament</h1>
+                <p className="admin-subtitle">Set the format, entry fee, and scheduled kick-off.</p>
+            </header>
+            {alert && <Alert message={alert.message} type={alert.type} onClose={() => setAlert(null)} />}
+            <form className="admin-form" onSubmit={handleSubmit}>
+                <section className="form-section setup-section">
+                    <h2 className="section-title">Tournament details</h2>
+                    <div className="input-group">
+                        <label htmlFor="tournament-name">Tournament name</label>
+                        <input
+                            id="tournament-name"
+                            className="cyber-input"
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            maxLength={255}
+                            placeholder="e.g. Footy IQ Champions League"
+                            required
+                        />
+                    </div>
+                    <div className="input-group">
+                        <label htmlFor="tournament-description">Description</label>
+                        <textarea
+                            id="tournament-description"
+                            className="cyber-textarea"
+                            value={description}
+                            onChange={(event) => setDescription(event.target.value)}
+                            rows={3}
+                            placeholder="Give players a quick overview of the competition."
+                        />
+                    </div>
+                    <div className="input-group">
+                        <label>Tournament format</label>
+                        <div className="quiz-format-toggle-bar" role="group" aria-label="Tournament format">
+                            <button
+                                type="button"
+                                className={`format-toggle-btn ${tournamentType === 'league' ? 'active' : ''}`}
+                                onClick={() => setTournamentType('league')}
+                            >
+                                <Trophy size={18} /> 1v1 League
+                            </button>
+                            <button
+                                type="button"
+                                className={`format-toggle-btn ${tournamentType === 'group_knockout' ? 'active' : ''}`}
+                                onClick={() => setTournamentType('group_knockout')}
+                            >
+                                <Users size={18} /> Group + Knockout
+                            </button>
+                        </div>
+                        <span className="input-hint">
+                            {tournamentType === 'league'
+                                ? 'League registration supports up to 20 players and starts automatically at the date below.'
+                                : 'This format is saved as an unavailable draft until its rules and bracket are defined.'}
+                        </span>
+                    </div>
+                    <div className="settings-grid">
+                        <div className="input-group">
+                            <label htmlFor="tournament-entry-fee">Entry fee (Footy Coins)</label>
+                            <input
+                                id="tournament-entry-fee"
+                                className="cyber-input"
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={entryFee}
+                                onChange={(event) => setEntryFee(Number(event.target.value))}
+                                required
+                            />
+                            <span className="input-hint">Set to 0 for free entry.</span>
+                        </div>
+                        <div className="input-group">
+                            <label htmlFor="tournament-start">Scheduled start</label>
+                            <input
+                                id="tournament-start"
+                                className="cyber-input"
+                                type="datetime-local"
+                                value={startAt}
+                                onChange={(event) => setStartAt(event.target.value)}
+                                required
+                            />
+                            <span className="input-hint">All dates are stored in UTC after conversion from your local time.</span>
+                        </div>
+                    </div>
+                </section>
+                <div className="tournament-create-summary">
+                    <CalendarClock size={19} />
+                    <span>Registration closes at the scheduled start, even when fewer than 20 players join.</span>
+                    <span className="tournament-capacity"><Coins size={15} /> {entryFee} coins</span>
+                </div>
+                <button className="btn-publish-quiz" type="submit" disabled={isSaving}>
+                    {isSaving ? 'Creating tournament…' : 'Create tournament'}
+                </button>
+            </form>
+        </main>
+    );
+};
+
+type AdminDestination = 'menu' | 'quiz' | 'tournament' | 'broadcast' | 'analytics';
 
 export const AdminPage: React.FC = () => {
     const [destination, setDestination] = useState<AdminDestination>('menu');
 
     if (destination === 'quiz') {
         return <AdminQuizPage onBack={() => setDestination('menu')} />;
+    }
+
+    if (destination === 'tournament') {
+        return <AdminTournamentPage onBack={() => setDestination('menu')} />;
     }
 
     if (destination === 'broadcast') {
@@ -525,10 +806,24 @@ export const AdminPage: React.FC = () => {
 
                 <button
                     type="button"
+                    className="admin-destination admin-destination-tournament"
+                    onClick={() => setDestination('tournament')}
+                >
+                    <span className="admin-destination-index">02 / COMPETITIONS</span>
+                    <span className="admin-destination-icon"><Trophy size={22} /></span>
+                    <span className="admin-destination-copy">
+                        <strong>Create tournament</strong>
+                        <span>Set up league entry, coin fees, and scheduled kick-off.</span>
+                    </span>
+                    <span className="admin-destination-action">Open tournament setup <ArrowLeft size={15} /></span>
+                </button>
+
+                <button
+                    type="button"
                     className="admin-destination admin-destination-broadcast"
                     onClick={() => setDestination('broadcast')}
                 >
-                    <span className="admin-destination-index">02 / COMMUNITY</span>
+                    <span className="admin-destination-index">03 / COMMUNITY</span>
                     <span className="admin-destination-icon"><Megaphone size={22} /></span>
                     <span className="admin-destination-copy">
                         <strong>Broadcast message</strong>
@@ -542,7 +837,7 @@ export const AdminPage: React.FC = () => {
                     className="admin-destination admin-destination-analytics"
                     onClick={() => setDestination('analytics')}
                 >
-                    <span className="admin-destination-index">03 / INSIGHTS</span>
+                    <span className="admin-destination-index">04 / INSIGHTS</span>
                     <span className="admin-destination-icon"><BarChart3 size={22} /></span>
                     <span className="admin-destination-copy">
                         <strong>Game analytics</strong>

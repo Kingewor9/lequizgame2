@@ -378,6 +378,39 @@ class TelegramBotService:
         print(f"[TELEGRAM] Bulk notifications: {success_count}/{len(user_telegram_ids)} sent successfully")
         return success_count
 
+    def send_tournament_message(self, user_telegram_ids: list, message_text: str) -> bool:
+        """Queue plain-text tournament notifications for the listed players."""
+        if not self.bot_token:
+            print("[TELEGRAM] Tournament notification skipped: bot is not configured")
+            return False
+        if not user_telegram_ids:
+            return True
+
+        threading.Thread(
+            target=self._dispatch_tournament_message,
+            args=(user_telegram_ids, message_text),
+            daemon=True,
+        ).start()
+        return True
+
+    def _dispatch_tournament_message(self, user_telegram_ids: list, message_text: str):
+        for user_id in user_telegram_ids:
+            try:
+                response = requests.post(
+                    f'{self.api_base}/sendMessage',
+                    json={'chat_id': user_id, 'text': message_text},
+                    timeout=10,
+                )
+                if response.status_code != 200:
+                    print(
+                        f"[TELEGRAM] Tournament notification failed for {user_id}: "
+                        f"{response.status_code} {response.text}"
+                    )
+            except requests.RequestException as error:
+                print(
+                    f"[TELEGRAM] Tournament notification error for {user_id}: {error}"
+                )
+
     def send_broadcast(
         self,
         user_telegram_ids: list,

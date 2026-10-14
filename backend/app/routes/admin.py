@@ -11,14 +11,59 @@ from app.models import (
     FootyCoinTask,
     User,
     UserLeague,
+    Tournament,
+    TournamentRegistration,
 )
 from app.utils import generate_id, format_success, format_error
 from app.services.telegram_service import get_telegram_service
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from urllib.parse import urlparse
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
+
+
+def _parse_utc(value):
+    parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    if parsed.tzinfo:
+        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
+def _quiz_destination(data, scheduled_for):
+    destination = data.get('destination', 'game')
+    tournament_id = data.get('tournament_id')
+    if destination == 'game':
+        if tournament_id:
+            return None, None, 'A standard game quiz cannot target a tournament.'
+        return 'game', None, None
+    if destination != 'tournament':
+        return None, None, 'Quiz destination must be game or tournament.'
+    if not tournament_id:
+        return None, None, 'Choose a tournament for this quiz.'
+
+    tournament = Tournament.objects(id=tournament_id).first()
+    if not tournament:
+        return None, None, 'Tournament not found.'
+    if tournament.tournament_type != 'league' or tournament.status in ('draft', 'cancelled', 'completed'):
+        return None, None, 'Tournament quizzes are only available for an active 1v1 league.'
+
+    quiz_start = scheduled_for or datetime.utcnow()
+    if quiz_start < tournament.start_at:
+        return None, None, 'Schedule this quiz at or after the tournament start date.'
+    gameweek = int((quiz_start - tournament.start_at).total_seconds() // 86400) + 1
+    max_gameweeks = tournament.total_gameweeks if tournament.status == 'active' else 38
+    if gameweek > max_gameweeks:
+        return None, None, 'The quiz date is outside this tournament season.'
+    duplicate = Quiz.objects(
+        destination='tournament',
+        tournament_id=tournament.id,
+        tournament_gameweek=gameweek,
+        is_active=True,
+    ).first()
+    if duplicate:
+        return None, None, f'A tournament quiz is already scheduled for GW{gameweek}.'
+    return 'tournament', (tournament.id, gameweek), None
 
 def admin_required(fn):
     @wraps(fn)
@@ -36,6 +81,81 @@ def admin_required(fn):
             
         return fn(*args, **kwargs)
     return wrapper
+
+
+@admin_bp.route('/tournaments', methods=['GET'])
+@admin_required
+def get_tournaments():
+    try:
+        tournaments = Tournament.objects().order_by('-created_at')
+        data = []
+        for tournament in tournaments:
+            item = tournament.to_dict()
+            item['registered_count'] = TournamentRegistration.objects(
+                tournament_id=tournament.id
+            ).count()
+            data.append(item)
+        return jsonify(format_success(data=data)), 200
+    except Exception as error:
+        current_app.logger.exception('Could not load admin tournaments')
+        return jsonify(format_error(f'Could not load tournaments: {error}')), 500
+
+
+@admin_bp.route('/tournaments', methods=['POST'])
+@admin_required
+def create_tournament():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(format_error('A JSON request body is required')), 400
+
+    name = data.get('name')
+    description = data.get('description', '')
+    tournament_type = data.get('tournament_type')
+    start_at_value = data.get('start_at')
+    entry_fee = data.get('entry_fee', 0)
+    if not isinstance(name, str) or not name.strip():
+        return jsonify(format_error('Tournament name is required')), 400
+    if len(name.strip()) > 255:
+        return jsonify(format_error('Tournament name must be 255 characters or fewer')), 400
+    if not isinstance(description, str):
+        return jsonify(format_error('Tournament description must be text')), 400
+    if tournament_type not in ('league', 'group_knockout'):
+        return jsonify(format_error('Choose a supported tournament type')), 400
+    if not isinstance(entry_fee, int) or isinstance(entry_fee, bool) or entry_fee < 0:
+        return jsonify(format_error('Entry fee must be a non-negative whole number of Footy Coins')), 400
+    if not isinstance(start_at_value, str):
+        return jsonify(format_error('A tournament start date and time are required')), 400
+
+    try:
+        start_at = _parse_utc(start_at_value)
+    except (TypeError, ValueError):
+        return jsonify(format_error('Enter a valid tournament start date and time')), 400
+    if start_at <= datetime.utcnow():
+        return jsonify(format_error('Tournament start date must be in the future')), 400
+
+    tournament = Tournament(
+        id=generate_id(),
+        name=name.strip(),
+        description=description.strip(),
+        tournament_type=tournament_type,
+        entry_fee=entry_fee,
+        max_players=20,
+        start_at=start_at,
+        status='registration' if tournament_type == 'league' else 'draft',
+    )
+    try:
+        tournament.save()
+        return jsonify(format_success(
+            data=tournament.to_dict(),
+            message=(
+                'Tournament created'
+                if tournament_type == 'league'
+                else 'Group stage + knockout tournament saved as a draft'
+            ),
+        )), 201
+    except Exception as error:
+        current_app.logger.exception('Could not create tournament')
+        return jsonify(format_error(f'Could not create tournament: {error}')), 500
 
 
 @admin_bp.route('/analytics', methods=['GET'])
@@ -193,8 +313,20 @@ def create_quiz():
         # Set expiration to 24 hours from now by default
         expires_at = datetime.utcnow() + timedelta(hours=24)
         if 'expires_at' in data:
-            expires_at = datetime.fromisoformat(data['expires_at'])
-        
+            expires_at = _parse_utc(data['expires_at'])
+        scheduled_for = _parse_utc(data['scheduled_for']) if data.get('scheduled_for') else None
+        destination, tournament_assignment, destination_error = _quiz_destination(
+            data,
+            scheduled_for,
+        )
+        if destination_error:
+            return jsonify(format_error(destination_error)), 400
+        if destination == 'tournament' and data.get('cost_in_footy_coins', 0) != 0:
+            return jsonify(format_error('Tournament quizzes are included in the tournament entry fee')), 400
+        tournament_id, tournament_gameweek = (
+            tournament_assignment if tournament_assignment else (None, None)
+        )
+
         quiz = Quiz(
             id=generate_id(),
             name=data['name'],
@@ -204,8 +336,13 @@ def create_quiz():
             points_per_question=data.get('points_per_question', 10),
             total_points=data['total_points'],
             cost_in_footy_coins=data.get('cost_in_footy_coins', 0),
+            destination=destination,
+            tournament_id=tournament_id,
+            tournament_gameweek=tournament_gameweek,
             is_active=True,
-            expires_at=expires_at
+            expires_at=expires_at,
+            scheduled_for=scheduled_for,
+            notification_sent=not bool(scheduled_for),
         )
         quiz.save()
         
@@ -240,8 +377,20 @@ def create_quiz_bulk():
         
         scheduled_for = None
         if 'scheduled_for' in data and data['scheduled_for']:
-            scheduled_for_str = data['scheduled_for'].replace('Z', '+00:00')
-            scheduled_for = datetime.fromisoformat(scheduled_for_str)
+            scheduled_for = _parse_utc(data['scheduled_for'])
+
+        destination, tournament_assignment, destination_error = _quiz_destination(
+            data,
+            scheduled_for,
+        )
+        if destination_error:
+            return jsonify(format_error(destination_error)), 400
+        if destination == 'tournament' and data.get('cost_in_footy_coins', 0) != 0:
+            return jsonify(format_error('Tournament quizzes are included in the tournament entry fee')), 400
+
+        tournament_id, tournament_gameweek = (
+            tournament_assignment if tournament_assignment else (None, None)
+        )
 
         quiz = Quiz(
             id=generate_id(),
@@ -253,6 +402,9 @@ def create_quiz_bulk():
             points_per_question=data.get('points_per_question', 10),
             total_points=data['total_points'],
             cost_in_footy_coins=data.get('cost_in_footy_coins', 0),
+            destination=destination,
+            tournament_id=tournament_id,
+            tournament_gameweek=tournament_gameweek,
             is_active=True,
             expires_at=expires_at,
             scheduled_for=scheduled_for,
@@ -293,11 +445,22 @@ def create_quiz_bulk():
         if not scheduled_for:
             try:
                 telegram_service = get_telegram_service()
+                user_telegram_ids = None
+                if destination == 'tournament':
+                    user_ids = TournamentRegistration.objects(
+                        tournament_id=tournament_id
+                    ).distinct('user_id')
+                    user_telegram_ids = [
+                        user.telegram_id
+                        for user in User.objects(id__in=user_ids).only('telegram_id')
+                        if user.telegram_id
+                    ]
                 telegram_service.send_quiz_notification(
                     quiz.name,
                     quiz.description,
                     quiz.total_questions,
                     quiz.total_points,
+                    user_telegram_ids=user_telegram_ids,
                     async_send=True,
                     expires_at=quiz.expires_at,
                 )
@@ -493,14 +656,27 @@ def notify_quiz(quiz_id):
             return jsonify(format_error('Quiz not found')), 404
 
         telegram_service = get_telegram_service()
-        telegram_service.send_quiz_notification(
+        user_telegram_ids = None
+        if getattr(quiz, 'destination', 'game') == 'tournament':
+            user_ids = TournamentRegistration.objects(
+                tournament_id=quiz.tournament_id
+            ).distinct('user_id')
+            user_telegram_ids = [
+                user.telegram_id
+                for user in User.objects(id__in=user_ids).only('telegram_id')
+                if user.telegram_id
+            ]
+        queued = telegram_service.send_quiz_notification(
             quiz.name,
             quiz.description or '',
             quiz.total_questions,
             quiz.total_points,
+            user_telegram_ids=user_telegram_ids,
             async_send=True,
             expires_at=quiz.expires_at,
         )
+        if not queued:
+            return jsonify(format_error('The quiz notification could not be queued')), 503
 
         quiz.notification_sent = True
         quiz.save()

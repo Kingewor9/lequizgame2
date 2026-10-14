@@ -122,6 +122,9 @@ class Quiz(Document):
     points_per_question = IntField(default=10)
     total_points = IntField(required=True)
     cost_in_footy_coins = IntField(default=0)
+    destination = StringField(default='game', choices=('game', 'tournament'))
+    tournament_id = StringField()
+    tournament_gameweek = IntField()
     is_active = BooleanField(default=True)
     questions = ListField(EmbeddedDocumentField(Question))
 
@@ -141,6 +144,9 @@ class Quiz(Document):
             'points_per_question': self.points_per_question,
             'total_points': self.total_points,
             'cost_in_footy_coins': self.cost_in_footy_coins,
+            'destination': getattr(self, 'destination', 'game') or 'game',
+            'tournament_id': getattr(self, 'tournament_id', None),
+            'tournament_gameweek': getattr(self, 'tournament_gameweek', None),
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() + 'Z',
             'expires_at': self.expires_at.isoformat() + 'Z',
@@ -164,6 +170,98 @@ class QuizAnswer(EmbeddedDocument):
             'answer_text': getattr(self, 'answer_text', None),
             'is_correct': self.is_correct,
         }
+
+
+class Tournament(Document):
+    """A scheduled competition and its league-season state."""
+    meta = {
+        'collection': 'tournaments',
+        'indexes': ['status', 'start_at', 'created_at'],
+    }
+
+    id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = StringField(max_length=255, required=True)
+    description = StringField(default='')
+    tournament_type = StringField(
+        required=True,
+        choices=('league', 'group_knockout'),
+    )
+    entry_fee = IntField(default=0, min_value=0)
+    max_players = IntField(default=20, min_value=2)
+    registered_count = IntField(default=0, min_value=0)
+    start_at = DateTimeField(required=True)
+    status = StringField(
+        default='registration',
+        choices=('registration', 'active', 'completed', 'draft', 'cancelled'),
+    )
+    total_gameweeks = IntField(default=38)
+    winner_user_ids = ListField(StringField(), default=list)
+    completion_notification_sent = BooleanField(default=False)
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'tournament_type': self.tournament_type,
+            'entry_fee': self.entry_fee,
+            'max_players': self.max_players,
+            'registered_count': self.registered_count,
+            'start_at': self.start_at.isoformat() + 'Z' if self.start_at else None,
+            'status': self.status,
+            'total_gameweeks': self.total_gameweeks,
+            'winner_user_ids': self.winner_user_ids,
+            'created_at': self.created_at.isoformat() + 'Z',
+        }
+
+
+class TournamentRegistration(Document):
+    """A player's unique registration in a tournament."""
+    meta = {
+        'collection': 'tournament_registrations',
+        'indexes': [
+            {'fields': ['tournament_id', 'user_id'], 'unique': True},
+            ['tournament_id', 'joined_at'],
+            'user_id',
+        ],
+    }
+
+    id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
+    tournament_id = StringField(required=True)
+    user_id = StringField(required=True)
+    joined_at = DateTimeField(default=datetime.utcnow)
+
+
+class TournamentFixture(Document):
+    """One scheduled head-to-head pairing in a league gameweek."""
+    meta = {
+        'collection': 'tournament_fixtures',
+        'indexes': [
+            {'fields': ['tournament_id', 'gameweek', 'player_one_id', 'player_two_id'], 'unique': True},
+            ['tournament_id', 'gameweek', 'scheduled_at'],
+            'player_one_id',
+            'player_two_id',
+        ],
+    }
+
+    id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
+    tournament_id = StringField(required=True)
+    gameweek = IntField(required=True)
+    player_one_id = StringField(required=True)
+    player_two_id = StringField()
+    scheduled_at = DateTimeField(required=True)
+    closes_at = DateTimeField(required=True)
+    status = StringField(default='scheduled', choices=('scheduled', 'completed', 'bye'))
+    player_one_score = IntField(default=0)
+    player_two_score = IntField(default=0)
+    player_one_submitted = BooleanField(default=False)
+    player_two_submitted = BooleanField(default=False)
+    winner_user_id = StringField()
+    result = StringField(choices=('win', 'draw', 'forfeit', 'bye'))
+    result_notification_sent = BooleanField(default=False)
+    created_at = DateTimeField(default=datetime.utcnow)
 
 
 class QuizResponse(Document):
@@ -222,6 +320,52 @@ class QuizAttempt(Document):
     quiz_id = StringField(required=True)
     started_at = DateTimeField(default=datetime.utcnow)
     completed_at = DateTimeField(null=True, default=None)
+
+
+class TournamentSubmission(Document):
+    """A tournament-only quiz result, isolated from global and league scores."""
+    meta = {
+        'collection': 'tournament_submissions',
+        'indexes': [
+            {'fields': ['user_id', 'quiz_id'], 'unique': True},
+            {'fields': ['tournament_id', 'gameweek', 'user_id'], 'unique': True},
+            ['tournament_id', 'gameweek'],
+        ],
+    }
+
+    id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = StringField(required=True)
+    tournament_id = StringField(required=True)
+    quiz_id = StringField(required=True)
+    gameweek = IntField(required=True)
+    total_questions = IntField(default=0)
+    correct_answers = IntField(default=0)
+    incorrect_answers = IntField(default=0)
+    points_earned = IntField(default=0)
+    accuracy_rate = IntField(default=0)
+    time_taken_seconds = IntField(default=0)
+    answers = ListField(EmbeddedDocumentField(QuizAnswer))
+    opponent_notified = BooleanField(default=False)
+    completed_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'tournament_id': self.tournament_id,
+            'quiz_id': self.quiz_id,
+            'gameweek': self.gameweek,
+            'total_questions': self.total_questions,
+            'correct_answers': self.correct_answers,
+            'incorrect_answers': self.incorrect_answers,
+            'points_earned': self.points_earned,
+            'accuracy_rate': self.accuracy_rate,
+            'time_taken_seconds': self.time_taken_seconds,
+            'answers': [answer.to_dict() for answer in self.answers] if self.answers else [],
+            'completed_at': self.completed_at.isoformat() + 'Z',
+            'created_at': self.created_at.isoformat() + 'Z',
+        }
 
 
 class League(Document):

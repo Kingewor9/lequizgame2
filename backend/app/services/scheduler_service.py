@@ -117,16 +117,32 @@ def check_scheduled_quizzes_job():
 
     for quiz in pending_quizzes:
         try:
-            quiz.notification_sent = True
-            quiz.save()
-            telegram_service.send_quiz_notification(
+            user_telegram_ids = None
+            if getattr(quiz, 'destination', 'game') == 'tournament':
+                from app.models import TournamentRegistration, User
+
+                registered_user_ids = TournamentRegistration.objects(
+                    tournament_id=quiz.tournament_id
+                ).distinct('user_id')
+                user_telegram_ids = [
+                    user.telegram_id
+                    for user in User.objects(id__in=registered_user_ids).only('telegram_id')
+                    if user.telegram_id
+                ]
+            queued = telegram_service.send_quiz_notification(
                 quiz.name,
                 quiz.description,
                 quiz.total_questions,
                 quiz.total_points,
+                user_telegram_ids=user_telegram_ids,
                 async_send=True,
                 expires_at=quiz.expires_at,
             )
+            if not queued:
+                print(f"[SCHEDULER] Notification could not be queued for quiz: {quiz.name}")
+                continue
+            quiz.notification_sent = True
+            quiz.save()
             print(f"[SCHEDULER] Fired exact timed scheduled notification to users for quiz: {quiz.name}")
         except Exception as e:
             print(f"[SCHEDULER] Failed to send scheduled quiz notification: {e}")
@@ -154,6 +170,21 @@ def init_scheduler(app):
         timezone='UTC',
         id='scheduled_quiz_notification_checker',
         replace_existing=True
+    )
+
+    def sync_tournaments_job():
+        with app.app_context():
+            from app.services.tournament_service import sync_all_tournaments
+
+            sync_all_tournaments()
+
+    scheduler.add_job(
+        sync_tournaments_job,
+        'interval',
+        minutes=1,
+        timezone='UTC',
+        id='tournament_season_scheduler',
+        replace_existing=True,
     )
     
     if not scheduler.running:

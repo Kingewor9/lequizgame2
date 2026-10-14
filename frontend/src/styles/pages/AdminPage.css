@@ -10,6 +10,26 @@
     padding: 24px 16px 120px;
 }
 
+.admin-destination-tournament {
+    background:
+        radial-gradient(ellipse at 100% 0, rgba(56, 189, 248, 0.13), transparent 52%),
+        var(--surface-low);
+}
+
+.admin-destination-tournament .admin-destination-icon {
+    border-color: rgba(56, 189, 248, 0.25);
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--color-sky);
+}
+
+.admin-destination-tournament .admin-destination-action {
+    color: var(--color-sky);
+}
+
+.admin-destination-tournament:hover {
+    border-color: rgba(56, 189, 248, 0.45);
+}
+
 /* ── Header ─────────────────────────────────────────────────────────────── */
 .admin-header {
     margin-bottom: 24px;
@@ -441,7 +461,7 @@
 
 .admin-destinations {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
 }
 
@@ -558,6 +578,55 @@
     color: var(--color-sky);
 }
 
+.admin-quiz-cost-note {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    gap: 9px;
+    padding: 12px 14px;
+    border: 1px solid rgba(245, 158, 11, 0.22);
+    border-radius: var(--radius-sm);
+    background: rgba(245, 158, 11, 0.07);
+    color: var(--color-amber-light);
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.87rem;
+    font-weight: 700;
+}
+
+.tournament-create-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 17px;
+    border: 1px solid rgba(56, 189, 248, 0.18);
+    border-radius: var(--radius-md);
+    background: rgba(56, 189, 248, 0.055);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+.tournament-create-summary > svg {
+    flex: 0 0 auto;
+    color: var(--color-sky);
+}
+
+.tournament-capacity {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+    color: var(--color-amber-light);
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.admin-form > .btn-publish-quiz:disabled {
+    cursor: wait;
+    opacity: 0.62;
+}
+
 .admin-destination-action svg {
     transform: rotate(180deg);
 }
@@ -590,5 +659,14 @@
 
     .admin-destination {
         min-height: 205px;
+    }
+
+    .tournament-create-summary {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .tournament-capacity {
+        margin-left: 28px;
     }
 }
