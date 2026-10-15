@@ -84,6 +84,14 @@ def initialize_default_tasks():
             'title': 'Join Our Telegram Channel',
             'description': 'Join @footyriddles on Telegram and earn 150 Footy Coins.',
             'reward_coins': 150,
+            'telegram_channel': '@footyriddles',
+        },
+        {
+            'type': 'join_announcement',
+            'title': 'Join our Announcement channel',
+            'description': 'Join @footyiqgame and earn 200 footy coins',
+            'reward_coins': 200,
+            'telegram_channel': '@footyiqgame',
         },
     ]
 

@@ -15,7 +15,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 coins_bp = Blueprint('coins', __name__, url_prefix='/api/footy-coins')
 
-TELEGRAM_CHANNEL = '@footyriddles'  # or use the channel's numeric ID e.g. -1001234567890
+TELEGRAM_CHANNEL = '@footyriddles'
 MAX_STARS_PURCHASE = 10_000_000
 
 
@@ -77,7 +77,7 @@ def telegram_bot_api(method: str, payload: dict) -> dict:
     return result
 
 
-def check_telegram_membership(telegram_id: int) -> bool:
+def check_telegram_membership(telegram_id: int, channel: str = TELEGRAM_CHANNEL) -> bool:
     """
     Ask Telegram's Bot API whether a user is a member of the channel.
     Returns True if the user is a member/admin, False otherwise.
@@ -88,7 +88,7 @@ def check_telegram_membership(telegram_id: int) -> bool:
     try:
         url = f'https://api.telegram.org/bot{bot_token}/getChatMember'
         resp = requests.get(url, params={
-            'chat_id': TELEGRAM_CHANNEL,
+            'chat_id': channel,
             'user_id': telegram_id,
         }, timeout=5)
         data = resp.json()
@@ -382,8 +382,8 @@ def verify_telegram_task(task_id):
         if not task:
             return jsonify(format_error('Task not found')), 404
 
-        if task.type != 'join_telegram':
-            return jsonify(format_error('This endpoint is only for join_telegram tasks')), 400
+        if task.type not in ('join_telegram', 'join_announcement'):
+            return jsonify(format_error('This endpoint is only for Telegram channel tasks')), 400
 
         # Check if already completed
         completed = UserFootyCoinTask.objects(user_id=user_id, task_id=task_id).first()
@@ -398,10 +398,11 @@ def verify_telegram_task(task_id):
         if not user.telegram_id:
             return jsonify(format_error('No Telegram ID linked to this account')), 400
 
-        is_member = check_telegram_membership(user.telegram_id)
+        channel = task.telegram_channel or TELEGRAM_CHANNEL
+        is_member = check_telegram_membership(user.telegram_id, channel)
         if not is_member:
             return jsonify(format_error(
-                'You have not joined @footyriddles yet. Please join the channel first.'
+                f'You have not joined {channel} yet. Please join the channel first.'
             )), 400
 
         # Record task completion
@@ -483,6 +484,14 @@ def seed_tasks():
             'title': 'Join Our Telegram Channel',
             'description': 'Join @footyriddles on Telegram and earn 150 Footy Coins.',
             'reward_coins': 150,
+            'telegram_channel': '@footyriddles',
+        },
+        {
+            'type': 'join_announcement',
+            'title': 'Join our Announcement channel',
+            'description': 'Join @footyiqgame and earn 200 footy coins',
+            'reward_coins': 200,
+            'telegram_channel': '@footyiqgame',
         },
     ]
 

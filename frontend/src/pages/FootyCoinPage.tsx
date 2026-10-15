@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check, Coins, Copy, Gift, Share2, Star, Users } from 'lucide-react';
+import { Check, Coins, Copy, Gift, Send, Share2, Star, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/apiService';
 import { Loading } from '../components/Loading';
@@ -27,7 +27,7 @@ const TASKS = [
   {
     id: 'join_telegram',
     type: 'join_telegram',
-    title: 'Join Our Telegram Channel',
+    title: 'Join Our Gaming Channel',
     description: 'Join @footyriddles on Telegram and earn 150 Footy Coins.',
     reward_coins: 150,
     icon: '🔊',
@@ -60,7 +60,7 @@ export const FootyCoinPage: React.FC = () => {
   const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
   const [taskInProgress, setTaskInProgress] = useState<string | null>(null);
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
-  const [pendingTelegramVerify, setPendingTelegramVerify] = useState(false);
+  const [pendingTelegramVerify, setPendingTelegramVerify] = useState<Set<string>>(new Set());
   const [isAdLoading, setIsAdLoading] = useState(false);
   const [purchaseAmount, setPurchaseAmount] = useState('100');
   const [isPurchasing, setIsPurchasing] = useState(false);
@@ -233,27 +233,38 @@ export const FootyCoinPage: React.FC = () => {
   };
 
   // ── Join Telegram ─────────────────────────────────────────────────────────
-  const handleJoinTelegram = () => {
-    window.open('https://t.me/footyriddles', '_blank');
-    setPendingTelegramVerify(true);
-    setAlert({ message: 'Join @footyriddles, then tap "Verify" to claim your coins!', type: 'info' });
+  const handleJoinTelegram = (taskType: string) => {
+    const channel = taskType === 'join_announcement'
+      ? { url: 'https://t.me/Footyiqgame', username: '@footyiqgame' }
+      : { url: 'https://t.me/footyriddles', username: '@footyriddles' };
+    window.open(channel.url, '_blank', 'noopener,noreferrer');
+    setPendingTelegramVerify((pending) => new Set(pending).add(taskType));
+    setAlert({
+      message: `Join ${channel.username}, then tap "Verify" to claim your coins!`,
+      type: 'info',
+    });
   };
 
-  const handleVerifyTelegram = async () => {
-    const taskId = backendTaskIds['join_telegram'];
+  const handleVerifyTelegram = async (taskType: string) => {
+    const taskId = backendTaskIds[taskType];
     if (!taskId) {
       setAlert({ message: 'Task not available. Please try again later.', type: 'error' });
       return;
     }
 
-    setTaskInProgress('join_telegram');
+    setTaskInProgress(taskType);
     try {
       const response = await apiService.post(`/footy-coins/tasks/${taskId}/verify-telegram`, {});
       if (response.success) {
-        setAlert({ message: '✅ Verified! 150 Footy Coins added to your balance.', type: 'success' });
+        const reward = taskType === 'join_announcement' ? 200 : 150;
+        setAlert({ message: `✅ Verified! ${reward} Footy Coins added to your balance.`, type: 'success' });
         await refreshUser();
-        setPendingTelegramVerify(false);
-        setCompletedTasks((prev) => new Set(prev).add('join_telegram'));
+        setPendingTelegramVerify((pending) => {
+          const next = new Set(pending);
+          next.delete(taskType);
+          return next;
+        });
+        setCompletedTasks((prev) => new Set(prev).add(taskType));
       } else {
         setAlert({ message: response.error || 'Could not verify. Please join the channel first.', type: 'error' });
       }
@@ -357,9 +368,9 @@ export const FootyCoinPage: React.FC = () => {
     }
     if (completedTasks.has(type)) return 'Completed';
     if (taskInProgress === type) return 'Processing...';
-    if (type === 'join_telegram' && pendingTelegramVerify) return 'Verify';
+    if ((type === 'join_telegram' || type === 'join_announcement') && pendingTelegramVerify.has(type)) return 'Verify';
     if (type === 'free_claim') return 'Claim';
-    if (type === 'join_telegram') return 'Join';
+    if (type === 'join_telegram' || type === 'join_announcement') return 'Join';
     return 'Go';
   };
 
@@ -372,16 +383,16 @@ export const FootyCoinPage: React.FC = () => {
     const base = 'btn-task';
     if (type === 'watch_ads') return `${base} btn-task--ad`;
     if (completedTasks.has(type)) return `${base} btn-task--done`;
-    if (type === 'join_telegram' && pendingTelegramVerify) return `${base} btn-task--verify`;
+    if ((type === 'join_telegram' || type === 'join_announcement') && pendingTelegramVerify.has(type)) return `${base} btn-task--verify`;
     return base;
   };
 
   const handleClick = (type: string) => {
     if (type === 'watch_ads') return handleWatchAd();
     if (type === 'free_claim') return handleFreeClaim();
-    if (type === 'join_telegram') {
-      if (pendingTelegramVerify) return handleVerifyTelegram();
-      return handleJoinTelegram();
+    if (type === 'join_telegram' || type === 'join_announcement') {
+      if (pendingTelegramVerify.has(type)) return handleVerifyTelegram(type);
+      return handleJoinTelegram(type);
     }
   };
 
@@ -410,6 +421,24 @@ export const FootyCoinPage: React.FC = () => {
             </div>
             <p className="coin-description">Use coins to play quizzes and compete</p>
           </div>
+        </section>
+
+        <section className="announcement-channel-card" aria-labelledby="announcement-channel-heading">
+          <div className="announcement-channel-top">
+            <div className="announcement-channel-icon"><Send size={20} aria-hidden="true" /></div>
+            <span className="announcement-channel-reward">+200 coins</span>
+          </div>
+          <p className="announcement-channel-eyebrow">THE LATEST FROM FOOTY IQ</p>
+          <h2 id="announcement-channel-heading">Join our Announcement channel</h2>
+          <p className="announcement-channel-copy">Join @footyiqgame and earn 200 footy coins</p>
+          <button
+            type="button"
+            className={getButtonClass('join_announcement')}
+            onClick={() => handleClick('join_announcement')}
+            disabled={!backendTaskIds.join_announcement || isButtonDisabled('join_announcement')}
+          >
+            {getButtonLabel('join_announcement')}
+          </button>
         </section>
 
         <section className="referral-card" aria-labelledby="referral-heading">

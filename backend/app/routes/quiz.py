@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from pymongo import UpdateOne
 from app.models import (
     User,
     Quiz,
@@ -12,7 +13,12 @@ from app.models import (
     TournamentRegistration,
     TournamentSubmission,
 )
-from app.utils import generate_id, format_success, format_error, calculate_quiz_accuracy
+from app.utils import (
+    generate_id,
+    format_success,
+    format_error,
+    calculate_quiz_accuracy,
+)
 from datetime import datetime
 
 quiz_bp = Blueprint('quiz', __name__, url_prefix='/api/quizzes')
@@ -64,19 +70,35 @@ def _tournament_quiz_available(quiz, user_id):
 
 
 def update_global_rankings():
-    """
-    Recalculate global_rank and global_total_players for all users.
-    Called after every quiz submission so the homepage always shows live data.
-    """
+    """Refresh all cached player ranks using a single batched database write."""
     try:
-        all_users = list(User.objects().order_by('-overall_score'))
-        total = len(all_users)
-        for rank, u in enumerate(all_users, 1):
-            u.global_rank = rank
-            u.global_total_players = total
-            u.save()
-    except Exception as e:
-        print(f'Error updating global rankings: {str(e)}')
+        users = User.objects.only(
+            'id',
+            'overall_score',
+            'global_rank',
+            'prev_global_rank',
+        ).order_by('-overall_score')
+        total = users.count()
+        updates = []
+
+        for rank, user in enumerate(users, 1):
+            values = {
+                'global_rank': rank,
+                'global_total_players': total,
+            }
+            previous_rank = getattr(user, 'global_rank', 0) or 0
+            if previous_rank > 0 and previous_rank != rank:
+                values['prev_global_rank'] = previous_rank
+            elif previous_rank == 0:
+                values['prev_global_rank'] = rank
+
+            updates.append(UpdateOne({'_id': user.id}, {'$set': values}))
+
+        if updates:
+            User._get_collection().bulk_write(updates, ordered=False)
+    except Exception:
+        current_app.logger.exception('Could not update global quiz rankings')
+
 
 @quiz_bp.route('/today', methods=['GET'])
 @jwt_required()
@@ -408,7 +430,7 @@ def submit_quiz(quiz_id):
         )
         transaction.save()
 
-        # ── Recalculate ALL users' global ranks so homepage shows live data ──
+        # Batch cached rank updates to avoid one database write per user.
         update_global_rankings()
 
         result_dict = response.to_dict()

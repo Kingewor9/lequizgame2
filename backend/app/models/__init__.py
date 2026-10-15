@@ -549,6 +549,7 @@ class FootyCoinTask(Document):
     title = StringField(max_length=255, required=True)
     description = StringField()
     reward_coins = IntField(default=100)
+    telegram_channel = StringField()
     is_active = BooleanField(default=True)
 
     created_at = DateTimeField(default=datetime.utcnow)

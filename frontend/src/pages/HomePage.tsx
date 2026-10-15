@@ -155,10 +155,9 @@ export const HomePage: React.FC = () => {
     const newAnswer = { questionId: currentQuestion.id, answerId: optionId, isCorrect };
     const updatedAnswers = [...answers, newAnswer];
     setAnswers(updatedAnswers);
+    const isLastQuestion = currentQuestionIndex >= (currentQuiz.questions.length - 1);
 
-    setTimeout(() => {
-      const isLastQuestion = currentQuestionIndex >= (currentQuiz.questions?.length || 0) - 1;
-
+    window.setTimeout(() => {
       if (!isLastQuestion) {
         setCurrentQuestionIndex((prev) => prev + 1);
         setSelectedAnswer(null);
@@ -166,7 +165,7 @@ export const HomePage: React.FC = () => {
       } else {
         handleQuizComplete(updatedAnswers);
       }
-    }, 1500);
+    }, isLastQuestion ? 500 : 1500);
   };
 
   const handleTextAnswerSubmit = async (answerText: string, isCorrect: boolean) => {
@@ -193,10 +192,9 @@ export const HomePage: React.FC = () => {
     };
     const updatedAnswers = [...answers, newAnswer];
     setAnswers(updatedAnswers);
+    const isLastQuestion = currentQuestionIndex >= (currentQuiz.questions.length - 1);
 
-    setTimeout(() => {
-      const isLastQuestion = currentQuestionIndex >= (currentQuiz.questions?.length || 0) - 1;
-
+    window.setTimeout(() => {
       if (!isLastQuestion) {
         setCurrentQuestionIndex((prev) => prev + 1);
         setSelectedAnswer(null);
@@ -204,7 +202,7 @@ export const HomePage: React.FC = () => {
       } else {
         handleQuizComplete(updatedAnswers);
       }
-    }, 1500);
+    }, isLastQuestion ? 500 : 1500);
   };
 
   const triggerVibration = (pattern: number[] = [100]) => {
@@ -240,7 +238,7 @@ export const HomePage: React.FC = () => {
         setQuizzes((prev) =>
           prev.map((q) => (q.id === currentQuiz.id ? { ...q, already_played: true } : q))
         );
-        await refreshUser();
+        void refreshUser();
       } else {
         setAlert({ message: 'Failed to submit quiz. Please try again.', type: 'error' });
       }
