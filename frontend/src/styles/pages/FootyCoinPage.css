@@ -119,7 +119,8 @@
   letter-spacing: 0.16em;
 }
 
-.announcement-channel-card h2 {
+.announcement-channel-card h2,
+.announcement-channel-card h3 {
   margin: 0;
   color: var(--text-primary);
   font-family: 'Unbounded', sans-serif;
@@ -186,7 +187,8 @@
   letter-spacing: 0.16em;
 }
 
-.referral-card h2 {
+.referral-card h2,
+.referral-card h3 {
   margin: 0;
   color: var(--text-primary);
   font-family: 'Unbounded', sans-serif;
@@ -302,58 +304,89 @@
   gap: 16px;
 }
 
+.earn-community-cards {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
 /* ── Task card ───────────────────────────────────────────────────────────── */
 .task-card {
-  background-color: var(--surface-low);
-  border: var(--border-subtle);
+  --task-accent: var(--cyan-accent);
+  --task-wash: rgba(0, 240, 255, 0.12);
+  --task-card-wash: rgba(0, 240, 255, 0.055);
+  --task-border: rgba(0, 240, 255, 0.2);
+  --task-shadow: rgba(0, 240, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+  padding: 22px;
+  border: 1px solid var(--task-border);
   border-radius: var(--radius-md);
-  padding: 20px;
-  transition: all 0.2s ease;
+  background:
+    radial-gradient(ellipse at 100% 0%, var(--task-wash), transparent 52%),
+    linear-gradient(145deg, var(--task-card-wash), transparent 58%),
+    var(--surface-low);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 9px;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .task-card:hover {
-  border-color: var(--cyan-accent);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-surface);
+  border-color: var(--task-accent);
+  box-shadow: 0 10px 28px var(--task-shadow);
+}
+
+.task-card--watch_ads {
+  --task-accent: var(--electric-pink);
+  --task-wash: rgba(255, 43, 133, 0.12);
+  --task-card-wash: rgba(255, 43, 133, 0.055);
+  --task-shadow: rgba(255, 43, 133, 0.1);
+  border-color: rgba(255, 43, 133, 0.2);
+}
+
+.task-card--free_claim {
+  --task-accent: var(--volt-yellow);
+  --task-wash: rgba(223, 255, 0, 0.12);
+  --task-card-wash: rgba(223, 255, 0, 0.055);
+  --task-shadow: rgba(223, 255, 0, 0.1);
+  border-color: rgba(223, 255, 0, 0.2);
+}
+
+.task-card--join_telegram {
+  --task-accent: var(--cyan-accent);
+  --task-wash: rgba(0, 240, 255, 0.12);
 }
 
 .task-card.completed {
-  opacity: 0.6;
-  border-style: dashed;
+  opacity: 0.68;
 }
 
-.task-left {
+.task-card-top {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
 }
 
 .task-icon-badge {
-  width: 48px;
-  height: 48px;
-  background-color: var(--surface-highest);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  flex-shrink: 0;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
-}
-
-.task-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border: 1px solid var(--task-border);
+  border-radius: 13px;
+  background: var(--task-card-wash);
+  font-size: 1.3rem;
+  box-shadow: inset 0 0 16px var(--task-shadow);
 }
 
 .task-title {
   font-family: 'Unbounded', sans-serif;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--text-primary);
   margin: 0;
@@ -361,34 +394,45 @@
 
 .task-description {
   font-family: 'Manrope', sans-serif;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  line-height: 1.4;
-  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin: 0 0 7px;
 }
 
 .task-reward {
-  font-family: 'Unbounded', sans-serif;
-  font-size: 0.85rem;
-  font-weight: 800;
+  padding: 7px 10px;
+  border: 1px solid rgba(223, 255, 0, 0.2);
+  border-radius: 999px;
+  background: rgba(223, 255, 0, 0.08);
   color: var(--volt-yellow);
-  align-self: flex-start;
-  background-color: rgba(223, 255, 0, 0.1);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
+  font-family: 'Unbounded', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.task-eyebrow {
+  margin: 0 0 1px;
+  color: var(--task-accent);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
 }
 
 /* Task action button */
 .btn-task {
   width: 100%;
-  padding: 14px;
+  min-height: 45px;
+  padding: 11px 14px;
   background-color: var(--cyan-accent);
   color: var(--bg-obsidian);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   font-family: 'Unbounded', sans-serif;
   font-weight: 800;
-  font-size: 0.9rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   cursor: pointer;
@@ -433,6 +477,10 @@
 
 .btn-task.btn-task--ad:hover:not(:disabled) {
   box-shadow: 0 0 15px var(--electric-pink-glow);
+}
+
+.task-card--free_claim .btn-task:not(:disabled) {
+  background: var(--volt-yellow);
 }
 
 /* ── Telegram Stars coin top-up ─────────────────────────────────────────── */
@@ -635,4 +683,11 @@
   cursor: not-allowed;
   filter: grayscale(0.6);
   opacity: 0.58;
+}
+
+@media (min-width: 700px) {
+  .earn-community-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
 }

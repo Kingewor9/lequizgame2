@@ -423,68 +423,6 @@ export const FootyCoinPage: React.FC = () => {
           </div>
         </section>
 
-        <section className="announcement-channel-card" aria-labelledby="announcement-channel-heading">
-          <div className="announcement-channel-top">
-            <div className="announcement-channel-icon"><Send size={20} aria-hidden="true" /></div>
-            <span className="announcement-channel-reward">+200 coins</span>
-          </div>
-          <p className="announcement-channel-eyebrow">THE LATEST FROM FOOTY IQ</p>
-          <h2 id="announcement-channel-heading">Join our Announcement channel</h2>
-          <p className="announcement-channel-copy">Join @footyiqgame and earn 200 footy coins</p>
-          <button
-            type="button"
-            className={getButtonClass('join_announcement')}
-            onClick={() => handleClick('join_announcement')}
-            disabled={!backendTaskIds.join_announcement || isButtonDisabled('join_announcement')}
-          >
-            {getButtonLabel('join_announcement')}
-          </button>
-        </section>
-
-        <section className="referral-card" aria-labelledby="referral-heading">
-          <div className="referral-card-top">
-            <div className="referral-icon"><Gift size={21} /></div>
-            <span className="referral-reward">+{referralInfo?.reward_per_referral ?? 10} coins</span>
-          </div>
-          <p className="referral-eyebrow">PASS IT ON</p>
-          <h2 id="referral-heading">Bring your squad.</h2>
-          <p className="referral-copy">
-            Invite a friend to launch Footy IQ. You get 10 Footy Coins when they join — and a Telegram
-            notification when your reward lands.
-          </p>
-          <div className="referral-count">
-            <Users size={17} aria-hidden="true" />
-            <span>
-              {isReferralLoading
-                ? 'Counting your successful invites…'
-                : `${referralInfo?.successful_referrals ?? 0} successful ${referralInfo?.successful_referrals === 1 ? 'invite' : 'invites'}`}
-            </span>
-          </div>
-          <div className="referral-link-row">
-            <span className="referral-link" title={referralInfo?.referral_link}>
-              {referralInfo?.referral_link || (isReferralLoading ? 'Preparing your invite link…' : 'Invite link unavailable')}
-            </span>
-            <button
-              type="button"
-              className="referral-copy-button"
-              onClick={handleCopyReferralLink}
-              disabled={!referralInfo || isReferralLoading}
-              aria-label="Copy invite link"
-            >
-              {isReferralCopied ? <Check size={17} /> : <Copy size={17} />}
-            </button>
-          </div>
-          <button
-            type="button"
-            className="referral-share-button"
-            onClick={handleShareReferralLink}
-            disabled={!referralInfo || isReferralLoading}
-          >
-            <Share2 size={17} />
-            Share invite
-          </button>
-        </section>
-
         <section className="buy-coins-card card" aria-labelledby="buy-coins-heading">
           <div className="buy-coins-heading-row">
             <div className="buy-coins-icon"><Star size={21} fill="currentColor" /></div>
@@ -560,29 +498,94 @@ export const FootyCoinPage: React.FC = () => {
 
           <div className="tasks-container">
             {TASKS.map((task) => (
-              <div
+              <article
                 key={task.id}
-                className={`task-card card ${completedTasks.has(task.type) && task.type !== 'watch_ads' ? 'completed' : ''
+                className={`task-card task-card--${task.type} ${completedTasks.has(task.type) && task.type !== 'watch_ads' ? 'completed' : ''
                   }`}
               >
-                <div className="task-left">
-                  <div className="task-icon-badge">{task.icon}</div>
-                  <div className="task-info">
-                    <h3 className="task-title">{task.title}</h3>
-                    <p className="task-description">{task.description}</p>
-                    <span className="task-reward">+{task.reward_coins} 💰</span>
-                  </div>
+                <div className="task-card-top">
+                  <div className="task-icon-badge" aria-hidden="true">{task.icon}</div>
+                  <span className="task-reward">+{task.reward_coins} coins</span>
                 </div>
-
+                <p className="task-eyebrow">
+                  {task.type === 'watch_ads' ? 'REPEATABLE REWARD' : task.type === 'free_claim' ? 'ONE-TIME BONUS' : 'JOIN THE COMMUNITY'}
+                </p>
+                <h3 className="task-title">{task.title}</h3>
+                <p className="task-description">{task.description}</p>
                 <button
+                  type="button"
                   className={getButtonClass(task.type)}
                   onClick={() => handleClick(task.type)}
                   disabled={isButtonDisabled(task.type)}
                 >
                   {getButtonLabel(task.type)}
                 </button>
-              </div>
+              </article>
             ))}
+          </div>
+
+          <div className="earn-community-cards">
+            <section className="announcement-channel-card" aria-labelledby="announcement-channel-heading">
+              <div className="announcement-channel-top">
+                <div className="announcement-channel-icon"><Send size={20} aria-hidden="true" /></div>
+                <span className="announcement-channel-reward">+200 coins</span>
+              </div>
+              <p className="announcement-channel-eyebrow">THE LATEST FROM FOOTY IQ</p>
+              <h3 id="announcement-channel-heading">Join our Announcement channel</h3>
+              <p className="announcement-channel-copy">Join @footyiqgame and earn 200 footy coins</p>
+              <button
+                type="button"
+                className={getButtonClass('join_announcement')}
+                onClick={() => handleClick('join_announcement')}
+                disabled={!backendTaskIds.join_announcement || isButtonDisabled('join_announcement')}
+              >
+                {getButtonLabel('join_announcement')}
+              </button>
+            </section>
+
+            <section className="referral-card" aria-labelledby="referral-heading">
+              <div className="referral-card-top">
+                <div className="referral-icon"><Gift size={21} aria-hidden="true" /></div>
+                <span className="referral-reward">+{referralInfo?.reward_per_referral ?? 10} coins</span>
+              </div>
+              <p className="referral-eyebrow">PASS IT ON</p>
+              <h3 id="referral-heading">Bring your squad.</h3>
+              <p className="referral-copy">
+                Invite a friend to launch Footy IQ. You get 10 Footy Coins when they join — and a Telegram
+                notification when your reward lands.
+              </p>
+              <div className="referral-count">
+                <Users size={17} aria-hidden="true" />
+                <span>
+                  {isReferralLoading
+                    ? 'Counting your successful invites…'
+                    : `${referralInfo?.successful_referrals ?? 0} successful ${referralInfo?.successful_referrals === 1 ? 'invite' : 'invites'}`}
+                </span>
+              </div>
+              <div className="referral-link-row">
+                <span className="referral-link" title={referralInfo?.referral_link}>
+                  {referralInfo?.referral_link || (isReferralLoading ? 'Preparing your invite link…' : 'Invite link unavailable')}
+                </span>
+                <button
+                  type="button"
+                  className="referral-copy-button"
+                  onClick={handleCopyReferralLink}
+                  disabled={!referralInfo || isReferralLoading}
+                  aria-label="Copy invite link"
+                >
+                  {isReferralCopied ? <Check size={17} /> : <Copy size={17} />}
+                </button>
+              </div>
+              <button
+                type="button"
+                className="referral-share-button"
+                onClick={handleShareReferralLink}
+                disabled={!referralInfo || isReferralLoading}
+              >
+                <Share2 size={17} />
+                Share invite
+              </button>
+            </section>
           </div>
         </section>
       </div>
