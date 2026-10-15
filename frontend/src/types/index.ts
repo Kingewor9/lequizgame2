@@ -37,6 +37,11 @@ export interface User {
   is_admin?: boolean;
 }
 
+export interface TelegramLoginResponse extends User {
+  access_token?: string;
+  welcome_bonus_awarded: boolean;
+}
+
 // Quiz Data
 export type QuizType = 'multiple_choice' | 'image_text';
 export type QuestionType = 'multiple_choice' | 'image_text';
@@ -232,7 +237,7 @@ export interface FootyCoinTransaction {
 
 export interface FootyCoinTask {
   id: string;
-  type: 'watch_ads' | 'free_claim' | 'join_telegram';
+  type: 'watch_ads' | 'join_telegram' | 'join_announcement';
   title: string;
   description: string;
   reward_coins: number;

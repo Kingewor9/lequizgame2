@@ -12,6 +12,7 @@ from urllib.parse import parse_qsl
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 REFERRAL_REWARD = 10
+WELCOME_BONUS = 250
 
 
 def _get_verified_referral_code(init_data, telegram_id):
@@ -94,6 +95,34 @@ def _complete_referral_reward(user):
     )
 
 
+def _claim_welcome_bonus(user):
+    """Credit the sign-in bonus once, including to accounts created before it was introduced."""
+    claimed = User.objects(
+        id=user.id,
+        welcome_bonus_claimed__ne=True,
+    ).update_one(
+        inc__footy_coins=WELCOME_BONUS,
+        set__welcome_bonus_claimed=True,
+        set__updated_at=datetime.utcnow(),
+    )
+    if not claimed:
+        return False
+
+    try:
+        FootyCoinTransaction(
+            id=f'welcome_bonus_{user.id}',
+            user_id=user.id,
+            type='earned',
+            amount=WELCOME_BONUS,
+            reason='Welcome bonus',
+        ).save()
+    except Exception:
+        current_app.logger.exception('Could not record welcome bonus transaction for user %s', user.id)
+
+    user.reload()
+    return True
+
+
 @auth_bp.route('/telegram-login', methods=['POST'])
 def telegram_login():
     """Authenticate user via Telegram"""
@@ -136,12 +165,16 @@ def telegram_login():
             user.save()
         else:
             # Telegram profile details can change after the account is created.
-            user.first_name = first_name
-            user.last_name = last_name
-            user.username = username
-            user.photo_url = photo_url
-            user.updated_at = datetime.utcnow()
-            user.save()
+            User.objects(id=user.id).update_one(
+                set__first_name=first_name,
+                set__last_name=last_name,
+                set__username=username,
+                set__photo_url=photo_url,
+                set__updated_at=datetime.utcnow(),
+            )
+            user.reload()
+
+        welcome_bonus_awarded = _claim_welcome_bonus(user)
 
         if referral_code and not getattr(user, 'referred_by_id', None):
             referrer = User.objects(referral_code=referral_code).first()
@@ -201,7 +234,8 @@ def telegram_login():
             data={
                 **user.to_dict(),
                 'is_admin': is_admin,
-                'access_token': access_token
+                'access_token': access_token,
+                'welcome_bonus_awarded': welcome_bonus_awarded,
             },
             message='Login successful'
         )), 200

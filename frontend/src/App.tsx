@@ -10,6 +10,7 @@ import { Loading } from './components/Loading';
 import { LeagueWinModal } from './components/LeagueWinModal';
 import { MilestoneModal } from './components/MilestoneModal';
 import { TournamentRenewalModal } from './components/TournamentRenewalModal';
+import { WelcomeBonusModal } from './components/WelcomeBonusModal';
 import { GameSoundProvider, useGameSound } from './context/GameSoundContext';
 import { apiService } from './services/apiService';
 import { ApiResponse, LeagueWinNotification, TournamentRenewal } from './types';
@@ -25,6 +26,8 @@ const AppContent: React.FC = () => {
     claimMilestoneNotification,
     dismissMilestoneNotification,
     refreshUser,
+    welcomeBonusAwarded,
+    dismissWelcomeBonus,
   } = useAuth();
   const { playSound } = useGameSound();
   const [activeTab, setActiveTab] = useState<'home' | 'league' | 'tournament' | 'coins' | 'admin'>('home');
@@ -160,7 +163,7 @@ const AppContent: React.FC = () => {
   const renderPage = () => {
     switch (activeTab) {
       case 'home':
-        return <HomePage />;
+        return <HomePage onCoinsClick={() => setActiveTab('coins')} />;
       case 'league':
         return (
           <LeaguePage
@@ -173,9 +176,9 @@ const AppContent: React.FC = () => {
       case 'coins':
         return <FootyCoinPage />;
       case 'admin':
-        return user?.is_admin ? <AdminPage /> : <HomePage />;
+        return user?.is_admin ? <AdminPage /> : <HomePage onCoinsClick={() => setActiveTab('coins')} />;
       default:
-        return <HomePage />;
+        return <HomePage onCoinsClick={() => setActiveTab('coins')} />;
     }
   };
 
@@ -189,7 +192,9 @@ const AppContent: React.FC = () => {
         {renderPage()}
       </div>
       <Navigation activeTab={activeTab} user={user} onTabChange={setActiveTab} />
-      {tournamentRenewals.length > 0 && !renewalPromptDismissed && activeTab !== 'coins' ? (
+      {welcomeBonusAwarded ? (
+        <WelcomeBonusModal onClose={dismissWelcomeBonus} />
+      ) : tournamentRenewals.length > 0 && !renewalPromptDismissed && activeTab !== 'coins' ? (
         <TournamentRenewalModal
           renewal={tournamentRenewals[0]}
           onRespond={respondToTournamentRenewal}

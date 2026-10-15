@@ -17,14 +17,6 @@ const TASKS = [
     icon: '⚡',
   },
   {
-    id: 'free_claim',
-    type: 'free_claim',
-    title: 'Welcome Bonus',
-    description: 'Claim your one-time welcome gift of 250 Footy Coins.',
-    reward_coins: 250,
-    icon: '🎁',
-  },
-  {
     id: 'join_telegram',
     type: 'join_telegram',
     title: 'Join Our Gaming Channel',
@@ -207,31 +199,6 @@ export const FootyCoinPage: React.FC = () => {
       .finally(() => setIsAdLoading(false));
   };
 
-  // ── Welcome Bonus ─────────────────────────────────────────────────────────
-  const handleFreeClaim = async () => {
-    const taskId = backendTaskIds['free_claim'];
-    if (!taskId) {
-      setAlert({ message: 'Task not available. Please try again later.', type: 'error' });
-      return;
-    }
-
-    setTaskInProgress('free_claim');
-    try {
-      const response = await apiService.post(`/footy-coins/tasks/${taskId}/complete`, {});
-      if (response.success) {
-        setAlert({ message: '🎉 Welcome bonus claimed! 250 Footy Coins added.', type: 'success' });
-        await refreshUser();
-        setCompletedTasks((prev) => new Set(prev).add('free_claim'));
-      } else {
-        setAlert({ message: response.error || 'Failed to claim bonus', type: 'error' });
-      }
-    } catch {
-      setAlert({ message: 'Failed to claim bonus', type: 'error' });
-    } finally {
-      setTaskInProgress(null);
-    }
-  };
-
   // ── Join Telegram ─────────────────────────────────────────────────────────
   const handleJoinTelegram = (taskType: string) => {
     const channel = taskType === 'join_announcement'
@@ -369,7 +336,6 @@ export const FootyCoinPage: React.FC = () => {
     if (completedTasks.has(type)) return 'Completed';
     if (taskInProgress === type) return 'Processing...';
     if ((type === 'join_telegram' || type === 'join_announcement') && pendingTelegramVerify.has(type)) return 'Verify';
-    if (type === 'free_claim') return 'Claim';
     if (type === 'join_telegram' || type === 'join_announcement') return 'Join';
     return 'Go';
   };
@@ -389,7 +355,6 @@ export const FootyCoinPage: React.FC = () => {
 
   const handleClick = (type: string) => {
     if (type === 'watch_ads') return handleWatchAd();
-    if (type === 'free_claim') return handleFreeClaim();
     if (type === 'join_telegram' || type === 'join_announcement') {
       if (pendingTelegramVerify.has(type)) return handleVerifyTelegram(type);
       return handleJoinTelegram(type);
@@ -416,7 +381,7 @@ export const FootyCoinPage: React.FC = () => {
           <div className="balance-card">
             <h2>Your Footy Coins</h2>
             <div className="coin-amount">
-              <span className="coin-icon">💰</span>
+              <Coins size={38} className="coin-icon" aria-hidden="true" />
               <span className="amount">{user?.footy_coins || 0}</span>
             </div>
             <p className="coin-description">Use coins to play quizzes and compete</p>
@@ -508,7 +473,7 @@ export const FootyCoinPage: React.FC = () => {
                   <span className="task-reward">+{task.reward_coins} coins</span>
                 </div>
                 <p className="task-eyebrow">
-                  {task.type === 'watch_ads' ? 'REPEATABLE REWARD' : task.type === 'free_claim' ? 'ONE-TIME BONUS' : 'JOIN THE COMMUNITY'}
+                  {task.type === 'watch_ads' ? 'REPEATABLE REWARD' : 'JOIN THE COMMUNITY'}
                 </p>
                 <h3 className="task-title">{task.title}</h3>
                 <p className="task-description">{task.description}</p>

@@ -312,13 +312,16 @@ def get_footy_coin_tasks():
 @coins_bp.route('/tasks/<task_id>/complete', methods=['POST'])
 @jwt_required()
 def complete_task(task_id):
-    """Complete a footy coin task (watch_ads, free_claim)"""
+    """Complete a repeatable ad-reward task."""
     try:
         user_id = get_jwt_identity()
 
         task = FootyCoinTask.objects(id=task_id).first()
         if not task:
             return jsonify(format_error('Task not found')), 404
+
+        if task.type == 'free_claim':
+            return jsonify(format_error('The welcome bonus is awarded automatically at sign-in')), 400
 
         # join_telegram must go through /verify-telegram instead
         if task.type == 'join_telegram':
@@ -474,12 +477,6 @@ def seed_tasks():
             'reward_coins': 50,
         },
         {
-            'type': 'free_claim',
-            'title': 'Welcome Bonus',
-            'description': 'Claim your one-time welcome gift of 250 Footy Coins.',
-            'reward_coins': 250,
-        },
-        {
             'type': 'join_telegram',
             'title': 'Join Our Telegram Channel',
             'description': 'Join @footyriddles on Telegram and earn 150 Footy Coins.',
@@ -505,3 +502,5 @@ def seed_tasks():
             )
             task.save()
             print(f"Seeded task: {task_data['title']}")
+
+    FootyCoinTask.objects(type='free_claim').update(is_active=False)

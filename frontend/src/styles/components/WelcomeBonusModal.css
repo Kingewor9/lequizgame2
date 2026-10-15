@@ -1,0 +1,64 @@
+.welcome-bonus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 8px 0 2px;
+}
+
+.welcome-bonus-icon {
+  position: relative;
+  display: grid;
+  width: 68px;
+  height: 68px;
+  place-items: center;
+  margin-bottom: 18px;
+  border: 1px solid rgba(223, 255, 0, 0.35);
+  border-radius: 22px;
+  background: rgba(223, 255, 0, 0.1);
+  color: var(--volt-yellow);
+  box-shadow: 0 0 28px rgba(223, 255, 0, 0.13);
+}
+
+.welcome-bonus-icon > svg:last-child {
+  position: absolute;
+  top: 9px;
+  right: 8px;
+}
+
+.welcome-bonus-eyebrow {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.welcome-bonus-amount {
+  margin: 8px 0 0;
+  color: var(--volt-yellow);
+  font-family: 'Unbounded', sans-serif;
+  font-size: 2.65rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-shadow: 0 0 22px var(--volt-yellow-glow);
+}
+
+.welcome-bonus-currency {
+  margin: 3px 0 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.welcome-bonus-copy {
+  max-width: 270px;
+  margin: 14px 0 22px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+.welcome-bonus-button {
+  width: 100%;
+}

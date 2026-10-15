@@ -48,7 +48,8 @@
 }
 
 .coin-icon {
-  font-size: 2.5rem;
+  color: var(--volt-yellow);
+  flex-shrink: 0;
   animation: bobbing 2s ease-in-out infinite;
 }
 
@@ -347,14 +348,6 @@
   border-color: rgba(255, 43, 133, 0.2);
 }
 
-.task-card--free_claim {
-  --task-accent: var(--volt-yellow);
-  --task-wash: rgba(223, 255, 0, 0.12);
-  --task-card-wash: rgba(223, 255, 0, 0.055);
-  --task-shadow: rgba(223, 255, 0, 0.1);
-  border-color: rgba(223, 255, 0, 0.2);
-}
-
 .task-card--join_telegram {
   --task-accent: var(--cyan-accent);
   --task-wash: rgba(0, 240, 255, 0.12);
@@ -477,10 +470,6 @@
 
 .btn-task.btn-task--ad:hover:not(:disabled) {
   box-shadow: 0 0 15px var(--electric-pink-glow);
-}
-
-.task-card--free_claim .btn-task:not(:disabled) {
-  background: var(--volt-yellow);
 }
 
 /* ── Telegram Stars coin top-up ─────────────────────────────────────────── */

@@ -25,6 +25,7 @@ class User(Document):
     prev_global_rank = IntField(default=0)
     global_total_players = IntField(default=0)
     footy_coins = IntField(default=0)
+    welcome_bonus_claimed = BooleanField(default=False)
     referral_code = StringField(unique=True, sparse=True)
     referred_by_id = StringField()
     referred_user_ids = ListField(StringField(), default=list)

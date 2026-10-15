@@ -74,12 +74,6 @@ def initialize_default_tasks():
             'reward_coins': 50,
         },
         {
-            'type': 'free_claim',
-            'title': 'Welcome Bonus',
-            'description': 'Claim your one-time welcome gift of 250 Footy Coins.',
-            'reward_coins': 250,
-        },
-        {
             'type': 'join_telegram',
             'title': 'Join Our Telegram Channel',
             'description': 'Join @footyriddles on Telegram and earn 150 Footy Coins.',
@@ -107,3 +101,5 @@ def initialize_default_tasks():
                 is_active=True,
                 **task_data
             ).save()
+
+    FootyCoinTask.objects(type='free_claim').update(is_active=False)

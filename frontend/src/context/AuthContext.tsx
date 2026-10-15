@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import { User, TelegramUser } from '../types';
+import { User, TelegramLoginResponse, TelegramUser } from '../types';
 import { apiService } from '../services/apiService';
 import { MilestoneNotification } from '../constants/milestones';
 
@@ -12,10 +12,12 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   milestoneNotification: MilestoneNotification | null;
+  welcomeBonusAwarded: boolean;
   logout: () => void;
   refreshUser: () => Promise<void>;
   claimMilestoneNotification: () => Promise<void>;
   dismissMilestoneNotification: () => void;
+  dismissWelcomeBonus: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,6 +28,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [milestoneNotification, setMilestoneNotification] = useState<MilestoneNotification | null>(null);
+  const [welcomeBonusAwarded, setWelcomeBonusAwarded] = useState(false);
   const activeMilestoneRef = useRef<MilestoneNotification | null>(null);
   const milestoneClaimRequest = useRef<Promise<void> | null>(null);
 
@@ -95,7 +98,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setTelegramUser(parsedUser);
 
         // Keep loading state true while retrying until successful
-        const response = await apiService.post(
+        const response = await apiService.post<TelegramLoginResponse>(
           '/auth/telegram-login',
           {
             telegram_id: parsedUser.id,
@@ -112,14 +115,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
 
         if (response.success && response.data) {
-          const data = response.data as any;
+          const data = response.data;
 
           // Save JWT token so apiService attaches it to all future requests
           if (data.access_token) {
             localStorage.setItem('access_token', data.access_token);
           }
 
-          setUser(data as User);
+          setUser(data);
+          setWelcomeBonusAwarded(data.welcome_bonus_awarded);
           localStorage.setItem('telegram_id', parsedUser.id.toString());
           localStorage.setItem('user_data', JSON.stringify(data));
           setError(null);
@@ -143,11 +147,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setTelegramUser(null);
     activeMilestoneRef.current = null;
     setMilestoneNotification(null);
+    setWelcomeBonusAwarded(false);
     // Clear all stored auth data including JWT token
     localStorage.removeItem('access_token');
     localStorage.removeItem('telegram_id');
     localStorage.removeItem('user_data');
   };
+
+  const dismissWelcomeBonus = () => setWelcomeBonusAwarded(false);
 
   const refreshUser = async () => {
     try {
@@ -174,10 +181,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       isLoading,
       error,
       milestoneNotification,
+      welcomeBonusAwarded,
       logout,
       refreshUser,
       claimMilestoneNotification,
       dismissMilestoneNotification,
+      dismissWelcomeBonus,
     }}>
       {children}
     </AuthContext.Provider>

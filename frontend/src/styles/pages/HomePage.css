@@ -22,9 +22,44 @@
 
 .welcome-heading-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.welcome-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.home-coin-balance {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid rgba(223, 255, 0, 0.28);
+  border-radius: 13px;
+  background: rgba(223, 255, 0, 0.08);
+  color: var(--volt-yellow);
+  font-size: 0.85rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.home-coin-balance:hover {
+  transform: translateY(-1px);
+  border-color: rgba(223, 255, 0, 0.55);
+  background: rgba(223, 255, 0, 0.14);
+}
+
+.home-coin-balance:focus-visible {
+  outline: 2px solid var(--volt-yellow);
+  outline-offset: 3px;
 }
 
 .welcome-title {

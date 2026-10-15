@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, ListOrdered, Trophy, CheckCircle2, Target, Sparkles, Clock, Volume2, VolumeX } from 'lucide-react';
+import { ChevronRight, Coins, ListOrdered, Trophy, CheckCircle2, Target, Sparkles, Clock, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Quiz, QuizResponse } from '../types';
 import { apiService } from '../services/apiService';
@@ -14,7 +14,7 @@ import { formatQuizTimer } from '../services/utilService';
 import { useGameSound } from '../context/GameSoundContext';
 import '../styles/pages/HomePage.css';
 
-export const HomePage: React.FC = () => {
+export const HomePage: React.FC<{ onCoinsClick: () => void }> = ({ onCoinsClick }) => {
   const { user, telegramUser, refreshUser } = useAuth();
   const { isSoundEnabled, toggleSound, playSound } = useGameSound();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -300,17 +300,28 @@ export const HomePage: React.FC = () => {
             <h1 className="welcome-title">
               Welcome, <span className="welcome-name">{displayName}</span>!
             </h1>
-            <button
-              type="button"
-              className={`sound-toggle ${isSoundEnabled ? 'sound-toggle-on' : ''}`}
-              onClick={toggleSound}
-              data-sound="none"
-              aria-label={isSoundEnabled ? 'Turn game sounds off' : 'Turn game sounds on'}
-              aria-pressed={isSoundEnabled}
-              title={isSoundEnabled ? 'Sound on' : 'Sound off'}
-            >
-              {isSoundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
-            </button>
+            <div className="welcome-actions">
+              <button
+                type="button"
+                className="home-coin-balance"
+                onClick={onCoinsClick}
+                aria-label={`Footy Coins balance: ${user?.footy_coins ?? 0}. Open Footy Coins`}
+              >
+                <Coins size={17} aria-hidden="true" />
+                <span>{(user?.footy_coins ?? 0).toLocaleString()}</span>
+              </button>
+              <button
+                type="button"
+                className={`sound-toggle ${isSoundEnabled ? 'sound-toggle-on' : ''}`}
+                onClick={toggleSound}
+                data-sound="none"
+                aria-label={isSoundEnabled ? 'Turn game sounds off' : 'Turn game sounds on'}
+                aria-pressed={isSoundEnabled}
+                title={isSoundEnabled ? 'Sound on' : 'Sound off'}
+              >
+                {isSoundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+              </button>
+            </div>
           </div>
           <p className="welcome-subtitle">Test your football knowledge & climb the ranks</p>
         </section>
