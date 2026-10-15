@@ -14,6 +14,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useGameSound } from '../context/GameSoundContext';
 import { Alert, AlertType } from '../components/Alert';
 import { Loading } from '../components/Loading';
 import { Modal } from '../components/Modal';
@@ -74,6 +75,7 @@ const formatRules = (
 
 export const TournamentPage: React.FC = () => {
   const { user, refreshUser } = useAuth();
+  const { playSound } = useGameSound();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [detail, setDetail] = useState<TournamentDetail | null>(null);
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
@@ -274,7 +276,11 @@ export const TournamentPage: React.FC = () => {
       quizSubmittingRef.current = false;
       setQuizSubmitting(false);
     }
-  }, [activeQuiz, activeTournamentId, fetchDetail, fetchTournaments]);
+  }, [activeQuiz, activeTournamentId, fetchDetail, fetchTournaments, playSound]);
+
+  useEffect(() => {
+    if (quizResults) playSound('complete');
+  }, [playSound, quizResults]);
 
   useEffect(() => {
     if (!quizStarted || !activeQuiz) return undefined;
@@ -297,6 +303,7 @@ export const TournamentPage: React.FC = () => {
 
   const recordAnswer = (answerId: string, isCorrect: boolean, answerText?: string) => {
     if (!activeQuiz?.questions?.length || isAnswered) return;
+    playSound(isCorrect ? 'correct' : 'incorrect');
     const question = activeQuiz.questions[currentQuestionIndex];
     const updatedAnswers = [
       ...answers,

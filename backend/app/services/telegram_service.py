@@ -7,6 +7,8 @@ from datetime import datetime
 from flask import current_app, has_app_context
 import asyncio
 
+TOURNAMENT_QUIZ_IMAGE_URL = 'https://ibb.co/Lz1qWjVQ'
+
 
 class TelegramBotService:
     """Service for sending notifications via Telegram Bot"""
@@ -49,6 +51,7 @@ class TelegramBotService:
         user_telegram_ids: list = None,
         async_send: bool = True,
         expires_at=None,
+        tournament_name: str = None,
     ) -> bool:
         """
         Send quiz notification directly to registered users via Telegram Bot.
@@ -88,6 +91,7 @@ class TelegramBotService:
                     total_questions,
                     total_points,
                     expires_at,
+                    tournament_name,
                 ),
                 daemon=True
             )
@@ -101,6 +105,7 @@ class TelegramBotService:
                 total_questions,
                 total_points,
                 expires_at,
+                tournament_name,
             )
             return True
 
@@ -112,6 +117,7 @@ class TelegramBotService:
         total_questions: int,
         total_points: int,
         expires_at=None,
+        tournament_name: str = None,
     ) -> int:
         """Helper to broadcast quiz notifications directly to users via the bot."""
         description_line = f"\n{quiz_description}" if quiz_description else ""
@@ -128,14 +134,25 @@ class TelegramBotService:
                 else f'{hours_remaining} hour' + ('' if hours_remaining == 1 else 's')
             )
             expiry_line = f"\n⏳ *Expires in:* {expiry_text}\n"
-        text = (
-            f"🎯 *New Quiz Available!*\n\n"
-            f"*{quiz_name}*{description_line}\n\n"
-            f"📝 *Questions:* {total_questions}\n"
-            f"⭐ *Points Available:* {total_points}"
-            f"{expiry_line}\n"
-            f"Tap the button below to play and earn points!"
-        )
+        if tournament_name:
+            text = (
+                f"🏆 *Tournament Quiz Available!*\n\n"
+                f"*Tournament:* {tournament_name}\n"
+                f"*{quiz_name}*{description_line}\n\n"
+                f"📝 *Questions:* {total_questions}\n"
+                f"⭐ *Points Available:* {total_points}"
+                f"{expiry_line}\n"
+                f"Open the tournament in Footy IQ to play this quiz!"
+            )
+        else:
+            text = (
+                f"🎯 *New Quiz Available!*\n\n"
+                f"*{quiz_name}*{description_line}\n\n"
+                f"📝 *Questions:* {total_questions}\n"
+                f"⭐ *Points Available:* {total_points}"
+                f"{expiry_line}\n"
+                f"Tap the button below to play and earn points!"
+            )
 
         reply_markup = None
         if self.miniapp_url:
@@ -150,7 +167,11 @@ class TelegramBotService:
                 ]
             }
 
-        image_url = "https://i.ibb.co/tTXt8Mbx/cropped-best-bike-3.png"
+        image_url = (
+            TOURNAMENT_QUIZ_IMAGE_URL
+            if tournament_name
+            else "https://i.ibb.co/tTXt8Mbx/cropped-best-bike-3.png"
+        )
 
         total_users = len(user_telegram_ids)
         print(f"[TELEGRAM] Starting quiz notification broadcast to {total_users} users via bot...")

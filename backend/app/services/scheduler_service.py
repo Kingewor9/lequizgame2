@@ -118,9 +118,18 @@ def check_scheduled_quizzes_job():
     for quiz in pending_quizzes:
         try:
             user_telegram_ids = None
+            tournament_name = None
             if getattr(quiz, 'destination', 'game') == 'tournament':
-                from app.models import TournamentRegistration, User
+                from app.models import Tournament, TournamentRegistration, User
 
+                tournament = Tournament.objects(id=quiz.tournament_id).first()
+                if not tournament:
+                    print(
+                        f"[SCHEDULER] Tournament {quiz.tournament_id} not found "
+                        f"for quiz: {quiz.name}"
+                    )
+                    continue
+                tournament_name = tournament.name
                 registered_user_ids = TournamentRegistration.objects(
                     tournament_id=quiz.tournament_id
                 ).distinct('user_id')
@@ -137,6 +146,7 @@ def check_scheduled_quizzes_job():
                 user_telegram_ids=user_telegram_ids,
                 async_send=True,
                 expires_at=quiz.expires_at,
+                tournament_name=tournament_name,
             )
             if not queued:
                 print(f"[SCHEDULER] Notification could not be queued for quiz: {quiz.name}")

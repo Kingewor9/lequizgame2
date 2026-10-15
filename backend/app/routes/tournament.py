@@ -12,6 +12,7 @@ from app.models import (
     TournamentSubmission,
     User,
 )
+from app.services.telegram_service import get_telegram_service
 from app.services.tournament_service import calculate_standings, sync_tournament
 from app.utils import format_error, format_success, generate_id
 
@@ -367,6 +368,27 @@ def register_for_tournament(tournament_id):
             User.objects(id=user_id).update_one(inc__footy_coins=tournament.entry_fee)
         current_app.logger.exception('Could not register user for tournament')
         return jsonify(format_error(f'Could not complete tournament registration: {error}')), 500
+
+    admin_telegram_ids = current_app.config.get('ADMIN_TELEGRAM_IDS', [])
+    if admin_telegram_ids:
+        try:
+            player_name = ' '.join(filter(None, [user.first_name, user.last_name]))
+            queued = get_telegram_service().send_tournament_message(
+                admin_telegram_ids,
+                f'🏆 Tournament registration\n\n'
+                f'{player_name} joined {tournament.name}.\n'
+                f'Entry fee: {tournament.entry_fee} Footy Coins.',
+            )
+            if not queued:
+                current_app.logger.warning(
+                    'Could not queue admin notification for tournament registration %s',
+                    registration.id,
+                )
+        except Exception:
+            current_app.logger.exception(
+                'Could not notify admins about tournament registration %s',
+                registration.id,
+            )
 
     return jsonify(format_success(
         data={

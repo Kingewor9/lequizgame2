@@ -515,7 +515,12 @@ def create_quiz_bulk():
             try:
                 telegram_service = get_telegram_service()
                 user_telegram_ids = None
+                tournament_name = None
                 if destination == 'tournament':
+                    tournament = Tournament.objects(id=tournament_id).first()
+                    if not tournament:
+                        raise ValueError(f'Tournament {tournament_id} no longer exists')
+                    tournament_name = tournament.name
                     user_ids = TournamentRegistration.objects(
                         tournament_id=tournament_id
                     ).distinct('user_id')
@@ -532,6 +537,7 @@ def create_quiz_bulk():
                     user_telegram_ids=user_telegram_ids,
                     async_send=True,
                     expires_at=quiz.expires_at,
+                    tournament_name=tournament_name,
                 )
             except Exception as e:
                 print(f"[ADMIN] Error sending quiz notification to users: {str(e)}")
@@ -726,7 +732,12 @@ def notify_quiz(quiz_id):
 
         telegram_service = get_telegram_service()
         user_telegram_ids = None
+        tournament_name = None
         if getattr(quiz, 'destination', 'game') == 'tournament':
+            tournament = Tournament.objects(id=quiz.tournament_id).first()
+            if not tournament:
+                return jsonify(format_error('Tournament not found for this quiz')), 404
+            tournament_name = tournament.name
             user_ids = TournamentRegistration.objects(
                 tournament_id=quiz.tournament_id
             ).distinct('user_id')
@@ -743,6 +754,7 @@ def notify_quiz(quiz_id):
             user_telegram_ids=user_telegram_ids,
             async_send=True,
             expires_at=quiz.expires_at,
+            tournament_name=tournament_name,
         )
         if not queued:
             return jsonify(format_error('The quiz notification could not be queued')), 503
