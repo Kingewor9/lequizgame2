@@ -62,7 +62,7 @@ export interface Quiz {
 }
 
 export type TournamentType = 'league' | 'group_knockout';
-export type TournamentStatus = 'registration' | 'active' | 'completed' | 'draft' | 'cancelled';
+export type TournamentStatus = 'registration' | 'active' | 'completed' | 'draft' | 'cancelled' | 'renewal';
 
 export interface Tournament {
   id: string;
@@ -78,6 +78,13 @@ export interface Tournament {
   winner_user_ids: string[];
   registered?: boolean;
   available?: boolean;
+}
+
+export interface TournamentRenewal {
+  tournament_id: string;
+  tournament_name: string;
+  start_at: string;
+  entry_fee: number;
 }
 
 export interface TournamentPlayer {

@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta
 
+from flask import current_app
+
 from app.models import (
     FootyCoinTransaction,
+    Quiz,
     Tournament,
     TournamentFixture,
     TournamentRegistration,
@@ -87,6 +90,9 @@ def start_tournament(tournament, now=None):
     participant_ids = [registration.user_id for registration in registrations]
     pairings_by_week = build_double_round_robin(participant_ids)
     tournament.total_gameweeks = len(pairings_by_week)
+    TournamentRegistration.objects(tournament_id=tournament.id).update(
+        set__renewal_status='current'
+    )
 
     for gameweek, pairings in enumerate(pairings_by_week, start=1):
         scheduled_at = tournament.start_at + timedelta(days=gameweek - 1)
@@ -112,6 +118,65 @@ def start_tournament(tournament, now=None):
         participant_ids,
         f'{tournament.name} starts now. Your league fixtures and daily quiz are ready.',
     )
+
+
+def schedule_tournament_restart(tournament, start_at):
+    registrations = list(
+        TournamentRegistration.objects(tournament_id=tournament.id).order_by('joined_at')
+    )
+    if len(registrations) < 2:
+        raise ValueError('At least two registered players are required to schedule a restart')
+
+    Quiz.objects(
+        destination='tournament',
+        tournament_id=tournament.id,
+    ).update(set__is_active=False)
+    TournamentRegistration.objects(tournament_id=tournament.id).update(
+        set__renewal_status='pending'
+    )
+    tournament.start_at = start_at
+    tournament.status = 'renewal'
+    tournament.completion_notification_sent = False
+    tournament.updated_at = datetime.utcnow()
+    tournament.save()
+
+    scheduled_date = start_at.strftime('%B %d, %Y at %H:%M UTC')
+    queued = _send_to_users(
+        [registration.user_id for registration in registrations],
+        f'{tournament.name} is scheduled to restart on {scheduled_date}. '
+        f'Open the app to choose whether to continue. The entry fee of '
+        f'{tournament.entry_fee} Footy Coins will only be charged if you accept. '
+        'Please respond before the restart time.',
+    )
+    if not queued:
+        current_app.logger.warning(
+            'Tournament restart scheduled without Telegram notification for %s',
+            tournament.id,
+        )
+    return queued
+
+
+def start_scheduled_restart(tournament, now=None):
+    now = now or datetime.utcnow()
+    registrations = list(
+        TournamentRegistration.objects(
+            tournament_id=tournament.id,
+            renewal_status='accepted',
+        ).order_by('joined_at')
+    )
+    TournamentRegistration.objects(
+        tournament_id=tournament.id,
+        renewal_status__ne='accepted',
+    ).delete()
+    tournament.registered_count = len(registrations)
+    tournament.winner_user_ids = []
+    tournament.completion_notification_sent = False
+    tournament.updated_at = now
+    tournament.save()
+
+    TournamentFixture.objects(tournament_id=tournament.id).delete()
+    TournamentSubmission.objects(tournament_id=tournament.id).delete()
+    start_tournament(tournament, now)
 
 
 def _finalize_fixture(tournament, fixture, now):
@@ -404,6 +469,10 @@ def _notify_tournament_completion(tournament, standings=None):
 
 def sync_tournament(tournament, now=None):
     now = now or datetime.utcnow()
+    if tournament.status == 'renewal' and tournament.start_at <= now:
+        start_scheduled_restart(tournament, now)
+        tournament.reload()
+
     if tournament.status == 'registration' and tournament.start_at <= now:
         start_tournament(tournament, now)
         tournament.reload()
@@ -444,7 +513,9 @@ def sync_tournament(tournament, now=None):
 
 def sync_all_tournaments():
     now = datetime.utcnow()
-    for tournament in Tournament.objects(status__in=['registration', 'active', 'completed']):
+    for tournament in Tournament.objects(
+        status__in=['registration', 'active', 'completed', 'renewal']
+    ):
         try:
             sync_tournament(tournament, now)
         except Exception:

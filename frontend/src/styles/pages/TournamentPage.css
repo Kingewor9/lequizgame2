@@ -173,6 +173,12 @@
   color: #c3cbd0;
 }
 
+.tournament-status-renewal {
+  border-color: rgba(56, 189, 248, 0.22);
+  background: rgba(56, 189, 248, 0.08);
+  color: #7dd3fc;
+}
+
 .tournament-status-draft,
 .tournament-status-cancelled {
   border-color: rgba(240, 118, 118, 0.18);

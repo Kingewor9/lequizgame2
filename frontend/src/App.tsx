@@ -9,9 +9,10 @@ import { AdminPage } from './pages/AdminPage';
 import { Loading } from './components/Loading';
 import { LeagueWinModal } from './components/LeagueWinModal';
 import { MilestoneModal } from './components/MilestoneModal';
+import { TournamentRenewalModal } from './components/TournamentRenewalModal';
 import { GameSoundProvider, useGameSound } from './context/GameSoundContext';
 import { apiService } from './services/apiService';
-import { ApiResponse, LeagueWinNotification } from './types';
+import { ApiResponse, LeagueWinNotification, TournamentRenewal } from './types';
 import './styles/global.css';
 
 const AppContent: React.FC = () => {
@@ -23,11 +24,14 @@ const AppContent: React.FC = () => {
     milestoneNotification,
     claimMilestoneNotification,
     dismissMilestoneNotification,
+    refreshUser,
   } = useAuth();
   const { playSound } = useGameSound();
   const [activeTab, setActiveTab] = useState<'home' | 'league' | 'tournament' | 'coins' | 'admin'>('home');
   const [leagueWin, setLeagueWin] = useState<LeagueWinNotification | null>(null);
   const [openLeagueId, setOpenLeagueId] = useState<string | null>(null);
+  const [tournamentRenewals, setTournamentRenewals] = useState<TournamentRenewal[]>([]);
+  const [renewalPromptDismissed, setRenewalPromptDismissed] = useState(false);
   const initialLeagueWinRequest = useRef<
     Promise<ApiResponse<{ win: LeagueWinNotification | null }>> | null
   >(null);
@@ -44,10 +48,24 @@ const AppContent: React.FC = () => {
     console.error('Could not claim league win notification:', response.error || 'Unexpected API response');
   }, []);
 
+  const loadTournamentRenewals = useCallback(async () => {
+    const response = await apiService.get<TournamentRenewal[]>('/tournaments/renewals');
+    if (response.success && Array.isArray(response.data)) {
+      setTournamentRenewals(response.data);
+    } else {
+      console.error(
+        'Could not load tournament renewal prompts:',
+        response.error || 'Unexpected API response'
+      );
+    }
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) {
       initialLeagueWinRequest.current = null;
       setLeagueWin(null);
+      setTournamentRenewals([]);
+      setRenewalPromptDismissed(false);
       return;
     }
 
@@ -66,6 +84,33 @@ const AppContent: React.FC = () => {
       }
     });
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || activeTab === 'coins') return;
+    setRenewalPromptDismissed(false);
+    void loadTournamentRenewals();
+  }, [activeTab, isAuthenticated, loadTournamentRenewals]);
+
+  const respondToTournamentRenewal = async (
+    renewal: TournamentRenewal,
+    decision: 'yes' | 'no'
+  ) => {
+    const response = await apiService.post<{ footy_coins?: number }>(
+      `/tournaments/renewals/${renewal.tournament_id}`,
+      { decision }
+    );
+    if (!response.success) {
+      await loadTournamentRenewals();
+      return response;
+    }
+    if (response.success) {
+      setTournamentRenewals((pending) => pending.filter(
+        (item) => item.tournament_id !== renewal.tournament_id
+      ));
+      if (decision === 'yes') await refreshUser();
+    }
+    return response;
+  };
 
   const dismissLeagueWin = () => {
     setLeagueWin(null);
@@ -144,14 +189,20 @@ const AppContent: React.FC = () => {
         {renderPage()}
       </div>
       <Navigation activeTab={activeTab} user={user} onTabChange={setActiveTab} />
-      {leagueWin && (
+      {tournamentRenewals.length > 0 && !renewalPromptDismissed && activeTab !== 'coins' ? (
+        <TournamentRenewalModal
+          renewal={tournamentRenewals[0]}
+          onRespond={respondToTournamentRenewal}
+          onGetCoins={() => setActiveTab('coins')}
+          onClose={() => setRenewalPromptDismissed(true)}
+        />
+      ) : leagueWin ? (
         <LeagueWinModal
           win={leagueWin}
           onClose={dismissLeagueWin}
           onViewLeague={viewWinningLeague}
         />
-      )}
-      {milestoneNotification && (
+      ) : milestoneNotification ? (
         <MilestoneModal
           milestone={milestoneNotification}
           onClose={() => {
@@ -159,7 +210,7 @@ const AppContent: React.FC = () => {
             void claimMilestoneNotification();
           }}
         />
-      )}
+      ) : null}
     </div>
   );
 };

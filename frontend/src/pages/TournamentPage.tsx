@@ -374,7 +374,8 @@ export const TournamentPage: React.FC = () => {
                         {tournament.status === 'registration' ? 'REGISTRATION OPEN'
                           : tournament.status === 'active' ? 'SEASON LIVE'
                             : tournament.status === 'completed' ? 'SEASON COMPLETE'
-                              : tournament.status === 'cancelled' ? 'CANCELLED' : 'DRAFT'}
+                              : tournament.status === 'cancelled' ? 'CANCELLED'
+                                : tournament.status === 'renewal' ? 'RESTART SCHEDULED' : 'DRAFT'}
                       </span>
                     </div>
                     <div className="tournament-card-main">
@@ -386,7 +387,8 @@ export const TournamentPage: React.FC = () => {
                         <p>{tournament.description || 'A new Footy IQ season is ready for challengers.'}</p>
                       </div>
                       <div className="tournament-card-crest" aria-hidden="true">
-                        {tournament.status === 'completed' ? <Crown size={25} /> : <Trophy size={25} />}
+                        {tournament.status === 'completed' || tournament.status === 'renewal'
+                          ? <Crown size={25} /> : <Trophy size={25} />}
                       </div>
                     </div>
                     <div className="tournament-card-meta">
@@ -472,7 +474,11 @@ export const TournamentPage: React.FC = () => {
                 <div className="tournament-waiting-card">
                   <Users size={23} />
                   <h2>Registration required</h2>
-                  <p>Join this season from the tournament list to see its game, table, and fixtures.</p>
+                  <p>
+                    {detail.tournament.status === 'renewal'
+                      ? 'The new season roster is being confirmed. Check your renewal prompt to choose whether to play.'
+                      : 'Join this season from the tournament list to see its game, table, and fixtures.'}
+                  </p>
                   <button type="button" className="tournament-back-button" onClick={() => setScreen('list')}>
                     Back to registration
                   </button>
@@ -571,13 +577,21 @@ export const TournamentPage: React.FC = () => {
                           </section>
                         </>
                       )}
-                      {detail.tournament.status === 'completed' && (
+                      {(detail.tournament.status === 'completed' || detail.tournament.status === 'renewal') && (
                         <section className="tournament-champion-banner">
                           <Crown size={26} />
                           <div>
-                            <span className="tournament-section-kicker">SEASON COMPLETE</span>
+                            <span className="tournament-section-kicker">
+                              {detail.tournament.status === 'renewal'
+                                ? 'NEXT SEASON SCHEDULED'
+                                : 'SEASON COMPLETE'}
+                            </span>
                             <h2>{detail.standings[0]?.name || 'Final table published'}</h2>
-                            <p>Champion · {detail.standings[0]?.points ?? 0} league points</p>
+                            <p>
+                              {detail.tournament.status === 'renewal'
+                                ? `Restart · ${formatDate(detail.tournament.start_at)}`
+                                : `Champion · ${detail.standings[0]?.points ?? 0} league points`}
+                            </p>
                           </div>
                           <button type="button" onClick={() => setScreen('table')}>Final table <ChevronRight size={16} /></button>
                         </section>
@@ -636,8 +650,8 @@ export const TournamentPage: React.FC = () => {
                               {detail.standings.map((standing) => (
                                 <tr className={standing.user_id === user?.id ? 'current-player' : ''} key={standing.user_id}>
                                   <td>
-                                    <span className={`tournament-position ${standing.rank === 1 && detail.tournament.status === 'completed' ? 'first' : ''}`}>
-                                      {standing.rank === 1 && detail.tournament.status === 'completed' ? <Crown size={14} /> : standing.rank}
+                                    <span className={`tournament-position ${standing.rank === 1 && detail.tournament.status !== 'active' ? 'first' : ''}`}>
+                                      {standing.rank === 1 && detail.tournament.status !== 'active' ? <Crown size={14} /> : standing.rank}
                                     </span>
                                   </td>
                                   <td className="tournament-table-player">

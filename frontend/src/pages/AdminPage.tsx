@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { apiService } from '../services/apiService';
 import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
-import { ArrowLeft, BarChart3, CalendarClock, Coins, Image as ImageIcon, ListFilter, Eye, Megaphone, Send, Trophy, Users } from 'lucide-react';
+import { ArrowLeft, BarChart3, CalendarClock, Coins, Eye, Image as ImageIcon, ListFilter, Megaphone, RotateCcw, Send, Trophy, Trash2, Users } from 'lucide-react';
 import '../styles/pages/AdminPage.css';
 import { BroadcastPage } from './BroadcastPage';
 import { AnalyticsPage } from './AnalyticsPage';
@@ -23,6 +23,7 @@ interface AdminTournament {
     tournament_type: 'league' | 'group_knockout';
     status: string;
     start_at: string;
+    entry_fee: number;
     registered_count: number;
 }
 
@@ -615,6 +616,90 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     });
     const [isSaving, setIsSaving] = useState(false);
     const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
+    const [tournaments, setTournaments] = useState<AdminTournament[]>([]);
+    const [isLoadingTournaments, setIsLoadingTournaments] = useState(true);
+    const [processingTournamentId, setProcessingTournamentId] = useState<string | null>(null);
+    const [restartTournamentId, setRestartTournamentId] = useState<string | null>(null);
+    const [restartAt, setRestartAt] = useState(() => {
+        const nextDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        return new Date(nextDay.getTime() - nextDay.getTimezoneOffset() * 60000)
+            .toISOString()
+            .slice(0, 16);
+    });
+
+    const refreshTournaments = useCallback(async () => {
+        setIsLoadingTournaments(true);
+        try {
+            const response = await apiService.get<AdminTournament[]>('/admin/tournaments');
+            if (!response.success || !Array.isArray(response.data)) {
+                setAlert({ message: response.error || 'Could not load tournaments.', type: 'error' });
+                return;
+            }
+            setTournaments(response.data);
+        } catch (error) {
+            console.error('Could not load tournaments:', error);
+            setAlert({ message: 'Could not load tournaments.', type: 'error' });
+        } finally {
+            setIsLoadingTournaments(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void refreshTournaments();
+    }, [refreshTournaments]);
+
+    const handleRestart = async (tournament: AdminTournament) => {
+        if (!restartAt || new Date(restartAt) <= new Date()) {
+            setAlert({ message: 'Choose a restart date and time in the future.', type: 'error' });
+            return;
+        }
+        const confirmed = window.confirm(
+            `Schedule "${tournament.name}" to restart on ${new Date(restartAt).toLocaleString()}? Players will be notified and must opt in. The ${tournament.entry_fee} Footy Coin entry fee will only be charged to players who accept.`
+        );
+        if (!confirmed) return;
+
+        setProcessingTournamentId(tournament.id);
+        try {
+            const response = await apiService.post(`/admin/tournaments/${tournament.id}/restart`, {
+                start_at: new Date(restartAt).toISOString(),
+            });
+            if (!response.success) {
+                setAlert({ message: response.error || 'Could not schedule tournament restart.', type: 'error' });
+                return;
+            }
+            setAlert({ message: response.message || 'Tournament restart scheduled.', type: 'success' });
+            setRestartTournamentId(null);
+            await refreshTournaments();
+        } catch (error) {
+            console.error('Could not schedule tournament restart:', error);
+            setAlert({ message: 'Could not schedule tournament restart.', type: 'error' });
+        } finally {
+            setProcessingTournamentId(null);
+        }
+    };
+
+    const handleDelete = async (tournament: AdminTournament) => {
+        const confirmed = window.confirm(
+            `Delete "${tournament.name}" and its tournament records? This cannot be undone. Player entry fees will not be refunded.`
+        );
+        if (!confirmed) return;
+
+        setProcessingTournamentId(tournament.id);
+        try {
+            const response = await apiService.delete(`/admin/tournaments/${tournament.id}`);
+            if (!response.success) {
+                setAlert({ message: response.error || 'Could not delete tournament.', type: 'error' });
+                return;
+            }
+            setAlert({ message: response.message || 'Tournament deleted.', type: 'success' });
+            await refreshTournaments();
+        } catch (error) {
+            console.error('Could not delete tournament:', error);
+            setAlert({ message: 'Could not delete tournament.', type: 'error' });
+        } finally {
+            setProcessingTournamentId(null);
+        }
+    };
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -649,6 +734,7 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             setName('');
             setDescription('');
             setEntryFee(0);
+            await refreshTournaments();
         } catch (error) {
             console.error('Could not create tournament:', error);
             setAlert({ message: 'Network error. Tournament was not created.', type: 'error' });
@@ -668,6 +754,109 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <p className="admin-subtitle">Set the format, entry fee, and scheduled kick-off.</p>
             </header>
             {alert && <Alert message={alert.message} type={alert.type} onClose={() => setAlert(null)} />}
+            <section className="form-section tournament-management">
+                <div className="tournament-management-heading">
+                    <div>
+                        <h2 className="section-title">Manage tournaments</h2>
+                        <p className="admin-subtitle">Restart completed leagues or permanently remove tournaments.</p>
+                    </div>
+                    <button
+                        type="button"
+                        className="tournament-refresh-button"
+                        onClick={() => void refreshTournaments()}
+                        disabled={isLoadingTournaments || processingTournamentId !== null}
+                    >
+                        <RotateCcw size={15} /> Refresh
+                    </button>
+                </div>
+                {isLoadingTournaments ? (
+                    <p className="tournament-management-empty">Loading tournaments…</p>
+                ) : tournaments.length === 0 ? (
+                    <p className="tournament-management-empty">No tournaments to manage yet.</p>
+                ) : (
+                    <ul className="tournament-management-list">
+                        {tournaments.map((tournament) => {
+                            const isProcessing = processingTournamentId === tournament.id;
+                            const canRestart = tournament.tournament_type === 'league'
+                                && tournament.status === 'completed';
+                            return (
+                                <li className="tournament-management-item" key={tournament.id}>
+                                    <div className="tournament-management-info">
+                                        <strong>{tournament.name}</strong>
+                                        <span>
+                                            {tournament.status === 'renewal'
+                                                ? `Restart scheduled for ${new Date(tournament.start_at).toLocaleString()}`
+                                                : tournament.status.replace('_', ' ')}
+                                            {' · '}{tournament.registered_count} players
+                                        </span>
+                                    </div>
+                                    <div className="tournament-management-actions">
+                                        {canRestart && restartTournamentId !== tournament.id && (
+                                            <button
+                                                type="button"
+                                                className="tournament-action-button tournament-action-restart"
+                                                onClick={() => setRestartTournamentId(tournament.id)}
+                                                disabled={processingTournamentId !== null || restartTournamentId !== null}
+                                            >
+                                                <CalendarClock size={15} />
+                                                Schedule restart
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            className="tournament-action-button tournament-action-delete"
+                                            onClick={() => void handleDelete(tournament)}
+                                            disabled={processingTournamentId !== null}
+                                        >
+                                            <Trash2 size={15} />
+                                            {isProcessing ? 'Working…' : 'Delete'}
+                                        </button>
+                                    </div>
+                                    {restartTournamentId === tournament.id && (
+                                        <div className="tournament-restart-schedule">
+                                            <label htmlFor={`tournament-restart-${tournament.id}`}>
+                                                New season start
+                                            </label>
+                                            <input
+                                                id={`tournament-restart-${tournament.id}`}
+                                                className="cyber-input"
+                                                type="datetime-local"
+                                                value={restartAt}
+                                                onChange={(event) => setRestartAt(event.target.value)}
+                                                min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+                                                    .toISOString()
+                                                    .slice(0, 16)}
+                                            />
+                                            <span className="input-hint">
+                                                Players will be asked to opt in. Their entry fee is charged only after they accept.
+                                            </span>
+                                            <div className="tournament-management-actions">
+                                                <button
+                                                    type="button"
+                                                    className="tournament-action-button tournament-action-restart"
+                                                    onClick={() => void handleRestart(tournament)}
+                                                    disabled={isProcessing || processingTournamentId !== null}
+                                                >
+                                                    <RotateCcw size={15} />
+                                                    {isProcessing ? 'Scheduling…' : 'Confirm schedule'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="tournament-action-button"
+                                                    onClick={() => setRestartTournamentId(null)}
+                                                    disabled={isProcessing}
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+            </section>
             <form className="admin-form" onSubmit={handleSubmit}>
                 <section className="form-section setup-section">
                     <h2 className="section-title">Tournament details</h2>

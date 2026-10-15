@@ -12,10 +12,13 @@ from app.models import (
     User,
     UserLeague,
     Tournament,
+    TournamentFixture,
     TournamentRegistration,
+    TournamentSubmission,
 )
 from app.utils import generate_id, format_success, format_error
 from app.services.telegram_service import get_telegram_service
+from app.services.tournament_service import schedule_tournament_restart
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from urllib.parse import urlparse
@@ -156,6 +159,72 @@ def create_tournament():
     except Exception as error:
         current_app.logger.exception('Could not create tournament')
         return jsonify(format_error(f'Could not create tournament: {error}')), 500
+
+
+@admin_bp.route('/tournaments/<tournament_id>', methods=['DELETE'])
+@admin_required
+def delete_tournament(tournament_id):
+    try:
+        tournament = Tournament.objects(id=tournament_id).first()
+        if not tournament:
+            return jsonify(format_error('Tournament not found')), 404
+
+        tournament_quizzes = list(Quiz.objects(
+            destination='tournament',
+            tournament_id=tournament.id,
+        ))
+        quiz_ids = [quiz.id for quiz in tournament_quizzes]
+        if quiz_ids:
+            QuizAttempt.objects(quiz_id__in=quiz_ids).delete()
+            QuizResponse.objects(quiz_id__in=quiz_ids).delete()
+            for quiz in tournament_quizzes:
+                quiz.delete()
+
+        TournamentSubmission.objects(tournament_id=tournament.id).delete()
+        TournamentFixture.objects(tournament_id=tournament.id).delete()
+        TournamentRegistration.objects(tournament_id=tournament.id).delete()
+        tournament.delete()
+        return jsonify(format_success(message='Tournament deleted')), 200
+    except Exception as error:
+        current_app.logger.exception('Could not delete tournament %s', tournament_id)
+        return jsonify(format_error(f'Could not delete tournament: {error}')), 500
+
+
+@admin_bp.route('/tournaments/<tournament_id>/restart', methods=['POST'])
+@admin_required
+def restart_tournament_route(tournament_id):
+    tournament = Tournament.objects(id=tournament_id).first()
+    if not tournament:
+        return jsonify(format_error('Tournament not found')), 404
+    if tournament.tournament_type != 'league' or tournament.status != 'completed':
+        return jsonify(format_error('Only completed 1v1 league tournaments can be restarted')), 409
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get('start_at'), str):
+        return jsonify(format_error('A scheduled restart date and time are required')), 400
+    try:
+        start_at = _parse_utc(data['start_at'])
+    except (TypeError, ValueError):
+        return jsonify(format_error('Enter a valid restart date and time')), 400
+    if start_at <= datetime.utcnow():
+        return jsonify(format_error('Restart date and time must be in the future')), 400
+
+    try:
+        notification_queued = schedule_tournament_restart(tournament, start_at)
+        tournament.reload()
+        return jsonify(format_success(
+            data=tournament.to_dict(),
+            message=(
+                'Restart scheduled and players have been notified'
+                if notification_queued
+                else 'Restart scheduled. Players will see the prompt in the app, but the bot notification could not be queued.'
+            ),
+        )), 200
+    except ValueError as error:
+        return jsonify(format_error(str(error))), 409
+    except Exception as error:
+        current_app.logger.exception('Could not restart tournament %s', tournament_id)
+        return jsonify(format_error(f'Could not restart tournament: {error}')), 500
 
 
 @admin_bp.route('/analytics', methods=['GET'])

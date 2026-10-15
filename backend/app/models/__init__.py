@@ -192,7 +192,7 @@ class Tournament(Document):
     start_at = DateTimeField(required=True)
     status = StringField(
         default='registration',
-        choices=('registration', 'active', 'completed', 'draft', 'cancelled'),
+        choices=('registration', 'active', 'completed', 'draft', 'cancelled', 'renewal'),
     )
     total_gameweeks = IntField(default=38)
     winner_user_ids = ListField(StringField(), default=list)
@@ -232,6 +232,10 @@ class TournamentRegistration(Document):
     tournament_id = StringField(required=True)
     user_id = StringField(required=True)
     joined_at = DateTimeField(default=datetime.utcnow)
+    renewal_status = StringField(
+        default='current',
+        choices=('current', 'pending', 'accepted'),
+    )
 
 
 class TournamentFixture(Document):

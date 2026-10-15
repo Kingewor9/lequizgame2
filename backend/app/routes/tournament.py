@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from flask import Blueprint, current_app, jsonify
+from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from app.models import (
@@ -76,7 +76,7 @@ def list_tournaments():
     try:
         user_id = get_jwt_identity()
         tournaments = Tournament.objects(
-            status__in=['registration', 'active', 'completed', 'cancelled', 'draft']
+            status__in=['registration', 'active', 'completed', 'cancelled', 'draft', 'renewal']
         ).order_by('start_at')
         registrations = {
             registration.tournament_id
@@ -95,6 +95,118 @@ def list_tournaments():
     except Exception as error:
         current_app.logger.exception('Could not list tournaments')
         return jsonify(format_error(f'Could not load tournaments: {error}')), 500
+
+
+@tournament_bp.route('/renewals', methods=['GET'])
+@jwt_required()
+def get_pending_tournament_renewals():
+    try:
+        user_id = get_jwt_identity()
+        pending_registrations = list(TournamentRegistration.objects(
+            user_id=user_id,
+            renewal_status='pending',
+        ))
+        renewals = []
+        for registration in pending_registrations:
+            tournament = Tournament.objects(
+                id=registration.tournament_id,
+                status='renewal',
+            ).first()
+            if not tournament:
+                continue
+            sync_tournament(tournament)
+            tournament.reload()
+            if tournament.status != 'renewal' or tournament.start_at <= datetime.utcnow():
+                continue
+            renewals.append({
+                'tournament_id': tournament.id,
+                'tournament_name': tournament.name,
+                'start_at': tournament.start_at.isoformat() + 'Z',
+                'entry_fee': tournament.entry_fee,
+            })
+        return jsonify(format_success(data=renewals)), 200
+    except Exception as error:
+        current_app.logger.exception('Could not load tournament renewal prompts')
+        return jsonify(format_error(f'Could not load renewal prompts: {error}')), 500
+
+
+@tournament_bp.route('/renewals/<tournament_id>', methods=['POST'])
+@jwt_required()
+def respond_to_tournament_renewal(tournament_id):
+    user_id = get_jwt_identity()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or data.get('decision') not in ('yes', 'no'):
+        return jsonify(format_error('Choose yes or no to respond to the tournament renewal')), 400
+
+    now = datetime.utcnow()
+    tournament = Tournament.objects(
+        id=tournament_id,
+        status='renewal',
+        start_at__gt=now,
+    ).first()
+    if not tournament:
+        return jsonify(format_error('The tournament renewal is no longer accepting responses')), 409
+    registration = TournamentRegistration.objects(
+        tournament_id=tournament.id,
+        user_id=user_id,
+        renewal_status='pending',
+    ).first()
+    if not registration:
+        return jsonify(format_error('No pending renewal response was found')), 409
+
+    if data['decision'] == 'no':
+        deleted_count = TournamentRegistration.objects(
+            id=registration.id,
+            renewal_status='pending',
+        ).delete()
+        if not deleted_count:
+            return jsonify(format_error('The renewal response has already been submitted')), 409
+        Tournament.objects(id=tournament.id).update_one(dec__registered_count=1)
+        return jsonify(format_success(message='You have left the next tournament season')), 200
+
+    user = User.objects(id=user_id).first()
+    if not user:
+        return jsonify(format_error('User not found')), 404
+
+    if tournament.entry_fee:
+        user = User.objects(
+            id=user_id,
+            footy_coins__gte=tournament.entry_fee,
+        ).modify(new=True, dec__footy_coins=tournament.entry_fee)
+        if not user:
+            return jsonify(format_error('You do not have enough Footy Coins to continue')), 400
+
+    accepted_registration = TournamentRegistration.objects(
+        id=registration.id,
+        renewal_status='pending',
+    ).modify(new=True, set__renewal_status='accepted')
+    if not accepted_registration:
+        if tournament.entry_fee:
+            User.objects(id=user_id).update_one(inc__footy_coins=tournament.entry_fee)
+        return jsonify(format_error('The renewal response has already been submitted')), 409
+
+    try:
+        if tournament.entry_fee:
+            FootyCoinTransaction(
+                id=generate_id(),
+                user_id=user_id,
+                type='spent',
+                amount=tournament.entry_fee,
+                reason=f'Tournament renewal: {tournament.name}',
+            ).save()
+    except Exception as error:
+        TournamentRegistration.objects(id=registration.id).update_one(
+            set__renewal_status='pending'
+        )
+        if tournament.entry_fee:
+            User.objects(id=user_id).update_one(inc__footy_coins=tournament.entry_fee)
+        current_app.logger.exception('Could not record tournament renewal fee')
+        return jsonify(format_error(f'Could not complete tournament renewal: {error}')), 500
+
+    return jsonify(format_success(
+        data={'footy_coins': user.footy_coins},
+        message='You are registered for the next tournament season',
+    )), 200
 
 
 @tournament_bp.route('/<tournament_id>', methods=['GET'])
@@ -119,13 +231,13 @@ def get_tournament(tournament_id):
                 max(1, int(elapsed.total_seconds() // 86400) + 1),
                 tournament.total_gameweeks,
             )
-        elif tournament.status == 'completed':
+        elif tournament.status in ('completed', 'renewal'):
             gameweek = tournament.total_gameweeks
 
         fixtures = []
         current_fixture = None
         quiz_data = None
-        if registration and tournament.status in ('active', 'completed'):
+        if registration and tournament.status in ('active', 'completed', 'renewal'):
             user_fixtures = TournamentFixture.objects(
                 tournament_id=tournament.id,
                 __raw__={

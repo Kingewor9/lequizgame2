@@ -120,10 +120,11 @@ class ApiService {
       return response.data;
     } catch (error) {
       const err = error as AxiosError;
+      const responseData = err.response?.data as { error?: string; message?: string } | undefined;
       return {
         success: false,
-        error: err.message || 'An error occurred',
-        message: (err.response?.data as any)?.message,
+        error: responseData?.error || err.message || 'An error occurred',
+        message: responseData?.message,
       };
     }
   }
@@ -137,10 +138,11 @@ class ApiService {
       return response.data;
     } catch (error) {
       const err = error as AxiosError;
+      const responseData = err.response?.data as { error?: string; message?: string } | undefined;
       return {
         success: false,
-        error: err.message || 'An error occurred',
-        message: (err.response?.data as any)?.message,
+        error: responseData?.error || err.message || 'An error occurred',
+        message: responseData?.message,
       };
     }
   }
