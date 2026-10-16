@@ -6,19 +6,32 @@ import { User } from '../types';
 interface NavigationProps {
   activeTab: 'home' | 'league' | 'tournament' | 'coins' | 'admin';
   user: User | null;
+  homeUnreadCount: number;
+  tournamentUnreadCount: number;
   onTabChange: (tab: 'home' | 'league' | 'tournament' | 'coins' | 'admin') => void;
 }
 
-export const Navigation: React.FC<NavigationProps> = ({ activeTab, user, onTabChange }) => {
+const formatUnreadCount = (count: number) => count > 99 ? '99+' : String(count);
+
+export const Navigation: React.FC<NavigationProps> = ({
+  activeTab,
+  user,
+  homeUnreadCount,
+  tournamentUnreadCount,
+  onTabChange,
+}) => {
   return (
     <nav className="bottom-nav" aria-label="Main Navigation">
       <button
         className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}
         onClick={() => onTabChange('home')}
-        aria-label="Home"
+        aria-label={`Home${homeUnreadCount > 0 ? `, ${homeUnreadCount} unanswered quizzes` : ''}`}
       >
         <div className="nav-icon-container">
           <Home size={21} strokeWidth={activeTab === 'home' ? 2.4 : 1.8} />
+          {homeUnreadCount > 0 && (
+            <span className="nav-unread-badge" aria-hidden="true">{formatUnreadCount(homeUnreadCount)}</span>
+          )}
         </div>
         <span className="nav-label">Home</span>
       </button>
@@ -37,10 +50,13 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, user, onTabCh
       <button
         className={`nav-item ${activeTab === 'tournament' ? 'active' : ''}`}
         onClick={() => onTabChange('tournament')}
-        aria-label="Tournament"
+        aria-label={`Tournament${tournamentUnreadCount > 0 ? `, ${tournamentUnreadCount} unanswered quizzes` : ''}`}
       >
         <div className="nav-icon-container">
           <Trophy size={21} strokeWidth={activeTab === 'tournament' ? 2.4 : 1.8} />
+          {tournamentUnreadCount > 0 && (
+            <span className="nav-unread-badge" aria-hidden="true">{formatUnreadCount(tournamentUnreadCount)}</span>
+          )}
         </div>
         <span className="nav-label">Tournament</span>
       </button>

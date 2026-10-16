@@ -73,7 +73,11 @@ const formatRules = (
   </div>
 );
 
-export const TournamentPage: React.FC = () => {
+interface TournamentPageProps {
+  onUnreadCountChange: (count: number) => void;
+}
+
+export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountChange }) => {
   const { user, refreshUser } = useAuth();
   const { playSound } = useGameSound();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -106,7 +110,10 @@ export const TournamentPage: React.FC = () => {
       throw new Error(response.error || 'Could not load tournaments.');
     }
     setTournaments(response.data);
-  }, []);
+    onUnreadCountChange(
+      response.data.reduce((total, tournament) => total + (tournament.unanswered_quiz_count || 0), 0)
+    );
+  }, [onUnreadCountChange]);
 
   const fetchDetail = useCallback(async (tournamentId: string, showSpinner = false) => {
     if (showSpinner) setIsRefreshing(true);
@@ -135,22 +142,23 @@ export const TournamentPage: React.FC = () => {
   }, [fetchTournaments]);
 
   useEffect(() => {
-    if (!activeTournamentId) return undefined;
     let mounted = true;
     const load = () => {
-      fetchDetail(activeTournamentId).catch((error: unknown) => {
-        if (!mounted) return;
-        console.error('Could not refresh tournament:', error);
-        setAlert({
-          message: error instanceof Error ? error.message : 'Could not refresh tournament.',
-          type: 'error',
+      if (activeTournamentId) {
+        fetchDetail(activeTournamentId).catch((error: unknown) => {
+          if (!mounted) return;
+          console.error('Could not refresh tournament:', error);
+          setAlert({
+            message: error instanceof Error ? error.message : 'Could not refresh tournament.',
+            type: 'error',
+          });
         });
-      });
+      }
       fetchTournaments().catch((error: unknown) => {
-        console.error('Could not refresh tournament list:', error);
+        if (mounted) console.error('Could not refresh tournament list:', error);
       });
     };
-    load();
+    if (activeTournamentId) load();
     const interval = window.setInterval(load, 30000);
     return () => {
       mounted = false;
@@ -263,7 +271,11 @@ export const TournamentPage: React.FC = () => {
       setQuizResults(response.data);
       setQuizStarted(false);
       await fetchDetail(activeQuiz.tournament_id || activeTournamentId || '');
-      await fetchTournaments();
+      try {
+        await fetchTournaments();
+      } catch (error) {
+        console.error('Could not refresh tournament unread counts:', error);
+      }
     } catch (error) {
       console.error('Could not submit tournament quiz:', error);
       setQuizStarted(false);
@@ -374,7 +386,10 @@ export const TournamentPage: React.FC = () => {
                   && !isFull && !tournament.registered;
                 const isBusy = registeringId === tournament.id;
                 return (
-                  <article className={`tournament-card ${!supported ? 'tournament-card-draft' : ''}`} key={tournament.id}>
+                  <article
+                    className={`tournament-card ${!supported ? 'tournament-card-draft' : ''} ${tournament.unanswered_quiz_count ? 'tournament-card-unread' : ''}`}
+                    key={tournament.id}
+                  >
                     <div className="tournament-card-topline">
                       <span className="tournament-card-index">SEASON {String(index + 1).padStart(2, '0')}</span>
                       <span className={`tournament-status tournament-status-${tournament.status}`}>
@@ -391,6 +406,13 @@ export const TournamentPage: React.FC = () => {
                           {tournament.tournament_type === 'league' ? '1v1 league' : 'group stage + knockout'}
                         </span>
                         <h2>{tournament.name}</h2>
+                        {!!tournament.unanswered_quiz_count && (
+                          <span className="tournament-unanswered-badge">
+                            <span className="tournament-unanswered-dot" aria-hidden="true" />
+                            {tournament.unanswered_quiz_count}{' '}
+                            {tournament.unanswered_quiz_count === 1 ? 'quiz' : 'quizzes'} waiting
+                          </span>
+                        )}
                         <p>{tournament.description || 'A new Footy IQ season is ready for challengers.'}</p>
                       </div>
                       <div className="tournament-card-crest" aria-hidden="true">

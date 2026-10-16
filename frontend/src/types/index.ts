@@ -83,6 +83,7 @@ export interface Tournament {
   winner_user_ids: string[];
   registered?: boolean;
   available?: boolean;
+  unanswered_quiz_count?: number;
 }
 
 export interface TournamentRenewal {

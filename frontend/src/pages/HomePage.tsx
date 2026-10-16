@@ -14,7 +14,12 @@ import { formatQuizTimer } from '../services/utilService';
 import { useGameSound } from '../context/GameSoundContext';
 import '../styles/pages/HomePage.css';
 
-export const HomePage: React.FC<{ onCoinsClick: () => void }> = ({ onCoinsClick }) => {
+interface HomePageProps {
+  onCoinsClick: () => void;
+  onUnreadCountChange: (count: number) => void;
+}
+
+export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountChange }) => {
   const { user, telegramUser, refreshUser } = useAuth();
   const { isSoundEnabled, toggleSound, playSound } = useGameSound();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -39,26 +44,35 @@ export const HomePage: React.FC<{ onCoinsClick: () => void }> = ({ onCoinsClick 
 
   // ── Fetch today's quizzes ────────────────────────────────────────────────────
   useEffect(() => {
-    const fetchQuizzes = async () => {
+    const fetchQuizzes = async (showLoading = false) => {
       try {
-        setQuizLoading(true);
+        if (showLoading) setQuizLoading(true);
         const response = await apiService.get('/quizzes/today');
         if (response.success && response.data) {
           const quizzesData = Array.isArray(response.data) ? response.data : [response.data];
-          setQuizzes(quizzesData as Quiz[]);
+          setQuizzes((currentQuizzes) => (quizzesData as Quiz[]).map((quiz) => {
+            const currentQuiz = currentQuizzes.find((current) => current.id === quiz.id);
+            return currentQuiz?.already_played ? { ...quiz, already_played: true } : quiz;
+          }));
         }
       } catch (error) {
         console.error('Error fetching quizzes:', error);
       } finally {
-        setQuizLoading(false);
+        if (showLoading) setQuizLoading(false);
       }
     };
 
-    fetchQuizzes();
+    void fetchQuizzes(true);
+    const refreshInterval = window.setInterval(() => void fetchQuizzes(), 30000);
 
     // Refresh user rank separately — failure must never affect quiz display
     refreshUser().catch((e) => console.error('refreshUser error:', e));
+    return () => window.clearInterval(refreshInterval);
   }, []);
+
+  useEffect(() => {
+    onUnreadCountChange(quizzes.filter((quiz) => !quiz.already_played).length);
+  }, [quizzes, onUnreadCountChange]);
 
   // ── Quiz timer ────────────────────────────────────────────────────────────
   useEffect(() => {

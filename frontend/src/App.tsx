@@ -31,6 +31,8 @@ const AppContent: React.FC = () => {
   } = useAuth();
   const { playSound } = useGameSound();
   const [activeTab, setActiveTab] = useState<'home' | 'league' | 'tournament' | 'coins' | 'admin'>('home');
+  const [homeUnreadCount, setHomeUnreadCount] = useState(0);
+  const [tournamentUnreadCount, setTournamentUnreadCount] = useState(0);
   const [leagueWin, setLeagueWin] = useState<LeagueWinNotification | null>(null);
   const [openLeagueId, setOpenLeagueId] = useState<string | null>(null);
   const [tournamentRenewals, setTournamentRenewals] = useState<TournamentRenewal[]>([]);
@@ -63,12 +65,21 @@ const AppContent: React.FC = () => {
     }
   }, []);
 
+  const updateHomeUnreadCount = useCallback((count: number) => {
+    setHomeUnreadCount(count);
+  }, []);
+  const updateTournamentUnreadCount = useCallback((count: number) => {
+    setTournamentUnreadCount(count);
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) {
       initialLeagueWinRequest.current = null;
       setLeagueWin(null);
       setTournamentRenewals([]);
       setRenewalPromptDismissed(false);
+      setHomeUnreadCount(0);
+      setTournamentUnreadCount(0);
       return;
     }
 
@@ -163,7 +174,12 @@ const AppContent: React.FC = () => {
   const renderPage = () => {
     switch (activeTab) {
       case 'home':
-        return <HomePage onCoinsClick={() => setActiveTab('coins')} />;
+        return (
+          <HomePage
+            onCoinsClick={() => setActiveTab('coins')}
+            onUnreadCountChange={updateHomeUnreadCount}
+          />
+        );
       case 'league':
         return (
           <LeaguePage
@@ -172,13 +188,23 @@ const AppContent: React.FC = () => {
           />
         );
       case 'tournament':
-        return <TournamentPage />;
+        return <TournamentPage onUnreadCountChange={updateTournamentUnreadCount} />;
       case 'coins':
         return <FootyCoinPage />;
       case 'admin':
-        return user?.is_admin ? <AdminPage /> : <HomePage onCoinsClick={() => setActiveTab('coins')} />;
+        return user?.is_admin ? <AdminPage /> : (
+          <HomePage
+            onCoinsClick={() => setActiveTab('coins')}
+            onUnreadCountChange={updateHomeUnreadCount}
+          />
+        );
       default:
-        return <HomePage onCoinsClick={() => setActiveTab('coins')} />;
+        return (
+          <HomePage
+            onCoinsClick={() => setActiveTab('coins')}
+            onUnreadCountChange={updateHomeUnreadCount}
+          />
+        );
     }
   };
 
@@ -191,7 +217,13 @@ const AppContent: React.FC = () => {
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: '90px' }} className="hide-scrollbar">
         {renderPage()}
       </div>
-      <Navigation activeTab={activeTab} user={user} onTabChange={setActiveTab} />
+      <Navigation
+        activeTab={activeTab}
+        user={user}
+        homeUnreadCount={homeUnreadCount}
+        tournamentUnreadCount={tournamentUnreadCount}
+        onTabChange={setActiveTab}
+      />
       {welcomeBonusAwarded ? (
         <WelcomeBonusModal onClose={dismissWelcomeBonus} />
       ) : tournamentRenewals.length > 0 && !renewalPromptDismissed && activeTab !== 'coins' ? (

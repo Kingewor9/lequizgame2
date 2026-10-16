@@ -71,11 +71,59 @@ def _fixture_for_user(fixture, user_id):
     }
 
 
+def _unanswered_quiz_count(tournament, user_id, now):
+    if tournament.status != 'active':
+        return 0
+
+    gameweek = min(
+        max(1, int((now - tournament.start_at).total_seconds() // 86400) + 1),
+        tournament.total_gameweeks,
+    )
+    fixture = TournamentFixture.objects(
+        tournament_id=tournament.id,
+        gameweek=gameweek,
+        status='scheduled',
+        __raw__={
+            '$or': [
+                {'player_one_id': user_id},
+                {'player_two_id': user_id},
+            ],
+        },
+    ).first()
+    if not fixture or not fixture.player_two_id or fixture.closes_at <= now:
+        return 0
+
+    quizzes = Quiz.objects(
+        destination='tournament',
+        tournament_id=tournament.id,
+        tournament_gameweek=gameweek,
+        is_active=True,
+        expires_at__gt=now,
+    ).order_by('-created_at')
+    quiz = next(
+        (
+            candidate for candidate in quizzes
+            if not candidate.scheduled_for or candidate.scheduled_for <= now
+        ),
+        None,
+    )
+    if not quiz:
+        return 0
+
+    return int(
+        TournamentSubmission.objects(
+            user_id=user_id,
+            quiz_id=quiz.id,
+        ).first() is None
+    )
+
+
 @tournament_bp.route('', methods=['GET'])
 @jwt_required()
 def list_tournaments():
     try:
         user_id = get_jwt_identity()
+        now = datetime.utcnow()
         tournaments = Tournament.objects(
             status__in=['registration', 'active', 'completed', 'cancelled', 'draft', 'renewal']
         ).order_by('start_at')
@@ -91,6 +139,10 @@ def list_tournaments():
             item['registered_count'] = TournamentRegistration.objects(
                 tournament_id=tournament.id
             ).count()
+            item['unanswered_quiz_count'] = (
+                _unanswered_quiz_count(tournament, user_id, now)
+                if item['registered'] else 0
+            )
             data.append(item)
         return jsonify(format_success(data=data)), 200
     except Exception as error:
