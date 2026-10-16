@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, Coins, Copy, Gift, Send, Share2, Star, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/apiService';
 import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
+import { useOnclicka } from '../hooks/useOnclicka';
 import '../styles/pages/FootyCoinPage.css';
 
 // ── Hardcoded task definitions ─────────────────────────────────────────────
@@ -47,6 +48,8 @@ interface ReferralInfo {
 
 type TelegramInvoiceStatus = 'paid' | 'cancelled' | 'failed' | string;
 
+const onclickaSpotId = Number(import.meta.env.VITE_ONCLICKA_SPOT_ID);
+
 export const FootyCoinPage: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
@@ -64,20 +67,9 @@ export const FootyCoinPage: React.FC = () => {
   const [backendTaskIds, setBackendTaskIds] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
 
-  const adControllerRef = useRef<any>(null);
-
-  // Initialize Adsgram
-  useEffect(() => {
-    if (window.Adsgram) {
-      const blockId = import.meta.env.VITE_ADSGRAM_BLOCK_ID;
-      if (blockId) {
-        adControllerRef.current = window.Adsgram.init({
-          blockId,
-          debug: import.meta.env.DEV,
-        });
-      }
-    }
-  }, []);
+  const { showAd, isReady: isAdReady, initializationError: adInitializationError } = useOnclicka({
+    spotId: onclickaSpotId,
+  });
 
   // Fetch completion status from backend (which tasks has this user already done)
   useEffect(() => {
@@ -161,8 +153,18 @@ export const FootyCoinPage: React.FC = () => {
 
   // ── Watch Ad ──────────────────────────────────────────────────────────────
   const handleWatchAd = async () => {
-    if (!adControllerRef.current) {
-      setAlert({ message: 'Ad system not ready. Please refresh.', type: 'error' });
+    if (!Number.isSafeInteger(onclickaSpotId) || onclickaSpotId <= 0) {
+      setAlert({ message: 'Ad rewards are not configured. Please contact support.', type: 'error' });
+      return;
+    }
+
+    if (!isAdReady) {
+      setAlert({
+        message: adInitializationError
+          ? 'Could not load the ad system. Please try again later.'
+          : 'Ad system is still loading. Please try again in a moment.',
+        type: 'error',
+      });
       return;
     }
 
@@ -173,30 +175,26 @@ export const FootyCoinPage: React.FC = () => {
     }
 
     setIsAdLoading(true);
-
-    adControllerRef.current
-      .show()
-      .then(async () => {
-        setTaskInProgress('watch_ads');
-        try {
-          const response = await apiService.post(`/footy-coins/tasks/${taskId}/complete`, {});
-          if (response.success) {
-            setAlert({ message: '🎉 Earned 50 Footy Coins for watching the ad!', type: 'success' });
-            await refreshUser();
-            // Don't mark watch_ads as completed since it's repeatable
-          } else {
-            setAlert({ message: response.error || 'Failed to claim ad reward', type: 'error' });
-          }
-        } catch {
-          setAlert({ message: 'Failed to claim ad reward', type: 'error' });
-        } finally {
-          setTaskInProgress(null);
-        }
-      })
-      .catch(() => {
-        setAlert({ message: 'You must watch the full ad to earn coins.', type: 'error' });
-      })
-      .finally(() => setIsAdLoading(false));
+    try {
+      await showAd();
+      setTaskInProgress('watch_ads');
+      const response = await apiService.post(`/footy-coins/tasks/${taskId}/complete`, {});
+      if (response.success) {
+        setAlert({ message: '🎉 Earned 50 Footy Coins for watching the ad!', type: 'success' });
+        await refreshUser();
+      } else {
+        setAlert({ message: response.error || 'Failed to claim ad reward', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Could not show ad or claim ad reward:', error);
+      setAlert({
+        message: 'The ad could not be completed or its reward could not be claimed. Please try again.',
+        type: 'error',
+      });
+    } finally {
+      setTaskInProgress(null);
+      setIsAdLoading(false);
+    }
   };
 
   // ── Join Telegram ─────────────────────────────────────────────────────────

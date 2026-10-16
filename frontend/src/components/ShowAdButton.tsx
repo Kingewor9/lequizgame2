@@ -1,11 +1,10 @@
 import { useCallback, ReactElement } from 'react';
-import { useAdsgram } from '../hooks/useAdsgram';
-import type { ShowPromiseResult } from '../types/adsgram';
+import { useOnclicka } from '../hooks/useOnclicka';
 
 export interface ShowAdButtonProps {
-  blockId: string;
-  onReward?: () => void;
-  onError?: (result: ShowPromiseResult) => void;
+  spotId: number;
+  onReward?: () => void | Promise<void>;
+  onError?: (error: unknown) => void;
   isLoading?: boolean;
   disabled?: boolean;
   className?: string;
@@ -14,9 +13,9 @@ export interface ShowAdButtonProps {
 
 /**
  * ShowAdButton Component
- * Displays a button that triggers Adsgram ads
+ * Displays a button that triggers an Onclicka ad
  * 
- * @param blockId - Your Adsgram block ID
+ * @param spotId - Your Onclicka Spot ID
  * @param onReward - Callback when user successfully watches the ad
  * @param onError - Callback if ad fails to load or play
  * @param isLoading - Show loading state
@@ -25,7 +24,7 @@ export interface ShowAdButtonProps {
  * @param children - Button text/content
  */
 export function ShowAdButton({
-  blockId,
+  spotId,
   onReward,
   onError,
   isLoading = false,
@@ -33,16 +32,21 @@ export function ShowAdButton({
   className = '',
   children = 'Watch & Earn',
 }: ShowAdButtonProps): ReactElement {
-  const showAd = useAdsgram({ blockId, onReward, onError });
+  const { showAd, isReady } = useOnclicka({ spotId });
 
   const handleClick = useCallback(async () => {
-    await showAd();
-  }, [showAd]);
+    try {
+      await showAd();
+      await onReward?.();
+    } catch (error) {
+      onError?.(error);
+    }
+  }, [onError, onReward, showAd]);
 
   return (
     <button
       onClick={handleClick}
-      disabled={disabled || isLoading}
+      disabled={disabled || isLoading || !isReady}
       className={`show-ad-button ${className}`.trim()}
       aria-label="Watch advertisement to earn coins"
     >
