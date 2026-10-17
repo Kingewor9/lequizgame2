@@ -16,6 +16,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 coins_bp = Blueprint('coins', __name__, url_prefix='/api/footy-coins')
 
 TELEGRAM_CHANNEL = '@footyriddles'
+TELEGRAM_REFERRAL_BOT_USERNAME = 'footyiqgamebot'
 MAX_STARS_PURCHASE = 10_000_000
 
 
@@ -33,21 +34,18 @@ def get_referral_info():
             user.save()
 
         miniapp_url = current_app.config.get('MINIAPP_URL', '')
-        if not miniapp_url or 'botname/appname' in miniapp_url:
-            bot_username = current_app.config.get('TELEGRAM_BOT_USERNAME', '').lstrip('@')
-            if not bot_username:
-                return jsonify(format_error('Telegram bot username is not configured')), 503
-            miniapp_url = f'https://t.me/{bot_username}'
-
         parts = urlsplit(miniapp_url)
+        path_segments = [segment for segment in parts.path.split('/') if segment]
+        app_path = path_segments[1:]
+        path = '/' + '/'.join([TELEGRAM_REFERRAL_BOT_USERNAME, *app_path])
         query = dict(parse_qsl(parts.query, keep_blank_values=True))
         query['startapp'] = f'ref_{user.referral_code}'
         referral_link = urlunsplit((
-            parts.scheme,
-            parts.netloc,
-            parts.path,
+            'https',
+            't.me',
+            path,
             urlencode(query),
-            parts.fragment,
+            '',
         ))
 
         return jsonify(format_success(data={

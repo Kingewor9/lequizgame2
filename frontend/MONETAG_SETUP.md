@@ -1,9 +1,5 @@
 # Monetag Ads Setup
 
-The Monetag SDK script and zone are configured in `index.html`:
+The frontend uses Monetag's `monetag-tg-sdk` package for Telegram Mini Apps. The rewarded-interstitial zone ID (`12051949`) is configured in `src/hooks/useMonetag.ts`. The package loads the Monetag SDK and creates the ad handler for that zone.
 
-```html
-<script src="https://libtl.com/sdk.js" data-zone="12051949" data-sdk="show_12051949"></script>
-```
-
-The `useMonetag` hook calls the SDK's `show_12051949()` rewarded-interstitial function. The Footy Coins page requests the existing backend reward only after the ad promise resolves successfully. If the ad promise rejects, no reward is requested.
+The Footy Coins page calls the handler from the user's click and requests the existing backend reward only after the ad promise resolves successfully. If the ad promise rejects, no reward is requested.

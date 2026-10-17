@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import '../types/monetag';
+import createAdHandler from 'monetag-tg-sdk';
+
+const MONETAG_REWARDED_INTERSTITIAL_ZONE_ID = 12051949;
 
 export function useMonetag() {
-  const showAdRef = useRef<NonNullable<Window['show_12051949']> | null>(null);
+  const showAdRef = useRef<(() => Promise<unknown>) | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [initializationError, setInitializationError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const show = window.show_12051949;
-    if (typeof show !== 'function') {
-      const error = new Error('Monetag ad script is unavailable.');
-      console.error(error.message);
-      setInitializationError(error);
-      return;
+    try {
+      showAdRef.current = createAdHandler(MONETAG_REWARDED_INTERSTITIAL_ZONE_ID);
+      setIsReady(true);
+    } catch (error) {
+      const initError = error instanceof Error
+        ? error
+        : new Error('Could not initialize Monetag ads.');
+      console.error('Could not initialize Monetag ads:', initError);
+      setInitializationError(initError);
     }
-
-    showAdRef.current = show;
-    setIsReady(true);
 
     return () => {
       showAdRef.current = null;
