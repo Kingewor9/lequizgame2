@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/apiService';
 import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
-import { useOnclicka } from '../hooks/useOnclicka';
+import { useMonetag } from '../hooks/useMonetag';
 import '../styles/pages/FootyCoinPage.css';
 
 // ── Hardcoded task definitions ─────────────────────────────────────────────
@@ -48,8 +48,6 @@ interface ReferralInfo {
 
 type TelegramInvoiceStatus = 'paid' | 'cancelled' | 'failed' | string;
 
-const onclickaSpotId = Number(import.meta.env.VITE_ONCLICKA_SPOT_ID);
-
 export const FootyCoinPage: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
@@ -67,9 +65,7 @@ export const FootyCoinPage: React.FC = () => {
   const [backendTaskIds, setBackendTaskIds] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
 
-  const { showAd, isReady: isAdReady, initializationError: adInitializationError } = useOnclicka({
-    spotId: onclickaSpotId,
-  });
+  const { showAd, isReady: isAdReady, initializationError: adInitializationError } = useMonetag();
 
   // Fetch completion status from backend (which tasks has this user already done)
   useEffect(() => {
@@ -153,16 +149,11 @@ export const FootyCoinPage: React.FC = () => {
 
   // ── Watch Ad ──────────────────────────────────────────────────────────────
   const handleWatchAd = async () => {
-    if (!Number.isSafeInteger(onclickaSpotId) || onclickaSpotId <= 0) {
-      setAlert({ message: 'Ad rewards are not configured. Please contact support.', type: 'error' });
-      return;
-    }
-
     if (!isAdReady) {
       setAlert({
         message: adInitializationError
-          ? 'Could not load the ad system. Please try again later.'
-          : 'Ad system is still loading. Please try again in a moment.',
+          ? 'Could not load Monetag ads. Please try again later.'
+          : 'Monetag ads are still loading. Please try again in a moment.',
         type: 'error',
       });
       return;

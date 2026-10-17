@@ -1,8 +1,7 @@
 import { useCallback, ReactElement } from 'react';
-import { useOnclicka } from '../hooks/useOnclicka';
+import { useMonetag } from '../hooks/useMonetag';
 
 export interface ShowAdButtonProps {
-  spotId: number;
   onReward?: () => void | Promise<void>;
   onError?: (error: unknown) => void;
   isLoading?: boolean;
@@ -13,9 +12,8 @@ export interface ShowAdButtonProps {
 
 /**
  * ShowAdButton Component
- * Displays a button that triggers an Onclicka ad
+ * Displays a button that triggers a Monetag rewarded interstitial
  * 
- * @param spotId - Your Onclicka Spot ID
  * @param onReward - Callback when user successfully watches the ad
  * @param onError - Callback if ad fails to load or play
  * @param isLoading - Show loading state
@@ -24,7 +22,6 @@ export interface ShowAdButtonProps {
  * @param children - Button text/content
  */
 export function ShowAdButton({
-  spotId,
   onReward,
   onError,
   isLoading = false,
@@ -32,7 +29,7 @@ export function ShowAdButton({
   className = '',
   children = 'Watch & Earn',
 }: ShowAdButtonProps): ReactElement {
-  const { showAd, isReady } = useOnclicka({ spotId });
+  const { showAd, isReady } = useMonetag();
 
   const handleClick = useCallback(async () => {
     try {
