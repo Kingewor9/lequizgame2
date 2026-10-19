@@ -763,6 +763,14 @@
     color: var(--color-sky);
 }
 
+.tournament-action-rewards {
+    color: var(--color-amber-light);
+}
+
+.tournament-action-rewards:hover:not(:disabled) {
+    border-color: rgba(251, 191, 36, 0.45);
+}
+
 .tournament-action-delete {
     color: #ff8b8b;
 }
@@ -829,6 +837,70 @@
     flex-direction: column;
     gap: 9px;
     padding-top: 10px;
+}
+
+.tournament-rewards-editor {
+    display: flex;
+    flex: 1 0 100%;
+    flex-direction: column;
+    gap: 13px;
+    margin-top: 3px;
+    padding: 16px;
+    border: 1px solid rgba(251, 191, 36, 0.16);
+    border-radius: var(--radius-sm);
+    background:
+        radial-gradient(ellipse at 100% 0, rgba(245, 158, 11, 0.07), transparent 58%),
+        rgba(255, 255, 255, 0.018);
+}
+
+.tournament-rewards-editor-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.tournament-rewards-editor-heading > div {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.tournament-rewards-editor-heading strong {
+    color: var(--color-amber-light);
+    font-size: 0.82rem;
+}
+
+.tournament-rewards-editor-heading span {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    line-height: 1.5;
+}
+
+.tournament-editor-close {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: var(--surface-highest);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.tournament-editor-close:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
+.tournament-rewards-editor .tournament-reward-ladder {
+    margin-top: 0;
+}
+
+.tournament-reward-editor-actions {
+    justify-content: flex-end;
 }
 
 .tournament-restart-schedule label {
@@ -927,6 +999,7 @@
 
     .tournament-management-actions {
         width: 100%;
+        flex-wrap: wrap;
     }
 
     .tournament-action-button {

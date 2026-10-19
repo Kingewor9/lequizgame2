@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { apiService } from '../services/apiService';
 import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
-import { ArrowLeft, BarChart3, CalendarClock, Coins, Eye, Image as ImageIcon, ListFilter, Megaphone, RotateCcw, Send, Trophy, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, BarChart3, CalendarClock, Coins, Eye, Image as ImageIcon, ListFilter, Megaphone, Pencil, RotateCcw, Save, Send, Trophy, Trash2, Users, X } from 'lucide-react';
 import '../styles/pages/AdminPage.css';
 import { BroadcastPage } from './BroadcastPage';
 import { AnalyticsPage } from './AnalyticsPage';
@@ -626,6 +626,9 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [isLoadingTournaments, setIsLoadingTournaments] = useState(true);
     const [processingTournamentId, setProcessingTournamentId] = useState<string | null>(null);
     const [restartTournamentId, setRestartTournamentId] = useState<string | null>(null);
+    const [editingRewardsTournamentId, setEditingRewardsTournamentId] = useState<string | null>(null);
+    const [editRewardPlaces, setEditRewardPlaces] = useState(0);
+    const [editPlaceRewards, setEditPlaceRewards] = useState(DEFAULT_PLACE_REWARDS);
     const [restartAt, setRestartAt] = useState(() => {
         const nextDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
         return new Date(nextDay.getTime() - nextDay.getTimezoneOffset() * 60000)
@@ -707,6 +710,62 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         }
     };
 
+    const startEditingRewards = (tournament: AdminTournament) => {
+        const rewards = tournament.place_rewards || {};
+        const placeCount = Object.keys(rewards).length;
+        setEditingRewardsTournamentId(tournament.id);
+        setEditRewardPlaces(placeCount);
+        setEditPlaceRewards(DEFAULT_PLACE_REWARDS.map(
+            (defaultReward, index) => rewards[String(index + 1)] ?? defaultReward
+        ));
+        setRestartTournamentId(null);
+    };
+
+    const cancelEditingRewards = () => {
+        setEditingRewardsTournamentId(null);
+        setEditRewardPlaces(0);
+    };
+
+    const handleSaveRewards = async (tournament: AdminTournament) => {
+        for (let index = 0; index < editRewardPlaces; index += 1) {
+            const amount = editPlaceRewards[index];
+            if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1_000_000_000) {
+                setAlert({
+                    message: `Set a whole-number Footy Coin reward between 1 and 1,000,000,000 for ${TOURNAMENT_PLACE_LABELS[index].toLowerCase()}.`,
+                    type: 'error',
+                });
+                return;
+            }
+        }
+
+        setProcessingTournamentId(tournament.id);
+        try {
+            const response = await apiService.put(
+                `/admin/tournaments/${tournament.id}/rewards`,
+                {
+                    place_rewards: Object.fromEntries(
+                        Array.from({ length: editRewardPlaces }, (_, index) => [
+                            String(index + 1),
+                            editPlaceRewards[index],
+                        ])
+                    ),
+                }
+            );
+            if (!response.success) {
+                setAlert({ message: response.error || 'Could not update tournament rewards.', type: 'error' });
+                return;
+            }
+            setAlert({ message: response.message || 'Tournament rewards updated.', type: 'success' });
+            cancelEditingRewards();
+            await refreshTournaments();
+        } catch (error) {
+            console.error('Could not update tournament rewards:', error);
+            setAlert({ message: 'Could not update tournament rewards.', type: 'error' });
+        } finally {
+            setProcessingTournamentId(null);
+        }
+    };
+
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!name.trim()) {
@@ -780,7 +839,7 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <div className="tournament-management-heading">
                     <div>
                         <h2 className="section-title">Manage tournaments</h2>
-                        <p className="admin-subtitle">Restart completed leagues or permanently remove tournaments.</p>
+                        <p className="admin-subtitle">Edit prizes before a season ends, restart completed leagues, or remove tournaments.</p>
                     </div>
                     <button
                         type="button"
@@ -801,6 +860,7 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             const isProcessing = processingTournamentId === tournament.id;
                             const canRestart = tournament.tournament_type === 'league'
                                 && tournament.status === 'completed';
+                            const canEditRewards = !['completed', 'cancelled'].includes(tournament.status);
                             return (
                                 <li className="tournament-management-item" key={tournament.id}>
                                     <div className="tournament-management-info">
@@ -813,6 +873,16 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         </span>
                                     </div>
                                     <div className="tournament-management-actions">
+                                        {canEditRewards && editingRewardsTournamentId !== tournament.id && (
+                                            <button
+                                                type="button"
+                                                className="tournament-action-button tournament-action-rewards"
+                                                onClick={() => startEditingRewards(tournament)}
+                                                disabled={processingTournamentId !== null}
+                                            >
+                                                <Pencil size={15} /> Edit rewards
+                                            </button>
+                                        )}
                                         {canRestart && restartTournamentId !== tournament.id && (
                                             <button
                                                 type="button"
@@ -834,6 +904,92 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             {isProcessing ? 'Working…' : 'Delete'}
                                         </button>
                                     </div>
+                                    {editingRewardsTournamentId === tournament.id && (
+                                        <div className="tournament-rewards-editor">
+                                            <div className="tournament-rewards-editor-heading">
+                                                <div>
+                                                    <strong>Edit prize ladder</strong>
+                                                    <span>Changes apply to this season until its final standings are published.</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="tournament-editor-close"
+                                                    onClick={cancelEditingRewards}
+                                                    disabled={isProcessing}
+                                                    aria-label="Cancel reward editing"
+                                                >
+                                                    <X size={17} />
+                                                </button>
+                                            </div>
+                                            <div className="input-group tournament-reward-place-count">
+                                                <label htmlFor={`edit-reward-places-${tournament.id}`}>Places rewarded</label>
+                                                <select
+                                                    id={`edit-reward-places-${tournament.id}`}
+                                                    className="cyber-input"
+                                                    value={editRewardPlaces}
+                                                    onChange={(event) => setEditRewardPlaces(Number(event.target.value))}
+                                                >
+                                                    <option value={0}>No coin rewards</option>
+                                                    {[1, 2, 3, 4].map((places) => (
+                                                        <option key={places} value={places}>
+                                                            {places} {places === 1 ? 'place' : 'places'}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            {editRewardPlaces > 0 && (
+                                                <div className="tournament-reward-ladder">
+                                                    {Array.from({ length: editRewardPlaces }, (_, index) => (
+                                                        <div className="tournament-reward-row" key={index}>
+                                                            <div className="tournament-reward-place">
+                                                                <span>{String(index + 1).padStart(2, '0')}</span>
+                                                                <strong>{TOURNAMENT_PLACE_LABELS[index]}</strong>
+                                                            </div>
+                                                            <label
+                                                                className="tournament-reward-amount"
+                                                                htmlFor={`edit-tournament-reward-${tournament.id}-${index + 1}`}
+                                                            >
+                                                                <input
+                                                                    id={`edit-tournament-reward-${tournament.id}-${index + 1}`}
+                                                                    className="cyber-input"
+                                                                    type="number"
+                                                                    min="1"
+                                                                    max="1000000000"
+                                                                    step="1"
+                                                                    value={editPlaceRewards[index]}
+                                                                    onChange={(event) => {
+                                                                        const updatedRewards = [...editPlaceRewards];
+                                                                        updatedRewards[index] = Number(event.target.value);
+                                                                        setEditPlaceRewards(updatedRewards);
+                                                                    }}
+                                                                />
+                                                                <span>Footy Coins</span>
+                                                            </label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <div className="tournament-management-actions tournament-reward-editor-actions">
+                                                <button
+                                                    type="button"
+                                                    className="tournament-action-button tournament-action-rewards"
+                                                    onClick={() => void handleSaveRewards(tournament)}
+                                                    disabled={isProcessing || processingTournamentId !== null}
+                                                >
+                                                    <Save size={15} />
+                                                    {isProcessing ? 'Saving…' : 'Save rewards'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="tournament-action-button"
+                                                    onClick={cancelEditingRewards}
+                                                    disabled={isProcessing}
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                     {restartTournamentId === tournament.id && (
                                         <div className="tournament-restart-schedule">
                                             <label htmlFor={`tournament-restart-${tournament.id}`}>

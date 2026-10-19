@@ -156,6 +156,7 @@ Admins can configure Footy Coin prizes for first through fourth place when creat
 - `GET /api/admin/analytics` - Get player, league, and quiz analytics (admin only; daily metrics use UTC)
 - `GET /api/admin/tournaments` - List tournaments for quiz routing (admin only)
 - `POST /api/admin/tournaments` - Create a scheduled tournament (admin only)
+- `PUT /api/admin/tournaments/<id>/rewards` - Update a tournament's place rewards before it ends (admin only)
 
 ### Footy Coins
 - `GET /api/footy-coins/referrals` - Get your invite link and successful referral count

@@ -34,6 +34,30 @@ def _parse_utc(value):
     return parsed
 
 
+def _validate_place_rewards(place_rewards):
+    if not isinstance(place_rewards, dict):
+        return 'Tournament place rewards must be an object'
+    if any(place not in ('1', '2', '3', '4') for place in place_rewards):
+        return 'Rewards can be configured for places 1 through 4 only'
+
+    reward_places = sorted(int(place) for place in place_rewards)
+    if reward_places and reward_places != list(range(1, len(reward_places) + 1)):
+        return 'Rewarded places must be consecutive, starting with first place'
+
+    for place, amount in place_rewards.items():
+        if (
+            isinstance(amount, bool)
+            or not isinstance(amount, int)
+            or amount < 1
+            or amount > 1_000_000_000
+        ):
+            return (
+                f'The Footy Coin reward for place {place} must be between '
+                '1 and 1,000,000,000'
+            )
+    return None
+
+
 def _quiz_destination(data, scheduled_for):
     destination = data.get('destination', 'game')
     tournament_id = data.get('tournament_id')
@@ -128,23 +152,9 @@ def create_tournament():
         return jsonify(format_error('Choose a supported tournament type')), 400
     if not isinstance(entry_fee, int) or isinstance(entry_fee, bool) or entry_fee < 0:
         return jsonify(format_error('Entry fee must be a non-negative whole number of Footy Coins')), 400
-    if not isinstance(place_rewards, dict):
-        return jsonify(format_error('Tournament place rewards must be an object')), 400
-    if any(place not in ('1', '2', '3', '4') for place in place_rewards):
-        return jsonify(format_error('Rewards can be configured for places 1 through 4 only')), 400
-    reward_places = sorted(int(place) for place in place_rewards)
-    if reward_places and reward_places != list(range(1, len(reward_places) + 1)):
-        return jsonify(format_error('Rewarded places must be consecutive, starting with first place')), 400
-    for place, amount in place_rewards.items():
-        if (
-            isinstance(amount, bool)
-            or not isinstance(amount, int)
-            or amount < 1
-            or amount > 1_000_000_000
-        ):
-            return jsonify(format_error(
-                f'The Footy Coin reward for place {place} must be between 1 and 1,000,000,000'
-            )), 400
+    reward_error = _validate_place_rewards(place_rewards)
+    if reward_error:
+        return jsonify(format_error(reward_error)), 400
     if not isinstance(start_at_value, str):
         return jsonify(format_error('A tournament start date and time are required')), 400
 
@@ -179,6 +189,45 @@ def create_tournament():
     except Exception as error:
         current_app.logger.exception('Could not create tournament')
         return jsonify(format_error(f'Could not create tournament: {error}')), 500
+
+
+@admin_bp.route('/tournaments/<tournament_id>/rewards', methods=['PUT'])
+@admin_required
+def update_tournament_rewards(tournament_id):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or 'place_rewards' not in data:
+        return jsonify(format_error('A place_rewards object is required')), 400
+
+    reward_error = _validate_place_rewards(data['place_rewards'])
+    if reward_error:
+        return jsonify(format_error(reward_error)), 400
+
+    try:
+        tournament = Tournament.objects(
+            id=tournament_id,
+            status__nin=['completed', 'cancelled'],
+        ).modify(
+            new=True,
+            set__place_rewards=data['place_rewards'],
+            set__updated_at=datetime.utcnow(),
+        )
+        if not tournament and not Tournament.objects(id=tournament_id).first():
+            return jsonify(format_error('Tournament not found')), 404
+        if not tournament:
+            return jsonify(format_error(
+                'Rewards cannot be changed after a tournament season has ended'
+            )), 409
+
+        return jsonify(format_success(
+            data=tournament.to_dict(),
+            message='Tournament rewards updated',
+        )), 200
+    except Exception as error:
+        current_app.logger.exception(
+            'Could not update rewards for tournament %s',
+            tournament_id,
+        )
+        return jsonify(format_error(f'Could not update tournament rewards: {error}')), 500
 
 
 @admin_bp.route('/tournaments/<tournament_id>', methods=['DELETE'])
