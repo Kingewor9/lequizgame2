@@ -49,6 +49,38 @@ const formatDate = (value: string) => new Date(value).toLocaleString([], {
   timeStyle: 'short',
 });
 
+const placeLabels: Record<number, string> = {
+  1: '1st',
+  2: '2nd',
+  3: '3rd',
+  4: '4th',
+};
+
+const rewardForPlace = (tournament: Tournament, place: number) =>
+  tournament.place_rewards?.[String(place)] || 0;
+
+const TournamentPrizeList: React.FC<{ tournament: Tournament }> = ({ tournament }) => {
+  const prizes = Object.entries(tournament.place_rewards || {})
+    .map(([place, amount]) => ({ place: Number(place), amount }))
+    .filter(({ place, amount }) => placeLabels[place] && amount > 0)
+    .sort((first, second) => first.place - second.place);
+
+  if (prizes.length === 0) return null;
+
+  return (
+    <div className="tournament-prize-list" aria-label="Tournament Footy Coin prizes">
+      <span className="tournament-prize-label">PRIZES</span>
+      {prizes.map(({ place, amount }) => (
+        <span className="tournament-prize-item" key={place}>
+          <strong>{placeLabels[place]}</strong>
+          <Coins size={13} />
+          {amount.toLocaleString()}
+        </span>
+      ))}
+    </div>
+  );
+};
+
 const ProfileImage: React.FC<{ name: string; photoUrl?: string; className?: string }> = ({
   name,
   photoUrl,
@@ -68,7 +100,7 @@ const formatRules = (
       <li>The player with the higher quiz score wins 3 league points. A tied score earns each player 1 point.</li>
       <li>If only one opponent submits, that player wins by forfeit (3 points); if neither submits, no league points are awarded.</li>
       <li>Quiz points stay separate from main-game and private-league scores. Standings use league points, then quiz point difference.</li>
-      <li>After the final gameweek, the season ends and the highest-ranked player(s) are announced as champion(s).</li>
+      <li>After the final gameweek, the season ends and the highest-ranked player(s) are announced as champion(s). Configured place prizes are credited automatically; tied players each receive the full reward for their place.</li>
     </ol>
   </div>
 );
@@ -79,6 +111,7 @@ interface TournamentPageProps {
 
 export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountChange }) => {
   const { user, refreshUser } = useAuth();
+  const refreshUserRef = useRef(refreshUser);
   const { playSound } = useGameSound();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [detail, setDetail] = useState<TournamentDetail | null>(null);
@@ -103,6 +136,11 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
   const [timeRemaining, setTimeRemaining] = useState(0);
   const timeRemainingRef = useRef(0);
   const quizSubmittingRef = useRef(false);
+  const refreshedCompletionRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    refreshUserRef.current = refreshUser;
+  }, [refreshUser]);
 
   const fetchTournaments = useCallback(async () => {
     const response = await apiService.get<Tournament[]>('/tournaments');
@@ -165,6 +203,16 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
       window.clearInterval(interval);
     };
   }, [activeTournamentId, fetchDetail, fetchTournaments]);
+
+  useEffect(() => {
+    const tournament = detail?.tournament;
+    if (tournament?.status !== 'completed') return;
+
+    const seasonKey = `${tournament.id}:${tournament.season || 1}`;
+    if (refreshedCompletionRef.current === seasonKey) return;
+    refreshedCompletionRef.current = seasonKey;
+    void refreshUserRef.current();
+  }, [detail?.tournament.id, detail?.tournament.status, detail?.tournament.season]);
 
   const openTournament = async (tournamentId: string) => {
     setDetail(null);
@@ -427,6 +475,7 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                         <Coins size={15} /> {tournament.entry_fee === 0 ? 'Free entry' : `${tournament.entry_fee} coins`}
                       </span>
                     </div>
+                    <TournamentPrizeList tournament={tournament} />
                     <div className="tournament-card-actions">
                       {supported ? (
                         <button type="button" className="tournament-rules-button" onClick={() => setShowRules(true)}>
@@ -497,6 +546,7 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                     <ShieldCheck size={15} /> Rules
                   </button>
                 </div>
+                <TournamentPrizeList tournament={detail.tournament} />
               </header>
 
               {!detail.registered ? (
@@ -673,7 +723,7 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                         <div className="tournament-table-scroll">
                           <table className="tournament-table">
                             <thead>
-                              <tr><th>Pos</th><th>Player</th><th>Pts</th><th>MP</th><th>GW</th><th>W</th><th>D</th><th>L</th><th>PD</th></tr>
+                              <tr><th>Pos</th><th>Player</th><th>Pts</th><th>MP</th><th>GW</th><th>W</th><th>D</th><th>L</th><th>PD</th><th>Prize</th></tr>
                             </thead>
                             <tbody>
                               {detail.standings.map((standing) => (
@@ -695,6 +745,11 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                                   <td>{standing.losses}</td>
                                   <td className={standing.point_difference > 0 ? 'positive' : standing.point_difference < 0 ? 'negative' : ''}>
                                     {standing.point_difference > 0 ? '+' : ''}{standing.point_difference}
+                                  </td>
+                                  <td className="tournament-table-prize">
+                                    {rewardForPlace(detail.tournament, standing.rank) > 0
+                                      ? `${rewardForPlace(detail.tournament, standing.rank).toLocaleString()} coins`
+                                      : '—'}
                                   </td>
                                 </tr>
                               ))}

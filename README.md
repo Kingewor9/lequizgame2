@@ -99,6 +99,7 @@ The API will be available at `http://localhost:8000`
 ### Tournament Page
 - Admin-created 1v1 league tournaments with scheduled registration and a maximum of 20 players
 - Entry fees charged once in Footy Coins at registration (or free entry)
+- Admin-configured Footy Coin prizes for the top one to four tournament places, credited automatically when final standings are confirmed
 - Daily double round-robin fixtures, tournament-only quiz scores, automated standings, and Telegram result notifications
 - Group stage + knockout tournaments can be saved as drafts, but remain unavailable until their format is implemented
 
@@ -117,6 +118,9 @@ Set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` (without `@`) to `footyiqgameb
 
 #### Telegram Stars payments
 Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` in the backend environment. Register the public HTTPS endpoint `/api/footy-coins/telegram-webhook` with Telegram's `setWebhook`, using the same value for `secret_token` and subscribing to `message` and `pre_checkout_query` updates. The database must support MongoDB transactions (for example, MongoDB Atlas or a replica set) so payments are credited atomically and only once.
+
+#### Tournament prizes
+Admins can configure Footy Coin prizes for first through fourth place when creating a tournament. Prizes are credited once from the final standings and recorded in each player's transaction history. Tied players at the same place each receive the full configured reward. Tournament prize credits use MongoDB transactions, so the database must support transactions (for example, MongoDB Atlas or a replica set).
 
 ## API Endpoints
 

@@ -6,6 +6,7 @@ from app.models import (
     FootyCoinTransaction,
     Quiz,
     Tournament,
+    TournamentAward,
     TournamentFixture,
     TournamentRegistration,
     TournamentSubmission,
@@ -169,6 +170,7 @@ def start_scheduled_restart(tournament, now=None):
         renewal_status__ne='accepted',
     ).delete()
     tournament.registered_count = len(registrations)
+    tournament.season = (getattr(tournament, 'season', 1) or 1) + 1
     tournament.winner_user_ids = []
     tournament.completion_notification_sent = False
     tournament.updated_at = now
@@ -424,6 +426,88 @@ def calculate_standings(tournament):
     return rows
 
 
+def _award_tournament_places(tournament, standings):
+    """Persist placements and coin rewards once for the current tournament season."""
+    if not standings:
+        return
+
+    TournamentAward.ensure_indexes()
+    FootyCoinTransaction.ensure_indexes()
+    database = TournamentAward._get_db()
+    awards_collection = TournamentAward._get_collection()
+    users_collection = User._get_collection()
+    transactions_collection = FootyCoinTransaction._get_collection()
+    place_rewards = getattr(tournament, 'place_rewards', {}) or {}
+    season = getattr(tournament, 'season', 1) or 1
+
+    if not any(place_rewards.get(str(row['rank']), 0) for row in standings):
+        for standing in standings:
+            TournamentAward.objects(
+                tournament_id=tournament.id,
+                season=season,
+                user_id=standing['user_id'],
+            ).update_one(
+                upsert=True,
+                set_on_insert__id=generate_id(),
+                set_on_insert__place=standing['rank'],
+                set_on_insert__coins_awarded=0,
+                set_on_insert__awarded_at=datetime.utcnow(),
+            )
+        return
+
+    def award_places(session):
+        existing_user_ids = {
+            award['user_id']
+            for award in awards_collection.find(
+                {'tournament_id': tournament.id, 'season': season},
+                {'user_id': 1},
+                session=session,
+            )
+        }
+        now = datetime.utcnow()
+
+        for standing in standings:
+            user_id = standing['user_id']
+            if user_id in existing_user_ids:
+                continue
+
+            amount = place_rewards.get(str(standing['rank']), 0)
+            if amount:
+                updated = users_collection.update_one(
+                    {'_id': user_id},
+                    {'$inc': {'footy_coins': amount}},
+                    session=session,
+                )
+                if updated.matched_count != 1:
+                    raise ValueError(
+                        f"Could not award tournament prize: player {user_id} was not found"
+                    )
+                transactions_collection.insert_one({
+                    '_id': generate_id(),
+                    'user_id': user_id,
+                    'type': 'reward',
+                    'amount': amount,
+                    'reason': (
+                        f'Tournament prize: {tournament.name} '
+                        f'(season {season}, place {standing["rank"]})'
+                    ),
+                    'created_at': now,
+                }, session=session)
+
+            awards_collection.insert_one({
+                '_id': generate_id(),
+                'tournament_id': tournament.id,
+                'season': season,
+                'user_id': user_id,
+                'place': standing['rank'],
+                'coins_awarded': amount,
+                'awarded_at': now,
+            }, session=session)
+
+    with database.client.start_session() as session:
+        session.with_transaction(award_places)
+
+
 def finish_tournament(tournament):
     standings = calculate_standings(tournament)
     if standings:
@@ -445,6 +529,7 @@ def finish_tournament(tournament):
         ]
     tournament.status = 'completed'
     tournament.save()
+    _award_tournament_places(tournament, standings)
     _notify_tournament_completion(tournament, standings)
 
 
@@ -478,6 +563,7 @@ def sync_tournament(tournament, now=None):
         tournament.reload()
 
     if tournament.status == 'completed':
+        _award_tournament_places(tournament, calculate_standings(tournament))
         _notify_tournament_completion(tournament)
         return
     if tournament.status != 'active':

@@ -12,6 +12,7 @@ from app.models import (
     User,
     UserLeague,
     Tournament,
+    TournamentAward,
     TournamentFixture,
     TournamentRegistration,
     TournamentSubmission,
@@ -116,6 +117,7 @@ def create_tournament():
     tournament_type = data.get('tournament_type')
     start_at_value = data.get('start_at')
     entry_fee = data.get('entry_fee', 0)
+    place_rewards = data.get('place_rewards', {})
     if not isinstance(name, str) or not name.strip():
         return jsonify(format_error('Tournament name is required')), 400
     if len(name.strip()) > 255:
@@ -126,6 +128,23 @@ def create_tournament():
         return jsonify(format_error('Choose a supported tournament type')), 400
     if not isinstance(entry_fee, int) or isinstance(entry_fee, bool) or entry_fee < 0:
         return jsonify(format_error('Entry fee must be a non-negative whole number of Footy Coins')), 400
+    if not isinstance(place_rewards, dict):
+        return jsonify(format_error('Tournament place rewards must be an object')), 400
+    if any(place not in ('1', '2', '3', '4') for place in place_rewards):
+        return jsonify(format_error('Rewards can be configured for places 1 through 4 only')), 400
+    reward_places = sorted(int(place) for place in place_rewards)
+    if reward_places and reward_places != list(range(1, len(reward_places) + 1)):
+        return jsonify(format_error('Rewarded places must be consecutive, starting with first place')), 400
+    for place, amount in place_rewards.items():
+        if (
+            isinstance(amount, bool)
+            or not isinstance(amount, int)
+            or amount < 1
+            or amount > 1_000_000_000
+        ):
+            return jsonify(format_error(
+                f'The Footy Coin reward for place {place} must be between 1 and 1,000,000,000'
+            )), 400
     if not isinstance(start_at_value, str):
         return jsonify(format_error('A tournament start date and time are required')), 400
 
@@ -142,6 +161,7 @@ def create_tournament():
         description=description.strip(),
         tournament_type=tournament_type,
         entry_fee=entry_fee,
+        place_rewards=place_rewards,
         max_players=20,
         start_at=start_at,
         status='registration' if tournament_type == 'league' else 'draft',
@@ -181,6 +201,7 @@ def delete_tournament(tournament_id):
                 quiz.delete()
 
         TournamentSubmission.objects(tournament_id=tournament.id).delete()
+        TournamentAward.objects(tournament_id=tournament.id).delete()
         TournamentFixture.objects(tournament_id=tournament.id).delete()
         TournamentRegistration.objects(tournament_id=tournament.id).delete()
         tournament.delete()

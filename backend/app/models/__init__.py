@@ -1,6 +1,7 @@
 from mongoengine import (
     Document, StringField, IntField, BooleanField, ListField,
-    EmbeddedDocument, EmbeddedDocumentField, DateTimeField, DynamicField
+    EmbeddedDocument, EmbeddedDocumentField, DateTimeField, DynamicField,
+    DictField,
 )
 from datetime import datetime
 import uuid
@@ -188,8 +189,10 @@ class Tournament(Document):
         choices=('league', 'group_knockout'),
     )
     entry_fee = IntField(default=0, min_value=0)
+    place_rewards = DictField(default=dict)
     max_players = IntField(default=20, min_value=2)
     registered_count = IntField(default=0, min_value=0)
+    season = IntField(default=1, min_value=1)
     start_at = DateTimeField(required=True)
     status = StringField(
         default='registration',
@@ -208,8 +211,10 @@ class Tournament(Document):
             'description': self.description,
             'tournament_type': self.tournament_type,
             'entry_fee': self.entry_fee,
+            'place_rewards': getattr(self, 'place_rewards', {}) or {},
             'max_players': self.max_players,
             'registered_count': self.registered_count,
+            'season': getattr(self, 'season', 1) or 1,
             'start_at': self.start_at.isoformat() + 'Z' if self.start_at else None,
             'status': self.status,
             'total_gameweeks': self.total_gameweeks,
@@ -237,6 +242,25 @@ class TournamentRegistration(Document):
         default='current',
         choices=('current', 'pending', 'accepted'),
     )
+
+
+class TournamentAward(Document):
+    """A player's final tournament placement and any Footy Coin prize."""
+    meta = {
+        'collection': 'tournament_awards',
+        'indexes': [
+            {'fields': ['tournament_id', 'season', 'user_id'], 'unique': True},
+            ['user_id', 'place'],
+        ],
+    }
+
+    id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
+    tournament_id = StringField(required=True)
+    season = IntField(default=1, min_value=1)
+    user_id = StringField(required=True)
+    place = IntField(required=True, min_value=1)
+    coins_awarded = IntField(default=0, min_value=0)
+    awarded_at = DateTimeField(default=datetime.utcnow)
 
 
 class TournamentFixture(Document):

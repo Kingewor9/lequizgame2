@@ -75,8 +75,10 @@ export interface Tournament {
   description: string;
   tournament_type: TournamentType;
   entry_fee: number;
+  place_rewards?: Record<string, number>;
   max_players: number;
   registered_count: number;
+  season?: number;
   start_at: string;
   status: TournamentStatus;
   total_gameweeks: number;

@@ -25,7 +25,11 @@ interface AdminTournament {
     start_at: string;
     entry_fee: number;
     registered_count: number;
+    place_rewards: Record<string, number>;
 }
+
+const TOURNAMENT_PLACE_LABELS = ['Champion', 'Runner-up', '3rd place', '4th place'];
+const DEFAULT_PLACE_REWARDS = [100, 50, 25, 10];
 
 const AdminImagePreview: React.FC<{ imageUrl: string; questionNumber: number }> = ({ imageUrl, questionNumber }) => {
     const [hasError, setHasError] = useState(false);
@@ -610,6 +614,8 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [description, setDescription] = useState('');
     const [tournamentType, setTournamentType] = useState<'league' | 'group_knockout'>('league');
     const [entryFee, setEntryFee] = useState(0);
+    const [rewardPlaces, setRewardPlaces] = useState(0);
+    const [placeRewards, setPlaceRewards] = useState(DEFAULT_PLACE_REWARDS);
     const [startAt, setStartAt] = useState(() => {
         const local = new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000);
         return local.toISOString().slice(0, 16);
@@ -711,6 +717,16 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             setAlert({ message: 'Choose a start date and time in the future.', type: 'error' });
             return;
         }
+        for (let index = 0; index < rewardPlaces; index += 1) {
+            const amount = placeRewards[index];
+            if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1_000_000_000) {
+                setAlert({
+                    message: `Set a whole-number Footy Coin reward between 1 and 1,000,000,000 for ${TOURNAMENT_PLACE_LABELS[index].toLowerCase()}.`,
+                    type: 'error',
+                });
+                return;
+            }
+        }
 
         setIsSaving(true);
         try {
@@ -720,6 +736,12 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 tournament_type: tournamentType,
                 entry_fee: entryFee,
                 start_at: new Date(startAt).toISOString(),
+                place_rewards: Object.fromEntries(
+                    Array.from({ length: rewardPlaces }, (_, index) => [
+                        String(index + 1),
+                        placeRewards[index],
+                    ])
+                ),
             });
             if (!response.success) {
                 setAlert({ message: response.error || 'Could not create tournament.', type: 'error' });
@@ -751,7 +773,7 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             <header className="admin-header">
                 <span className="admin-hub-kicker">COMPETITIONS / SETUP</span>
                 <h1 className="admin-title">Create tournament</h1>
-                <p className="admin-subtitle">Set the format, entry fee, and scheduled kick-off.</p>
+                <p className="admin-subtitle">Set the format, entry fee, prize ladder, and scheduled kick-off.</p>
             </header>
             {alert && <Alert message={alert.message} type={alert.type} onClose={() => setAlert(null)} />}
             <section className="form-section tournament-management">
@@ -936,10 +958,75 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         </div>
                     </div>
                 </section>
+                <section className="form-section tournament-rewards-section">
+                    <div className="tournament-rewards-heading">
+                        <span className="tournament-rewards-icon"><Trophy size={19} /></span>
+                        <div>
+                            <h2 className="section-title">Winner rewards</h2>
+                            <p className="admin-subtitle">Set Footy Coin prizes for the final standings.</p>
+                        </div>
+                    </div>
+                    <div className="input-group tournament-reward-place-count">
+                        <label htmlFor="tournament-reward-places">Places rewarded</label>
+                        <select
+                            id="tournament-reward-places"
+                            className="cyber-input"
+                            value={rewardPlaces}
+                            onChange={(event) => setRewardPlaces(Number(event.target.value))}
+                        >
+                            <option value={0}>No coin rewards</option>
+                            {[1, 2, 3, 4].map((places) => (
+                                <option key={places} value={places}>
+                                    {places} {places === 1 ? 'place' : 'places'}
+                                </option>
+                            ))}
+                        </select>
+                        <span className="input-hint">Choose from champion only up to the top four.</span>
+                    </div>
+                    {rewardPlaces > 0 && (
+                        <div className="tournament-reward-ladder">
+                            {Array.from({ length: rewardPlaces }, (_, index) => (
+                                <div className="tournament-reward-row" key={index}>
+                                    <div className="tournament-reward-place">
+                                        <span>{String(index + 1).padStart(2, '0')}</span>
+                                        <strong>{TOURNAMENT_PLACE_LABELS[index]}</strong>
+                                    </div>
+                                    <label className="tournament-reward-amount" htmlFor={`tournament-reward-${index + 1}`}>
+                                        <input
+                                            id={`tournament-reward-${index + 1}`}
+                                            className="cyber-input"
+                                            type="number"
+                                            min="1"
+                                            max="1000000000"
+                                            step="1"
+                                            value={placeRewards[index]}
+                                            onChange={(event) => {
+                                                const updatedRewards = [...placeRewards];
+                                                updatedRewards[index] = Number(event.target.value);
+                                                setPlaceRewards(updatedRewards);
+                                            }}
+                                            required
+                                        />
+                                        <span>Footy Coins</span>
+                                    </label>
+                                </div>
+                            ))}
+                            <p className="tournament-reward-note">
+                                Players tied on a place each receive that place&apos;s full reward.
+                            </p>
+                        </div>
+                    )}
+                </section>
                 <div className="tournament-create-summary">
                     <CalendarClock size={19} />
                     <span>Registration closes at the scheduled start, even when fewer than 20 players join.</span>
                     <span className="tournament-capacity"><Coins size={15} /> {entryFee} coins</span>
+                    {rewardPlaces > 0 && (
+                        <span className="tournament-capacity">
+                            <Trophy size={15} />
+                            {placeRewards.slice(0, rewardPlaces).reduce((total, reward) => total + reward, 0).toLocaleString()} prize pool
+                        </span>
+                    )}
                 </div>
                 <button className="btn-publish-quiz" type="submit" disabled={isSaving}>
                     {isSaving ? 'Creating tournament…' : 'Create tournament'}
@@ -1002,7 +1089,7 @@ export const AdminPage: React.FC = () => {
                     <span className="admin-destination-icon"><Trophy size={22} /></span>
                     <span className="admin-destination-copy">
                         <strong>Create tournament</strong>
-                        <span>Set up league entry, coin fees, and scheduled kick-off.</span>
+                        <span>Set league entry, coin fees, scheduled kick-off, and place rewards.</span>
                     </span>
                     <span className="admin-destination-action">Open tournament setup <ArrowLeft size={15} /></span>
                 </button>

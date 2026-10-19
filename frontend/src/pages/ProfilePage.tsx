@@ -212,7 +212,7 @@ export const ProfilePage: React.FC<Props> = ({ userId, onBack }) => {
             <div className="achievement-icon"><Medal size={20} /></div>
             <span className="achievement-count">{profile.tournament_wins}</span>
             <span className="achievement-label">Tournament wins</span>
-            <span className="achievement-detail">Official tournaments</span>
+            <span className="achievement-detail">Tournament championships</span>
           </article>
           <article className="profile-achievement-card profile-milestone-award">
             <div className="achievement-icon"><Shield size={20} /></div>

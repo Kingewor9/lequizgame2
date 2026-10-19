@@ -291,6 +291,48 @@
   color: var(--tournament-gold);
 }
 
+.tournament-prize-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  padding: 0 0 13px;
+}
+
+.tournament-prize-label {
+  margin-right: 2px;
+  color: #818a7e;
+  font-family: 'Unbounded', sans-serif;
+  font-size: 0.48rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.tournament-prize-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid rgba(242, 198, 109, 0.13);
+  border-radius: 7px;
+  background: rgba(242, 198, 109, 0.045);
+  color: #d6c89d;
+  font-size: 0.61rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tournament-prize-item strong,
+.tournament-prize-item svg {
+  color: var(--tournament-gold);
+}
+
+.tournament-table-prize {
+  color: var(--tournament-gold) !important;
+  font-size: 0.58rem !important;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .tournament-card-actions {
   justify-content: flex-start;
   gap: 9px;
@@ -429,6 +471,11 @@
   margin-top: 16px;
   color: #a6ada3;
   font-size: 0.7rem;
+}
+
+.tournament-detail-header > .tournament-prize-list {
+  padding-top: 13px;
+  padding-bottom: 0;
 }
 
 .tournament-subnav {
@@ -894,7 +941,7 @@
 
 .tournament-table {
   width: 100%;
-  min-width: 580px;
+  min-width: 640px;
   border-collapse: collapse;
   font-variant-numeric: tabular-nums;
   text-align: right;

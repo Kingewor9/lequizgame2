@@ -7,6 +7,7 @@ from app.models import (
     League,
     LeagueTrophy,
     MilestoneAchievement,
+    TournamentAward,
     UserLeague,
 )
 from app.utils import (
@@ -167,8 +168,10 @@ def get_user(user_id):
         user_dict['is_admin'] = user.telegram_id in current_app.config.get('ADMIN_TELEGRAM_IDS', [])
         _record_ended_league_wins(user_id)
         user_dict['league_wins'] = LeagueTrophy.objects(user_id=user_id).count()
-        # Tournaments are not yet persisted by the game, so there are no recorded wins.
-        user_dict['tournament_wins'] = 0
+        user_dict['tournament_wins'] = TournamentAward.objects(
+            user_id=user_id,
+            place=1,
+        ).count()
         
         return jsonify(format_success(data=user_dict)), 200
     
