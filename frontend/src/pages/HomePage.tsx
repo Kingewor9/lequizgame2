@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Coins, ListOrdered, Trophy, CheckCircle2, Target, Sparkles, Clock, Volume2, VolumeX } from 'lucide-react';
+import { ChevronRight, Coins, ListOrdered, Trophy, CheckCircle2, Target, Sparkles, Clock, Volume2, VolumeX, Swords } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Quiz, QuizResponse } from '../types';
 import { apiService } from '../services/apiService';
@@ -11,6 +11,7 @@ import { QuizQuestion } from '../components/QuizQuestion';
 import { ShowAdButton } from '../components/ShowAdButton';
 import { LeaderboardPage } from './LeaderboardPage';
 import { ProfilePage } from './ProfilePage';
+import { BattlePage } from './BattlePage';
 import { formatQuizTimer } from '../services/utilService';
 import { useGameSound } from '../context/GameSoundContext';
 import '../styles/pages/HomePage.css';
@@ -31,6 +32,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
   const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [showBattles, setShowBattles] = useState(false);
+  const [battleTargetUserId, setBattleTargetUserId] = useState<string | null>(null);
 
   // Quiz state
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -308,11 +311,27 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
   };
 
   if (quizLoading) return <Loading message="Loading today's quiz..." />;
+  if (showBattles) {
+    return (
+      <BattlePage
+        onBack={() => {
+          setShowBattles(false);
+          setBattleTargetUserId(null);
+        }}
+        initialPlayerId={battleTargetUserId}
+      />
+    );
+  }
   if (profileUserId) {
     return (
       <ProfilePage
         userId={profileUserId}
         onBack={() => setProfileUserId(null)}
+        onChallenge={(targetUserId) => {
+          setProfileUserId(null);
+          setBattleTargetUserId(targetUserId);
+          setShowBattles(true);
+        }}
       />
     );
   }
@@ -365,6 +384,19 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
           </div>
           <p className="welcome-subtitle">Test your football knowledge & climb the ranks</p>
         </section>
+
+        <button
+          type="button"
+          className="home-battle-entry"
+          onClick={() => setShowBattles(true)}
+        >
+          <span className="home-battle-emblem"><Swords size={23} /></span>
+          <span className="home-battle-copy">
+            <strong>1v1 Battle</strong>
+            <span>Challenge a player · win 150 Footy Coins</span>
+          </span>
+          <ChevronRight size={19} />
+        </button>
 
         {/* Today's Quiz Section */}
         <section className="quiz-section">

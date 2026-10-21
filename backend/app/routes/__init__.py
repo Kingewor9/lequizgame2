@@ -5,6 +5,7 @@ from app.routes.coins import coins_bp
 from app.routes.user import user_bp
 from app.routes.admin import admin_bp
 from app.routes.tournament import tournament_bp
+from app.routes.battle import battle_bp
 
 
 def register_blueprints(app):
@@ -16,3 +17,4 @@ def register_blueprints(app):
     app.register_blueprint(user_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(tournament_bp)
+    app.register_blueprint(battle_bp)

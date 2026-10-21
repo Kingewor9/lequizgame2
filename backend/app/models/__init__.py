@@ -414,6 +414,35 @@ class TournamentSubmission(Document):
         }
 
 
+class Battle(Document):
+    """A one-to-one challenge scored from main-game quiz results over 24 hours."""
+    meta = {
+        'collection': 'battles',
+        'indexes': [
+            ['challenger_id', 'status', 'started_at'],
+            ['opponent_id', 'status', 'started_at'],
+            ['status', 'expires_at'],
+        ],
+    }
+
+    id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
+    challenger_id = StringField(required=True)
+    opponent_id = StringField(required=True)
+    status = StringField(
+        default='pending',
+        choices=('pending', 'active', 'completed', 'declined', 'expired'),
+    )
+    challenged_at = DateTimeField(default=datetime.utcnow)
+    started_at = DateTimeField(null=True, default=None)
+    expires_at = DateTimeField(null=True, default=None)
+    challenger_score = IntField(default=0)
+    opponent_score = IntField(default=0)
+    winner_id = StringField()
+    coins_awarded = IntField(default=0)
+    completed_at = DateTimeField(null=True, default=None)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+
 class League(Document):
     """League model"""
     # ── Only ONE meta block ──────────────────────────────────────────────────

@@ -35,6 +35,42 @@ export interface User {
   created_at: string;
   updated_at: string;
   is_admin?: boolean;
+  battle_record?: BattleRecord;
+}
+
+export interface BattleRecord {
+  played: number;
+  won: number;
+  lost: number;
+  drawn: number;
+}
+
+export interface BattlePlayer {
+  id: string;
+  name: string;
+  username?: string;
+  photo_url?: string;
+}
+
+export type BattleStatus = 'pending' | 'active' | 'completed' | 'declined' | 'expired';
+
+export interface Battle {
+  id: string;
+  status: BattleStatus;
+  challenger: BattlePlayer | null;
+  opponent: BattlePlayer | null;
+  challenger_score: number;
+  opponent_score: number;
+  my_score: number;
+  their_score: number;
+  winner_id?: string | null;
+  coins_awarded: number;
+  challenged_at: string;
+  started_at?: string | null;
+  expires_at?: string | null;
+  completed_at?: string | null;
+  is_challenger: boolean;
+  can_respond: boolean;
 }
 
 export interface TelegramLoginResponse extends User {

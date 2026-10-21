@@ -196,6 +196,21 @@ def init_scheduler(app):
         id='tournament_season_scheduler',
         replace_existing=True,
     )
+
+    def sync_battles_job():
+        with app.app_context():
+            from app.services.battle_service import sync_battles
+
+            sync_battles()
+
+    scheduler.add_job(
+        sync_battles_job,
+        'interval',
+        minutes=1,
+        timezone='UTC',
+        id='one_v_one_battle_scheduler',
+        replace_existing=True,
+    )
     
     if not scheduler.running:
         scheduler.start()

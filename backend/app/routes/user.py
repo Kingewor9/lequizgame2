@@ -9,6 +9,7 @@ from app.models import (
     MilestoneAchievement,
     TournamentAward,
     UserLeague,
+    Battle,
 )
 from app.utils import (
     calculate_global_rank,
@@ -172,6 +173,28 @@ def get_user(user_id):
             user_id=user_id,
             place=1,
         ).count()
+        completed_battles = Battle.objects(
+            status='completed',
+            __raw__={
+                '$or': [
+                    {'challenger_id': user_id},
+                    {'opponent_id': user_id},
+                ]
+            },
+        )
+        battle_wins = battle_draws = 0
+        battle_played = completed_battles.count()
+        for battle in completed_battles:
+            if battle.winner_id is None:
+                battle_draws += 1
+            elif battle.winner_id == user_id:
+                battle_wins += 1
+        user_dict['battle_record'] = {
+            'played': battle_played,
+            'won': battle_wins,
+            'lost': battle_played - battle_wins - battle_draws,
+            'drawn': battle_draws,
+        }
         
         return jsonify(format_success(data=user_dict)), 200
     

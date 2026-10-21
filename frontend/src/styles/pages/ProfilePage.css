@@ -258,6 +258,70 @@
 
 .profile-milestone-foot strong {
   color: var(--text-primary);
+}
+
+.profile-battle-record {
+  padding: 18px;
+  border-color: rgba(223, 255, 0, 0.16);
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(223, 255, 0, 0.08), transparent 48%),
+    var(--surface-card);
+}
+
+.profile-battle-record .profile-section-heading > svg {
+  color: var(--volt-yellow, #dfff00);
+}
+
+.profile-battle-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.profile-battle-stats > div {
+  display: flex;
+  min-height: 63px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.profile-battle-stats strong {
+  color: #f2f6f2;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.profile-battle-stats span {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.profile-challenge-button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 43px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(223, 255, 0, 0.32);
+  border-radius: 12px;
+  background: rgba(223, 255, 0, 0.09);
+  color: var(--volt-yellow, #dfff00);
+  font-size: 0.78rem;
+  font-weight: 800;
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.profile-challenge-button:hover {
+  transform: translateY(-1px);
+  background: rgba(223, 255, 0, 0.15);
   font-weight: 800;
 }
 

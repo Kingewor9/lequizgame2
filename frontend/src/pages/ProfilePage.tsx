@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Award, ChevronLeft, Crown, Medal, Shield, Trophy } from 'lucide-react';
+import { Award, ChevronLeft, Crown, Medal, Shield, Swords, Trophy } from 'lucide-react';
 import { Loading } from '../components/Loading';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/apiService';
@@ -10,14 +10,21 @@ import '../styles/pages/ProfilePage.css';
 interface PlayerProfile extends User {
   league_wins: number;
   tournament_wins: number;
+  battle_record: {
+    played: number;
+    won: number;
+    lost: number;
+    drawn: number;
+  };
 }
 
 interface Props {
   userId: string;
   onBack: () => void;
+  onChallenge: (userId: string) => void;
 }
 
-export const ProfilePage: React.FC<Props> = ({ userId, onBack }) => {
+export const ProfilePage: React.FC<Props> = ({ userId, onBack, onChallenge }) => {
   const { user: currentUser } = useAuth();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -191,6 +198,31 @@ export const ProfilePage: React.FC<Props> = ({ userId, onBack }) => {
             <span>Every milestone achieved. You&apos;re a Legend.</span>
           )}
         </div>
+      </section>
+
+      <section className="profile-battle-record card">
+        <div className="profile-section-heading">
+          <div>
+            <span className="profile-eyebrow">HEAD-TO-HEAD</span>
+            <h2>1v1 Battle record</h2>
+          </div>
+          <Swords size={20} />
+        </div>
+        <div className="profile-battle-stats">
+          <div><strong>{profile.battle_record?.played || 0}</strong><span>Played</span></div>
+          <div><strong>{profile.battle_record?.won || 0}</strong><span>Won</span></div>
+          <div><strong>{profile.battle_record?.lost || 0}</strong><span>Lost</span></div>
+          <div><strong>{profile.battle_record?.drawn || 0}</strong><span>Drawn</span></div>
+        </div>
+        {currentUser?.id !== profile.id && (
+          <button
+            className="profile-challenge-button"
+            onClick={() => onChallenge(profile.id)}
+          >
+            <Swords size={17} />
+            Challenge this player
+          </button>
+        )}
       </section>
 
       <section className="profile-achievements">
