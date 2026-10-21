@@ -1,5 +1,6 @@
-import { useCallback, ReactElement } from 'react';
+import { useCallback, ReactElement, useState } from 'react';
 import { useMonetag } from '../hooks/useMonetag';
+import '../styles/components/ShowAdButton.css';
 
 export interface ShowAdButtonProps {
   onReward?: () => void | Promise<void>;
@@ -30,24 +31,31 @@ export function ShowAdButton({
   children = 'Watch & Earn',
 }: ShowAdButtonProps): ReactElement {
   const { showAd, isReady } = useMonetag();
+  const [isAdPlaying, setIsAdPlaying] = useState(false);
 
   const handleClick = useCallback(async () => {
+    if (disabled || isLoading || isAdPlaying || !isReady) return;
+
+    setIsAdPlaying(true);
     try {
       await showAd();
       await onReward?.();
     } catch (error) {
       onError?.(error);
+    } finally {
+      setIsAdPlaying(false);
     }
-  }, [onError, onReward, showAd]);
+  }, [disabled, isAdPlaying, isLoading, isReady, onError, onReward, showAd]);
 
   return (
     <button
       onClick={handleClick}
-      disabled={disabled || isLoading || !isReady}
+      disabled={disabled || isLoading || isAdPlaying || !isReady}
+      aria-busy={isLoading || isAdPlaying}
       className={`show-ad-button ${className}`.trim()}
       aria-label="Watch advertisement to earn coins"
     >
-      {isLoading ? 'Loading Ad...' : children}
+      {isLoading ? 'Loading Ad...' : isAdPlaying ? 'Ad in progress...' : children}
     </button>
   );
 }

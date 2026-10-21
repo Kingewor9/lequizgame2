@@ -25,6 +25,8 @@ class User(Document):
     global_rank = IntField(default=0)
     prev_global_rank = IntField(default=0)
     global_total_players = IntField(default=0)
+    leaderboard_booster_day = StringField(default='')
+    leaderboard_booster_quiz_ids = ListField(StringField(), default=list)
     footy_coins = IntField(default=0)
     welcome_bonus_claimed = BooleanField(default=False)
     referral_code = StringField(unique=True, sparse=True)
@@ -310,6 +312,8 @@ class QuizResponse(Document):
     points_earned = IntField()
     accuracy_rate = IntField()
     time_taken_seconds = IntField()
+    leaderboard_bonus = IntField(default=0)
+    leaderboard_boosted_at = DateTimeField(null=True, default=None)
 
     answers = ListField(EmbeddedDocumentField(QuizAnswer))
 
@@ -327,6 +331,11 @@ class QuizResponse(Document):
             'points_earned': self.points_earned,
             'accuracy_rate': self.accuracy_rate,
             'time_taken_seconds': self.time_taken_seconds,
+            'leaderboard_bonus': self.leaderboard_bonus,
+            'leaderboard_boosted_at': (
+                self.leaderboard_boosted_at.isoformat() + 'Z'
+                if self.leaderboard_boosted_at else None
+            ),
             'answers': [a.to_dict() for a in self.answers] if self.answers else [],
             'completed_at': self.completed_at.isoformat() + 'Z',
             'created_at': self.created_at.isoformat() + 'Z',

@@ -100,6 +100,27 @@ def update_global_rankings():
         current_app.logger.exception('Could not update global quiz rankings')
 
 
+def _leaderboard_booster_status(user, quiz, response, now=None):
+    now = now or datetime.utcnow()
+    today = now.date().isoformat()
+    uses_today = (
+        len(getattr(user, 'leaderboard_booster_quiz_ids', []) or [])
+        if getattr(user, 'leaderboard_booster_day', '') == today
+        else 0
+    )
+    bonus = getattr(response, 'leaderboard_bonus', 0) or 0
+    return {
+        'available': (
+            getattr(quiz, 'destination', 'game') != 'tournament'
+            and response.points_earned > 0
+            and bonus == 0
+            and uses_today < 3
+        ),
+        'uses_remaining': max(0, 3 - uses_today),
+        'bonus_points': bonus,
+    }
+
+
 @quiz_bp.route('/today', methods=['GET'])
 @jwt_required()
 def get_today_quiz():
@@ -227,8 +248,15 @@ def submit_quiz(quiz_id):
             quiz_id=quiz_id,
         ).first()
         if existing_response:
+            result = existing_response.to_dict()
+            if not is_tournament_quiz:
+                user = User.objects(id=user_id).first()
+                if user:
+                    result['leaderboard_booster'] = _leaderboard_booster_status(
+                        user, quiz, existing_response
+                    )
             return jsonify(format_success(
-                data=existing_response.to_dict(),
+                data=result,
                 message='Quiz submitted successfully',
             )), 200
 
@@ -434,6 +462,9 @@ def submit_quiz(quiz_id):
         update_global_rankings()
 
         result_dict = response.to_dict()
+        result_dict['leaderboard_booster'] = _leaderboard_booster_status(
+            user, quiz, response
+        )
         print(f"[DEBUG] Returning result: {result_dict}")
         
         return jsonify(format_success(
@@ -444,3 +475,170 @@ def submit_quiz(quiz_id):
     except Exception as e:
         current_app.logger.exception('Error submitting quiz %s', quiz_id)
         return jsonify(format_error(f'Error submitting quiz: {str(e)}')), 500
+
+
+@quiz_bp.route('/<quiz_id>/leaderboard-booster', methods=['POST'])
+@jwt_required()
+def use_leaderboard_booster(quiz_id):
+    """Double a completed main-game quiz's contribution to the global leaderboard."""
+    try:
+        user_id = get_jwt_identity()
+        quiz = Quiz.objects(id=quiz_id).first()
+        if not quiz:
+            return jsonify(format_error('Quiz not found')), 404
+        if getattr(quiz, 'destination', 'game') == 'tournament':
+            return jsonify(format_error('The leaderboard booster is not available for tournament quizzes')), 400
+
+        response = QuizResponse.objects(user_id=user_id, quiz_id=quiz_id).first()
+        if not response:
+            return jsonify(format_error('Complete this quiz before using the leaderboard booster')), 409
+        if response.points_earned <= 0:
+            return jsonify(format_error('A score greater than zero is required to use the leaderboard booster')), 400
+
+        user = User.objects(id=user_id).first()
+        if not user:
+            return jsonify(format_error('User not found')), 404
+
+        if getattr(response, 'leaderboard_bonus', 0):
+            return jsonify(format_success(
+                data={
+                    'leaderboard_bonus': response.leaderboard_bonus,
+                    'leaderboard_score': user.overall_score,
+                    'leaderboard_booster': _leaderboard_booster_status(
+                        user, quiz, response
+                    ),
+                },
+                message='Leaderboard score already doubled for this quiz',
+            )), 200
+
+        now = datetime.utcnow()
+        today = now.date().isoformat()
+        user_collection = User._get_collection()
+        reservation = user_collection.update_one(
+            {
+                '_id': user_id,
+                '$or': [
+                    {
+                        'leaderboard_booster_day': today,
+                        'leaderboard_booster_quiz_ids': {'$ne': quiz_id},
+                        '$expr': {
+                            '$lt': [
+                                {
+                                    '$size': {
+                                        '$ifNull': ['$leaderboard_booster_quiz_ids', []]
+                                    }
+                                },
+                                3,
+                            ]
+                        },
+                    },
+                    {'leaderboard_booster_day': {'$ne': today}},
+                ],
+            },
+            [
+                {
+                    '$set': {
+                        'leaderboard_booster_day': today,
+                        'leaderboard_booster_quiz_ids': {
+                            '$cond': [
+                                {'$eq': ['$leaderboard_booster_day', today]},
+                                {
+                                    '$concatArrays': [
+                                        {
+                                            '$ifNull': [
+                                                '$leaderboard_booster_quiz_ids',
+                                                [],
+                                            ]
+                                        },
+                                        [quiz_id],
+                                    ]
+                                },
+                                [quiz_id],
+                            ]
+                        },
+                    }
+                }
+            ],
+        )
+        if reservation.modified_count != 1:
+            return jsonify(format_error('You have used all 3 leaderboard boosters for today')), 429
+
+        bonus = response.points_earned
+        response_updated = False
+        try:
+            response_updated = QuizResponse.objects(
+                id=response.id,
+                user_id=user_id,
+                leaderboard_bonus=0,
+            ).update_one(
+                set__leaderboard_bonus=bonus,
+                set__leaderboard_boosted_at=now,
+            )
+            if not response_updated:
+                user_collection.update_one(
+                    {'_id': user_id, 'leaderboard_booster_day': today},
+                    {'$pull': {'leaderboard_booster_quiz_ids': quiz_id}},
+                )
+                current_response = QuizResponse.objects(id=response.id).first()
+                if current_response and getattr(current_response, 'leaderboard_bonus', 0):
+                    return jsonify(format_success(
+                        data={
+                            'leaderboard_bonus': current_response.leaderboard_bonus,
+                            'leaderboard_score': user.overall_score,
+                            'leaderboard_booster': _leaderboard_booster_status(
+                                user, quiz, current_response
+                            ),
+                        },
+                        message='Leaderboard score already doubled for this quiz',
+                    )), 200
+                return jsonify(format_error('Could not apply the leaderboard booster. Please try again.')), 409
+
+            score_updated = User.objects(id=user_id).update_one(inc__overall_score=bonus)
+            if not score_updated:
+                QuizResponse.objects(
+                    id=response.id,
+                    user_id=user_id,
+                    leaderboard_bonus=bonus,
+                ).update_one(
+                    set__leaderboard_bonus=0,
+                    unset__leaderboard_boosted_at=1,
+                )
+                user_collection.update_one(
+                    {'_id': user_id, 'leaderboard_booster_day': today},
+                    {'$pull': {'leaderboard_booster_quiz_ids': quiz_id}},
+                )
+                return jsonify(format_error('Could not update the leaderboard score. Please try again.')), 500
+        except Exception:
+            if response_updated:
+                QuizResponse.objects(
+                    id=response.id,
+                    user_id=user_id,
+                    leaderboard_bonus=bonus,
+                ).update_one(
+                    set__leaderboard_bonus=0,
+                    unset__leaderboard_boosted_at=1,
+                )
+            user_collection.update_one(
+                {'_id': user_id, 'leaderboard_booster_day': today},
+                {'$pull': {'leaderboard_booster_quiz_ids': quiz_id}},
+            )
+            raise
+
+        update_global_rankings()
+        user.reload()
+        response.leaderboard_bonus = bonus
+        response.leaderboard_boosted_at = now
+        return jsonify(format_success(
+            data={
+                'leaderboard_bonus': bonus,
+                'leaderboard_score': user.overall_score,
+                'leaderboard_booster': _leaderboard_booster_status(
+                    user, quiz, response, now
+                ),
+            },
+            message='Leaderboard score doubled successfully',
+        )), 200
+
+    except Exception as e:
+        current_app.logger.exception('Error applying leaderboard booster for quiz %s', quiz_id)
+        return jsonify(format_error(f'Error applying leaderboard booster: {str(e)}')), 500

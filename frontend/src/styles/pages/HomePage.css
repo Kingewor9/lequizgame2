@@ -355,6 +355,69 @@
   color: #f8fafc;
 }
 
+.booster-points-note {
+  color: #6ee7b7;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.leaderboard-booster {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(223, 255, 0, 0.32);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(223, 255, 0, 0.12), transparent 55%),
+    rgba(255, 255, 255, 0.035);
+}
+
+.leaderboard-booster-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  color: var(--volt-yellow);
+}
+
+.leaderboard-booster-copy > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.leaderboard-booster-copy > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.leaderboard-booster-copy strong {
+  color: #f8fafc;
+  font-size: 0.92rem;
+}
+
+.leaderboard-booster-copy span {
+  color: #aeb9c9;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.leaderboard-booster-button {
+  width: 100%;
+  border: 1px solid rgba(223, 255, 0, 0.55);
+  border-radius: 12px;
+  background: var(--volt-yellow);
+  color: #12170a;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.leaderboard-booster-button:hover:not(:disabled) {
+  border-color: #eaff7a;
+  background: #eaff7a;
+  box-shadow: 0 8px 24px rgba(223, 255, 0, 0.16);
+}
+
 .results-done-btn {
   width: 100%;
   margin-top: 4px;

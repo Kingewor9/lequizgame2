@@ -8,6 +8,7 @@ import { Modal } from '../components/Modal';
 import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
 import { QuizQuestion } from '../components/QuizQuestion';
+import { ShowAdButton } from '../components/ShowAdButton';
 import { LeaderboardPage } from './LeaderboardPage';
 import { ProfilePage } from './ProfilePage';
 import { formatQuizTimer } from '../services/utilService';
@@ -41,6 +42,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizResults, setQuizResults] = useState<QuizResponse | null>(null);
+  const [isBoosterLoading, setIsBoosterLoading] = useState(false);
 
   // ── Fetch today's quizzes ────────────────────────────────────────────────────
   useEffect(() => {
@@ -262,6 +264,30 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
     }
   };
 
+  const handleLeaderboardBoosterReward = async () => {
+    if (!currentQuiz || !quizResults || currentQuiz.destination === 'tournament') return;
+
+    setIsBoosterLoading(true);
+    try {
+      const response = await apiService.post<{
+        leaderboard_bonus: number;
+        leaderboard_booster: NonNullable<QuizResponse['leaderboard_booster']>;
+      }>(`/quizzes/${currentQuiz.id}/leaderboard-booster`, {});
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Could not double your leaderboard points.');
+      }
+
+      setQuizResults((current) => current ? {
+        ...current,
+        leaderboard_bonus: response.data!.leaderboard_bonus,
+        leaderboard_booster: response.data!.leaderboard_booster,
+      } : current);
+      await refreshUser();
+    } finally {
+      setIsBoosterLoading(false);
+    }
+  };
+
   const handleQuizTimeout = () => {
     if (answers.length === 0) {
       setAlert({ message: 'Time limit reached. Quiz ended.', type: 'warning' });
@@ -459,7 +485,14 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
               <div className="result-metric-card">
                 <Sparkles size={18} className="text-amber" />
                 <span className="metric-title">Points</span>
-                <span className="metric-val text-amber">+{quizResults.points_earned}</span>
+                <span className="metric-val text-amber">
+                  +{quizResults.points_earned + (quizResults.leaderboard_bonus || 0)}
+                </span>
+                {(quizResults.leaderboard_bonus || 0) > 0 && (
+                  <span className="booster-points-note">
+                    x2 applied to leaderboard
+                  </span>
+                )}
               </div>
 
               <div className="result-metric-card">
@@ -471,6 +504,35 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
                 </span>
               </div>
             </div>
+
+            {currentQuiz?.destination !== 'tournament' &&
+              quizResults.leaderboard_booster?.available && (
+                <div className="leaderboard-booster">
+                  <div className="leaderboard-booster-copy">
+                    <Sparkles size={20} aria-hidden="true" />
+                    <div>
+                      <strong>Double your leaderboard points</strong>
+                      <span>
+                        Watch a short ad to add {quizResults.points_earned} points to your global score.
+                        {' '}{quizResults.leaderboard_booster.uses_remaining} boosts left today.
+                      </span>
+                    </div>
+                  </div>
+                  <ShowAdButton
+                    className="leaderboard-booster-button"
+                    isLoading={isBoosterLoading}
+                    onReward={handleLeaderboardBoosterReward}
+                    onError={(error) => {
+                      const message = error instanceof Error
+                        ? error.message
+                        : 'The ad could not be completed. Please try again.';
+                      setAlert({ message, type: 'error' });
+                    }}
+                  >
+                    Watch ad to apply x2
+                  </ShowAdButton>
+                </div>
+              )}
 
             <button className="btn-primary results-done-btn" onClick={handleCloseQuizModal}>
               Back to Hub

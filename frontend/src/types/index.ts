@@ -163,6 +163,13 @@ export interface QuizResponse {
   correct_answers: number;
   incorrect_answers: number;
   points_earned: number;
+  leaderboard_bonus?: number;
+  leaderboard_boosted_at?: string | null;
+  leaderboard_booster?: {
+    available: boolean;
+    uses_remaining: number;
+    bonus_points: number;
+  };
   accuracy_rate: number;
   completed_at: string;
   time_taken_seconds: number;
