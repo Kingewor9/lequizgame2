@@ -73,14 +73,19 @@ def _quiz_destination(data, scheduled_for):
     tournament = Tournament.objects(id=tournament_id).first()
     if not tournament:
         return None, None, 'Tournament not found.'
-    if tournament.tournament_type != 'league' or tournament.status in ('draft', 'cancelled', 'completed'):
-        return None, None, 'Tournament quizzes are only available for an active 1v1 league.'
+    if tournament.tournament_type not in ('league', 'group_knockout') or tournament.status in ('draft', 'starting', 'cancelled', 'completed'):
+        return None, None, 'Tournament quizzes are only available for a tournament accepting registrations or in progress.'
 
     quiz_start = scheduled_for or datetime.utcnow()
     if quiz_start < tournament.start_at:
         return None, None, 'Schedule this quiz at or after the tournament start date.'
     gameweek = int((quiz_start - tournament.start_at).total_seconds() // 86400) + 1
-    max_gameweeks = tournament.total_gameweeks if tournament.status == 'active' else 38
+    max_gameweeks = (
+        tournament.total_gameweeks
+        if tournament.status == 'active'
+        else 10 if tournament.tournament_type == 'group_knockout'
+        else 38
+    )
     if gameweek > max_gameweeks:
         return None, None, 'The quiz date is outside this tournament season.'
     duplicate = Quiz.objects(
@@ -90,7 +95,7 @@ def _quiz_destination(data, scheduled_for):
         is_active=True,
     ).first()
     if duplicate:
-        return None, None, f'A tournament quiz is already scheduled for GW{gameweek}.'
+        return None, None, f'A tournament quiz is already scheduled for gameweek {gameweek}.'
     return 'tournament', (tournament.id, gameweek), None
 
 def admin_required(fn):
@@ -172,18 +177,17 @@ def create_tournament():
         tournament_type=tournament_type,
         entry_fee=entry_fee,
         place_rewards=place_rewards,
-        max_players=20,
+        max_players=32 if tournament_type == 'group_knockout' else 20,
         start_at=start_at,
-        status='registration' if tournament_type == 'league' else 'draft',
+        total_gameweeks=10 if tournament_type == 'group_knockout' else 38,
+        status='registration',
     )
     try:
         tournament.save()
         return jsonify(format_success(
             data=tournament.to_dict(),
             message=(
-                'Tournament created'
-                if tournament_type == 'league'
-                else 'Group stage + knockout tournament saved as a draft'
+                'Tournament created and registration is open'
             ),
         )), 201
     except Exception as error:

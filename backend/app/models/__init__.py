@@ -198,7 +198,7 @@ class Tournament(Document):
     start_at = DateTimeField(required=True)
     status = StringField(
         default='registration',
-        choices=('registration', 'active', 'completed', 'draft', 'cancelled', 'renewal'),
+        choices=('registration', 'starting', 'cancelling', 'active', 'completed', 'draft', 'cancelled', 'renewal'),
     )
     total_gameweeks = IntField(default=38)
     winner_user_ids = ListField(StringField(), default=list)
@@ -240,6 +240,8 @@ class TournamentRegistration(Document):
     tournament_id = StringField(required=True)
     user_id = StringField(required=True)
     joined_at = DateTimeField(default=datetime.utcnow)
+    group_name = StringField()
+    draw_lot = IntField(default=0)
     renewal_status = StringField(
         default='current',
         choices=('current', 'pending', 'accepted'),
@@ -280,6 +282,11 @@ class TournamentFixture(Document):
     id = StringField(primary_key=True, default=lambda: str(uuid.uuid4()))
     tournament_id = StringField(required=True)
     gameweek = IntField(required=True)
+    stage = StringField(default='league', choices=('league', 'group', 'knockout'))
+    group_name = StringField()
+    round_name = StringField()
+    leg = IntField(default=1)
+    bracket_slot = IntField()
     player_one_id = StringField(required=True)
     player_two_id = StringField()
     scheduled_at = DateTimeField(required=True)
@@ -291,6 +298,7 @@ class TournamentFixture(Document):
     player_two_submitted = BooleanField(default=False)
     winner_user_id = StringField()
     result = StringField(choices=('win', 'draw', 'forfeit', 'bye'))
+    tiebreak_method = StringField()
     result_notification_sent = BooleanField(default=False)
     created_at = DateTimeField(default=datetime.utcnow)
 

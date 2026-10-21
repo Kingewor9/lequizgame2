@@ -67,7 +67,7 @@ export interface Quiz {
 }
 
 export type TournamentType = 'league' | 'group_knockout';
-export type TournamentStatus = 'registration' | 'active' | 'completed' | 'draft' | 'cancelled' | 'renewal';
+export type TournamentStatus = 'registration' | 'starting' | 'cancelling' | 'active' | 'completed' | 'draft' | 'cancelled' | 'renewal';
 
 export interface Tournament {
   id: string;
@@ -104,9 +104,15 @@ export interface TournamentPlayer {
 export interface TournamentFixture {
   id: string;
   gameweek: number;
-  scheduled_at: string;
-  closes_at: string;
-  status: 'scheduled' | 'completed' | 'bye';
+  stage?: 'league' | 'group' | 'knockout';
+  group_name?: string | null;
+  round_name?: string | null;
+  leg?: number;
+  bracket_slot?: number | null;
+  tiebreak_method?: string | null;
+  scheduled_at: string | null;
+  closes_at: string | null;
+  status: 'scheduled' | 'completed' | 'bye' | 'pending';
   result?: 'win' | 'draw' | 'forfeit' | 'bye' | null;
   winner_user_id?: string | null;
   player: TournamentPlayer | null;
@@ -117,10 +123,22 @@ export interface TournamentFixture {
   opponent_submitted: boolean;
 }
 
+export interface TournamentGroup {
+  name: string;
+  standings: TournamentStanding[];
+}
+
+export interface TournamentBracketRound {
+  name: string;
+  gameweek: number;
+  fixtures: TournamentFixture[];
+}
+
 export interface TournamentStanding {
   user_id: string;
   name: string;
   photo_url?: string;
+  group_name?: string;
   rank: number;
   points: number;
   matches_played: number;

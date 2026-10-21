@@ -21,7 +21,15 @@ import { Modal } from '../components/Modal';
 import { QuizCard } from '../components/QuizCard';
 import { QuizQuestion } from '../components/QuizQuestion';
 import { apiService } from '../services/apiService';
-import { Quiz, QuizResponse, Tournament, TournamentFixture, TournamentStanding } from '../types';
+import {
+  Quiz,
+  QuizResponse,
+  Tournament,
+  TournamentBracketRound,
+  TournamentFixture,
+  TournamentGroup,
+  TournamentStanding,
+} from '../types';
 import '../styles/pages/TournamentPage.css';
 
 interface TournamentDetail {
@@ -33,6 +41,9 @@ interface TournamentDetail {
   fixtures: TournamentFixture[];
   standings: TournamentStanding[];
   user_standing: TournamentStanding | null;
+  groups: TournamentGroup[];
+  road_to_final: TournamentBracketRound[];
+  final_standings: TournamentStanding[];
 }
 
 interface TournamentAnswer {
@@ -42,7 +53,7 @@ interface TournamentAnswer {
   isCorrect: boolean;
 }
 
-type TournamentScreen = 'list' | 'game' | 'fixtures' | 'table';
+type TournamentScreen = 'list' | 'game' | 'fixtures' | 'table' | 'bracket';
 
 const formatDate = (value: string) => new Date(value).toLocaleString([], {
   dateStyle: 'medium',
@@ -91,17 +102,34 @@ const ProfileImage: React.FC<{ name: string; photoUrl?: string; className?: stri
   </div>
 );
 
-const formatRules = (
+const formatRules = (tournamentType: Tournament['tournament_type']) => (
   <div className="tournament-rules">
-    <p>Every season has up to 20 registered players and is scheduled to begin on the date set by the admin.</p>
-    <ol>
-      <li>Fixtures are generated as a double round-robin. With 20 players, that is 38 daily gameweeks.</li>
-      <li>Each gameweek, both opponents receive the same tournament quiz and have until it closes to submit once.</li>
-      <li>The player with the higher quiz score wins 3 league points. A tied score earns each player 1 point.</li>
-      <li>If only one opponent submits, that player wins by forfeit (3 points); if neither submits, no league points are awarded.</li>
-      <li>Quiz points stay separate from main-game and private-league scores. Standings use league points, then quiz point difference.</li>
-      <li>After the final gameweek, the season ends and the highest-ranked player(s) are announced as champion(s). Configured place prizes are credited automatically; tied players each receive the full reward for their place.</li>
-    </ol>
+    {tournamentType === 'group_knockout' ? (
+      <>
+        <p>The competition opens with 32 players split randomly into eight groups of four. Registration closes at the scheduled start; if all 32 places are not filled, the tournament is cancelled and entry fees are refunded.</p>
+        <ol>
+          <li>Each group plays a home-and-away round robin: six fixtures per player across six daily quiz rounds.</li>
+          <li>Group points are awarded for each fixture: 3 for a win, 1 for a draw, and 0 for a loss or a match with no submissions.</li>
+          <li>Group ranking is decided by points, quiz-point difference, quiz points scored, head-to-head points, then a pre-drawn lot. The top two players in each group advance.</li>
+          <li>The Round of 16 pairs group winners with runners-up by random draw. Players from the same group cannot meet in this round.</li>
+          <li>The Round of 16, quarter-finals, semi-finals, and final are all single-match eliminations. Higher quiz score advances; ties are broken by accuracy, then faster completion, then a draw lot.</li>
+          <li>Complete the tournament quiz for your fixture before it closes. A single submission wins by forfeit; if neither player submits a knockout quiz, a draw lot decides who advances.</li>
+          <li>Tournament quiz scores affect tournament results only, not your main-game leaderboard or private leagues. Configured prizes are credited automatically after the final.</li>
+        </ol>
+      </>
+    ) : (
+      <>
+        <p>Every season has up to 20 registered players and is scheduled to begin on the date set by the admin.</p>
+        <ol>
+          <li>Fixtures are generated as a double round-robin. With 20 players, that is 38 daily gameweeks.</li>
+          <li>Each gameweek, both opponents receive the same tournament quiz and have until it closes to submit once.</li>
+          <li>The player with the higher quiz score wins 3 league points. A tied score earns each player 1 point.</li>
+          <li>If only one opponent submits, that player wins by forfeit (3 points); if neither submits, no league points are awarded.</li>
+          <li>Quiz points stay separate from main-game and private-league scores. Standings use league points, then quiz point difference.</li>
+          <li>After the final gameweek, the season ends and the highest-ranked player(s) are announced as champion(s). Configured place prizes are credited automatically; tied players each receive the full reward for their place.</li>
+        </ol>
+      </>
+    )}
   </div>
 );
 
@@ -123,6 +151,7 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
   const [isQuizLoading, setIsQuizLoading] = useState(false);
   const [alert, setAlert] = useState<{ message: string; type: AlertType } | null>(null);
   const [showRules, setShowRules] = useState(false);
+  const [rulesTournamentType, setRulesTournamentType] = useState<Tournament['tournament_type']>('league');
 
   const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
   const [quizResults, setQuizResults] = useState<QuizResponse | null>(null);
@@ -402,6 +431,13 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
 
   const currentUserStanding = detail?.user_standing;
   const completedFixture = detail?.current_fixture?.status === 'completed';
+  const userEliminated = !!detail && detail.tournament.tournament_type === 'group_knockout'
+    && detail.fixtures.some((fixture) => (
+      fixture.stage === 'knockout'
+      && fixture.status === 'completed'
+      && (fixture.player?.id === user?.id || fixture.opponent?.id === user?.id)
+      && fixture.winner_user_id !== user?.id
+    ));
 
   return (
     <main className={`tournament-page ${screen === 'list' ? 'tournament-page-list' : ''}`}>
@@ -428,7 +464,7 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
           ) : (
             <section className="tournament-list" aria-label="Available tournaments">
               {tournaments.map((tournament, index) => {
-                const supported = tournament.tournament_type === 'league' && tournament.available;
+                const supported = tournament.available;
                 const isFull = tournament.registered_count >= tournament.max_players;
                 const canRegister = supported && tournament.status === 'registration'
                   && !isFull && !tournament.registered;
@@ -442,6 +478,8 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                       <span className="tournament-card-index">SEASON {String(index + 1).padStart(2, '0')}</span>
                       <span className={`tournament-status tournament-status-${tournament.status}`}>
                         {tournament.status === 'registration' ? 'REGISTRATION OPEN'
+                          : tournament.status === 'starting' ? 'DRAW IN PROGRESS'
+                            : tournament.status === 'cancelling' ? 'CANCELLING'
                           : tournament.status === 'active' ? 'SEASON LIVE'
                             : tournament.status === 'completed' ? 'SEASON COMPLETE'
                               : tournament.status === 'cancelled' ? 'CANCELLED'
@@ -478,7 +516,14 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                     <TournamentPrizeList tournament={tournament} />
                     <div className="tournament-card-actions">
                       {supported ? (
-                        <button type="button" className="tournament-rules-button" onClick={() => setShowRules(true)}>
+                        <button
+                          type="button"
+                          className="tournament-rules-button"
+                          onClick={() => {
+                            setRulesTournamentType(tournament.tournament_type);
+                            setShowRules(true);
+                          }}
+                        >
                           <ShieldCheck size={16} /> View rules
                         </button>
                       ) : (
@@ -535,14 +580,25 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
             <>
               <header className="tournament-detail-header">
                 <span className="tournament-kicker">
-                  {detail.tournament.status === 'active' ? `GAMEWEEK ${detail.current_gameweek} / ${detail.tournament.total_gameweeks}` : 'SEASON CENTRE'}
+                  {detail.tournament.status === 'active'
+                    ? detail.tournament.tournament_type === 'group_knockout'
+                      ? `${detail.current_fixture?.round_name || 'TOURNAMENT'} / ROUND ${detail.current_gameweek}`
+                      : `GAMEWEEK ${detail.current_gameweek} / ${detail.tournament.total_gameweeks}`
+                    : 'SEASON CENTRE'}
                 </span>
                 <h1>{detail.tournament.name}</h1>
                 <p>{detail.tournament.description || 'The daily duel league.'}</p>
                 <div className="tournament-detail-meta">
                   <span><Users size={15} /> {detail.tournament.registered_count} players</span>
                   <span><CalendarDays size={15} /> Starts {formatDate(detail.tournament.start_at)}</span>
-                  <button type="button" className="tournament-rules-button" onClick={() => setShowRules(true)}>
+                  <button
+                    type="button"
+                    className="tournament-rules-button"
+                    onClick={() => {
+                      setRulesTournamentType(detail.tournament.tournament_type);
+                      setShowRules(true);
+                    }}
+                  >
                     <ShieldCheck size={15} /> Rules
                   </button>
                 </div>
@@ -564,10 +620,20 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                 </div>
               ) : (
                 <>
-                  <nav className="tournament-subnav" aria-label="Tournament sections">
+                  <nav
+                    className={`tournament-subnav ${detail.tournament.tournament_type === 'group_knockout' ? 'tournament-subnav-groups' : ''}`}
+                    aria-label="Tournament sections"
+                  >
                     <button className={screen === 'game' ? 'active' : ''} onClick={() => setScreen('game')} type="button">Game</button>
                     <button className={screen === 'fixtures' ? 'active' : ''} onClick={() => setScreen('fixtures')} type="button">Fixtures</button>
-                    <button className={screen === 'table' ? 'active' : ''} onClick={() => setScreen('table')} type="button">League table</button>
+                    <button className={screen === 'table' ? 'active' : ''} onClick={() => setScreen('table')} type="button">
+                      {detail.tournament.tournament_type === 'group_knockout' ? 'Groups' : 'League table'}
+                    </button>
+                    {detail.tournament.tournament_type === 'group_knockout' && (
+                      <button className={screen === 'bracket' ? 'active' : ''} onClick={() => setScreen('bracket')} type="button">
+                        Road to final
+                      </button>
+                    )}
                   </nav>
 
                   {screen === 'game' && (
@@ -575,18 +641,45 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                       {detail.tournament.status === 'registration' && (
                         <div className="tournament-waiting-card">
                           <Clock3 size={22} />
-                          <h2>Season starts soon</h2>
-                          <p>Your place is saved. The first fixtures unlock at {formatDate(detail.tournament.start_at)}.</p>
+                          <h2>{detail.tournament.tournament_type === 'group_knockout' ? 'The draw awaits 32 players' : 'Season starts soon'}</h2>
+                          <p>
+                            {detail.tournament.tournament_type === 'group_knockout'
+                              ? `The groups are drawn at ${formatDate(detail.tournament.start_at)}. If all 32 places are not filled, registration fees will be refunded.`
+                              : `Your place is saved. The first fixtures unlock at ${formatDate(detail.tournament.start_at)}.`}
+                          </p>
+                        </div>
+                      )}
+                      {detail.tournament.status === 'cancelled' && (
+                        <div className="tournament-waiting-card tournament-cancelled-card">
+                          <ShieldCheck size={22} />
+                          <h2>Tournament cancelled</h2>
+                          <p>All 32 places were not filled before kick-off. Any entry fee has been refunded.</p>
                         </div>
                       )}
                       {detail.tournament.status === 'active' && (
                         <>
                           <section className="tournament-game-section">
                             <div className="tournament-section-heading">
-                              <span className="tournament-section-kicker">TODAY'S DUEL</span>
-                              <span className="tournament-gameweek-chip">GW {detail.current_gameweek}</span>
+                              <span className="tournament-section-kicker">
+                                {userEliminated
+                                  ? 'TOURNAMENT RUN COMPLETE'
+                                  : detail.tournament.tournament_type === 'group_knockout'
+                                  ? detail.current_fixture?.round_name || 'TOURNAMENT FIXTURE'
+                                  : "TODAY'S DUEL"}
+                              </span>
+                              <span className="tournament-gameweek-chip">
+                                {detail.current_fixture?.group_name
+                                  ? `GROUP ${detail.current_fixture.group_name} · `
+                                  : ''}
+                                GW {detail.current_gameweek}
+                              </span>
                             </div>
-                            {detail.live_quiz ? (
+                            {userEliminated ? (
+                              <div className="tournament-no-quiz">
+                                <Trophy size={20} />
+                                <div><strong>Your knockout run is complete</strong><span>See your final position and follow the remaining teams on the road to the final.</span></div>
+                              </div>
+                            ) : detail.live_quiz ? (
                               <QuizCard
                                 quiz={detail.live_quiz}
                                 onStartClick={startQuiz}
@@ -603,7 +696,11 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                           <section className="tournament-standing-card">
                             <div className="tournament-standing-icon"><ListOrdered size={20} /></div>
                             <div className="tournament-standing-content">
-                              <span className="tournament-section-kicker">YOUR SEASON</span>
+                              <span className="tournament-section-kicker">
+                                {detail.tournament.tournament_type === 'group_knockout'
+                                  ? `YOUR GROUP${currentUserStanding?.group_name ? ` · ${currentUserStanding.group_name}` : ''}`
+                                  : 'YOUR SEASON'}
+                              </span>
                               <div className="tournament-standing-stats">
                                 <span><strong>{currentUserStanding?.points ?? 0}</strong><small>PTS</small></span>
                                 <span><strong>{currentUserStanding?.matches_played ?? 0}</strong><small>MP</small></span>
@@ -612,10 +709,14 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                             </div>
                             <div className="tournament-rank-block">
                               <strong>{currentUserStanding ? `#${currentUserStanding.rank}` : '—'}</strong>
-                              <span>of {detail.tournament.registered_count}</span>
+                              <span>
+                                of {detail.tournament.tournament_type === 'group_knockout'
+                                  ? '4'
+                                  : detail.tournament.registered_count}
+                              </span>
                             </div>
                             <button type="button" className="tournament-inline-link" onClick={() => setScreen('table')}>
-                              View table <ChevronRight size={15} />
+                            {detail.tournament.tournament_type === 'group_knockout' ? 'View groups' : 'View table'} <ChevronRight size={15} />
                             </button>
                           </section>
 
@@ -626,7 +727,12 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                                 {completedFixture ? 'FINAL' : 'TODAY'}
                               </span>
                             </div>
-                            {!detail.current_fixture || !detail.current_fixture.opponent ? (
+                            {userEliminated ? (
+                              <div className="tournament-bye-state">
+                                <span className="tournament-bye-icon"><Trophy size={22} /></span>
+                                <div><strong>Knockout stage complete for you</strong><p>Follow the remaining fixtures in the road to the final.</p></div>
+                              </div>
+                            ) : !detail.current_fixture || !detail.current_fixture.opponent ? (
                               <div className="tournament-bye-state">
                                 <span className="tournament-bye-icon"><CalendarDays size={22} /></span>
                                 <div><strong>Bye week</strong><p>You have no opponent in GW {detail.current_gameweek}. Your next fixture is in the schedule.</p></div>
@@ -651,7 +757,7 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                               </div>
                             )}
                             <button type="button" className="tournament-wide-link" onClick={() => setScreen('fixtures')}>
-                              View previous & upcoming fixtures <ChevronRight size={16} />
+                            View tournament fixtures <ChevronRight size={16} />
                             </button>
                           </section>
                         </>
@@ -665,11 +771,17 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                                 ? 'NEXT SEASON SCHEDULED'
                                 : 'SEASON COMPLETE'}
                             </span>
-                            <h2>{detail.standings[0]?.name || 'Final table published'}</h2>
+                            <h2>
+                              {(detail.tournament.tournament_type === 'group_knockout'
+                                ? detail.final_standings
+                                : detail.standings)[0]?.name || 'Final table published'}
+                            </h2>
                             <p>
                               {detail.tournament.status === 'renewal'
                                 ? `Restart · ${formatDate(detail.tournament.start_at)}`
-                                : `Champion · ${detail.standings[0]?.points ?? 0} league points`}
+                                : detail.tournament.tournament_type === 'group_knockout'
+                                  ? 'Tournament champion · knockout final'
+                                  : `Champion · ${detail.standings[0]?.points ?? 0} league points`}
                             </p>
                           </div>
                           <button type="button" onClick={() => setScreen('table')}>Final table <ChevronRight size={16} /></button>
@@ -681,8 +793,15 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                   {screen === 'fixtures' && (
                     <section className="tournament-fixtures-view">
                       <div className="tournament-page-section-title">
-                        <div><span className="tournament-section-kicker">SEASON SCHEDULE</span><h2>Fixtures</h2></div>
-                        <span>{detail.fixtures.length} gameweeks</span>
+                        <div>
+                          <span className="tournament-section-kicker">SEASON SCHEDULE</span>
+                          <h2>{detail.tournament.tournament_type === 'group_knockout' ? 'All fixtures' : 'Fixtures'}</h2>
+                        </div>
+                        <span>
+                          {detail.tournament.tournament_type === 'group_knockout'
+                            ? `${detail.fixtures.length} matches`
+                            : `${detail.fixtures.length} gameweeks`}
+                        </span>
                       </div>
                       {detail.fixtures.length === 0 ? (
                         <div className="tournament-no-quiz"><Clock3 size={20} /><div><strong>Fixtures are being prepared</strong><span>They will appear when the season starts.</span></div></div>
@@ -691,18 +810,25 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                           {detail.fixtures.map((fixture) => (
                             <article className={`tournament-fixture-row ${fixture.gameweek === detail.current_gameweek ? 'current' : ''}`} key={fixture.id}>
                               <div className="tournament-fixture-row-meta">
-                                <strong>GW {fixture.gameweek}</strong>
+                                <strong>
+                                  {fixture.group_name
+                                    ? `GROUP ${fixture.group_name} · LEG ${fixture.leg || 1}`
+                                    : fixture.round_name || `GW ${fixture.gameweek}`}
+                                </strong>
                                 <span>{fixture.result === 'bye' || fixture.status === 'bye' ? 'Bye' : fixture.status === 'completed' ? fixture.result === 'forfeit' ? 'Forfeit' : fixture.result === 'draw' ? 'Draw' : fixture.result === null ? 'No result' : 'Final' : 'Scheduled'}</span>
-                                <time>{formatDate(fixture.scheduled_at)}</time>
+                                {fixture.scheduled_at && <time>{formatDate(fixture.scheduled_at)}</time>}
                               </div>
                               <div className="tournament-fixture-row-match">
-                                <span>{fixture.player?.name || 'You'}</span>
+                                <span>{fixture.player?.name || 'TBD'}</span>
                                 {fixture.opponent ? (
                                   <>
                                     <strong>{fixture.player_score ?? '—'} <i>:</i> {fixture.opponent_score ?? '—'}</strong>
                                     <span>{fixture.opponent.name}</span>
-                                  </>
-                                ) : <strong className="tournament-bye-label">BYE</strong>}
+                                  </>) : (
+                                  <strong className="tournament-bye-label">
+                                    {fixture.status === 'pending' ? 'VS TBD' : 'BYE'}
+                                  </strong>
+                                )}
                               </div>
                             </article>
                           ))}
@@ -714,10 +840,58 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                   {screen === 'table' && (
                     <section className="tournament-table-view">
                       <div className="tournament-page-section-title">
-                        <div><span className="tournament-section-kicker">SEASON STANDINGS</span><h2>League table</h2></div>
+                        <div>
+                          <span className="tournament-section-kicker">SEASON STANDINGS</span>
+                          <h2>{detail.tournament.tournament_type === 'group_knockout' ? 'Group tables' : 'League table'}</h2>
+                        </div>
                         <span>GW {detail.current_gameweek || '—'} / {detail.tournament.total_gameweeks}</span>
                       </div>
-                      {detail.standings.length === 0 ? (
+                      {detail.tournament.tournament_type === 'group_knockout' ? (
+                        detail.groups.some((group) => group.standings.length > 0) ? (
+                          <div className="tournament-groups-grid">
+                            {detail.groups.map((group) => (
+                              <section className="tournament-group-card" key={group.name}>
+                                <div className="tournament-group-heading">
+                                  <span>GROUP {group.name}</span>
+                                  <small>TOP 2 ADVANCE</small>
+                                </div>
+                                <div className="tournament-group-table-wrap">
+                                  <table className="tournament-group-table">
+                                    <thead>
+                                      <tr><th>Pos</th><th>Player</th><th>Pts</th><th>MP</th><th>GD</th></tr>
+                                    </thead>
+                                    <tbody>
+                                      {group.standings.map((standing) => (
+                                        <tr
+                                          className={`${standing.user_id === user?.id ? 'current-player' : ''} ${standing.rank <= 2 ? 'qualifying' : ''}`}
+                                          key={standing.user_id}
+                                        >
+                                          <td><span className="tournament-position">{standing.rank}</span></td>
+                                          <td className="tournament-table-player">
+                                            <ProfileImage name={standing.name} photoUrl={standing.photo_url} className="small" />
+                                            <strong>{standing.user_id === user?.id ? 'You' : standing.name}</strong>
+                                          </td>
+                                          <td className="standings-points">{standing.points}</td>
+                                          <td>{standing.matches_played}</td>
+                                          <td className={standing.point_difference > 0 ? 'positive' : standing.point_difference < 0 ? 'negative' : ''}>
+                                            {standing.point_difference > 0 ? '+' : ''}{standing.point_difference}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                  {group.standings.length === 0 && <p className="tournament-group-empty">Group draw at kick-off</p>}
+                                </div>
+                              </section>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="tournament-no-quiz">
+                            <ListOrdered size={20} />
+                            <div><strong>Groups are waiting for kick-off</strong><span>All 32 registered players are drawn into eight groups when the tournament begins.</span></div>
+                          </div>
+                        )
+                      ) : detail.standings.length === 0 ? (
                         <div className="tournament-no-quiz"><ListOrdered size={20} /><div><strong>Table is ready for kick-off</strong><span>Standings will update as fixtures are completed.</span></div></div>
                       ) : (
                         <div className="tournament-table-scroll">
@@ -760,6 +934,61 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
                       <p className="tournament-table-note">MP = completed head-to-head fixtures · GW = completed gameweeks, including bye weeks · PD = quiz points for minus quiz points against.</p>
                     </section>
                   )}
+
+                  {screen === 'bracket' && (
+                    <section className="tournament-bracket-view">
+                      <div className="tournament-page-section-title">
+                        <div><span className="tournament-section-kicker">THE ELIMINATION RUN</span><h2>Road to the final</h2></div>
+                        <span>8 → 1 champion</span>
+                      </div>
+                      <p className="tournament-bracket-intro">
+                        Group winners meet runners-up in a random draw. Every knockout is one match; winners advance.
+                      </p>
+                      <div className="tournament-bracket-rounds">
+                        {detail.road_to_final.map((round) => (
+                          <section className="tournament-bracket-round" key={round.name}>
+                            <div className="tournament-bracket-round-heading">
+                              <strong>{round.name}</strong>
+                              <span>GAMEWEEK {round.gameweek}</span>
+                            </div>
+                            <div className={`tournament-bracket-matches tournament-bracket-matches-${round.fixtures.length}`}>
+                              {round.fixtures.map((fixture) => (
+                                <article
+                                  className={`tournament-bracket-match ${fixture.status === 'completed' ? 'complete' : ''}`}
+                                  key={fixture.id}
+                                >
+                                  {[fixture.player, fixture.opponent].map((player, playerIndex) => {
+                                    const score = playerIndex === 0 ? fixture.player_score : fixture.opponent_score;
+                                    const isWinner = !!player && fixture.winner_user_id === player.id;
+                                    return (
+                                      <div className={`tournament-bracket-player ${isWinner ? 'winner' : ''}`} key={`${fixture.id}-${playerIndex}`}>
+                                        <ProfileImage
+                                          name={player?.name || 'TBD'}
+                                          photoUrl={player?.photo_url}
+                                          className="small"
+                                        />
+                                        <strong>{player?.name || 'Awaiting qualifier'}</strong>
+                                        <span>{player ? score ?? '—' : '—'}</span>
+                                      </div>
+                                    );
+                                  })}
+                                  <small className="tournament-bracket-status">
+                                    {fixture.status === 'completed'
+                                      ? fixture.tiebreak_method === 'draw_lots' || fixture.tiebreak_method === 'double_forfeit_draw'
+                                        ? 'DECIDED BY DRAW LOT'
+                                        : fixture.tiebreak_method
+                                          ? `ADVANCED · ${fixture.tiebreak_method.toUpperCase()} TIE-BREAK`
+                                          : 'ADVANCED'
+                                      : fixture.status === 'scheduled' ? 'SINGLE-LEG TIE' : 'PENDING'}
+                                  </small>
+                                </article>
+                              ))}
+                            </div>
+                          </section>
+                        ))}
+                      </div>
+                    </section>
+                  )}
                 </>
               )}
             </>
@@ -769,8 +998,12 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
         </section>
       )}
 
-      <Modal isOpen={showRules} onClose={() => setShowRules(false)} title="1v1 league rules">
-        {formatRules}
+      <Modal
+        isOpen={showRules}
+        onClose={() => setShowRules(false)}
+        title={rulesTournamentType === 'group_knockout' ? 'Group + knockout rules' : '1v1 league rules'}
+      >
+        {formatRules(rulesTournamentType)}
       </Modal>
 
       <Modal

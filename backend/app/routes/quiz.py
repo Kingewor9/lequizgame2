@@ -57,6 +57,12 @@ def _tournament_quiz_available(quiz, user_id):
     fixture = TournamentFixture.objects(
         tournament_id=tournament.id,
         gameweek=current_gameweek,
+        status='scheduled',
+        **(
+            {'player_two_id__ne': None}
+            if tournament.tournament_type == 'group_knockout'
+            else {}
+        ),
         __raw__={
             '$or': [
                 {'player_one_id': user_id},

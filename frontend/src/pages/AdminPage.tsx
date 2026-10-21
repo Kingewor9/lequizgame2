@@ -809,7 +809,7 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             setAlert({
                 message: tournamentType === 'league'
                     ? 'Tournament created. Registration closes at its scheduled start time.'
-                    : 'Tournament saved as a draft. Group and knockout rules are not enabled yet.',
+                    : 'Tournament created with 32 places. Registration closes at kick-off; entry fees are refunded if all places are not filled.',
                 type: 'success',
             });
             setName('');
@@ -1082,7 +1082,7 @@ const AdminTournamentPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         <span className="input-hint">
                             {tournamentType === 'league'
                                 ? 'League registration supports up to 20 players and starts automatically at the date below.'
-                                : 'This format is saved as an unavailable draft until its rules and bracket are defined.'}
+                                : 'Exactly 32 players are required. Registration closes at kick-off; the tournament is cancelled and entry fees refunded if fewer than 32 join.'}
                         </span>
                     </div>
                     <div className="settings-grid">

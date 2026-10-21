@@ -13,7 +13,14 @@ from app.models import (
     User,
 )
 from app.services.telegram_service import get_telegram_service
-from app.services.tournament_service import calculate_standings, sync_tournament
+from app.services.tournament_service import (
+    GROUP_NAMES,
+    KNOCKOUT_ROUNDS,
+    calculate_group_knockout_final_standings,
+    calculate_standings,
+    refund_tournament_registrations,
+    sync_tournament,
+)
 from app.utils import format_error, format_success, generate_id
 
 
@@ -37,6 +44,11 @@ def _fixture_for_user(fixture, user_id):
     return {
         'id': fixture.id,
         'gameweek': fixture.gameweek,
+        'stage': fixture.stage,
+        'group_name': fixture.group_name,
+        'round_name': fixture.round_name,
+        'leg': fixture.leg,
+        'bracket_slot': fixture.bracket_slot,
         'scheduled_at': fixture.scheduled_at.isoformat() + 'Z',
         'closes_at': fixture.closes_at.isoformat() + 'Z',
         'status': fixture.status,
@@ -69,6 +81,112 @@ def _fixture_for_user(fixture, user_id):
         'player_submitted': own_submission is not None,
         'opponent_submitted': opponent_submission is not None,
     }
+
+
+def _fixture_for_group_tournament(fixture, users, submissions):
+    player_one = users.get(fixture.player_one_id)
+    player_two = users.get(fixture.player_two_id) if fixture.player_two_id else None
+    first_submission = submissions.get((fixture.gameweek, fixture.player_one_id))
+    second_submission = (
+        submissions.get((fixture.gameweek, fixture.player_two_id))
+        if fixture.player_two_id else None
+    )
+
+    def serialize_player(player):
+        return {
+            'id': player.id,
+            'name': ' '.join(filter(None, [player.first_name, player.last_name])),
+            'photo_url': player.photo_url,
+        } if player else None
+
+    return {
+        'id': fixture.id,
+        'gameweek': fixture.gameweek,
+        'stage': fixture.stage,
+        'group_name': fixture.group_name,
+        'round_name': fixture.round_name,
+        'leg': fixture.leg,
+        'bracket_slot': fixture.bracket_slot,
+        'scheduled_at': fixture.scheduled_at.isoformat() + 'Z',
+        'closes_at': fixture.closes_at.isoformat() + 'Z',
+        'status': fixture.status,
+        'result': fixture.result,
+        'winner_user_id': fixture.winner_user_id,
+        'tiebreak_method': fixture.tiebreak_method,
+        'player': serialize_player(player_one),
+        'opponent': serialize_player(player_two),
+        'player_score': (
+            first_submission.points_earned if first_submission
+            else fixture.player_one_score if fixture.status == 'completed'
+            else None
+        ),
+        'opponent_score': (
+            second_submission.points_earned if second_submission
+            else fixture.player_two_score if fixture.status == 'completed'
+            else None
+        ),
+        'player_submitted': first_submission is not None,
+        'opponent_submitted': second_submission is not None,
+    }
+
+
+def _group_standings_by_name(tournament, standings):
+    rows_by_group = {group_name: [] for group_name in GROUP_NAMES}
+    for row in standings:
+        rows_by_group[row['group_name']].append({
+            key: value for key, value in row.items()
+            if key not in ('draw_lot', 'head_to_head_points')
+        })
+    return [
+        {'name': group_name, 'standings': rows_by_group[group_name]}
+        for group_name in GROUP_NAMES
+    ]
+
+
+def _road_to_final(tournament, users, submissions):
+    rounds = []
+    for round_name, gameweek, match_count in KNOCKOUT_ROUNDS:
+        stored_fixtures = list(TournamentFixture.objects(
+            tournament_id=tournament.id,
+            stage='knockout',
+            round_name=round_name,
+        ).order_by('bracket_slot'))
+        fixtures_by_slot = {
+            fixture.bracket_slot: fixture for fixture in stored_fixtures
+        }
+        matches = []
+        for slot in range(1, match_count + 1):
+            fixture = fixtures_by_slot.get(slot)
+            if fixture:
+                matches.append(_fixture_for_group_tournament(fixture, users, submissions))
+            else:
+                matches.append({
+                    'id': f'{round_name}:{slot}',
+                    'gameweek': gameweek,
+                    'stage': 'knockout',
+                    'group_name': None,
+                    'round_name': round_name,
+                    'leg': 1,
+                    'bracket_slot': slot,
+                    'scheduled_at': None,
+                    'closes_at': None,
+                    'status': 'pending',
+                    'result': None,
+                    'winner_user_id': None,
+                    'tiebreak_method': None,
+                    'player': None,
+                    'opponent': None,
+                    'player_score': None,
+                    'opponent_score': None,
+                    'player_submitted': False,
+                    'opponent_submitted': False,
+                })
+        rounds.append({
+            'name': round_name,
+            'gameweek': gameweek,
+            'fixtures': matches,
+        })
+    return rounds
 
 
 def _unanswered_quiz_count(tournament, user_id, now):
@@ -125,7 +243,10 @@ def list_tournaments():
         user_id = get_jwt_identity()
         now = datetime.utcnow()
         tournaments = Tournament.objects(
-            status__in=['registration', 'active', 'completed', 'cancelled', 'draft', 'renewal']
+            status__in=[
+                'registration', 'starting', 'cancelling', 'active',
+                'completed', 'cancelled', 'draft', 'renewal',
+            ]
         ).order_by('start_at')
         registrations = {
             registration.tournament_id
@@ -135,7 +256,7 @@ def list_tournaments():
         for tournament in tournaments:
             item = tournament.to_dict()
             item['registered'] = tournament.id in registrations
-            item['available'] = tournament.tournament_type == 'league'
+            item['available'] = tournament.tournament_type in ('league', 'group_knockout')
             item['registered_count'] = TournamentRegistration.objects(
                 tournament_id=tournament.id
             ).count()
@@ -288,6 +409,9 @@ def get_tournament(tournament_id):
             gameweek = tournament.total_gameweeks
 
         fixtures = []
+        group_fixtures = []
+        group_fixture_users = {}
+        group_fixture_submissions = {}
         current_fixture = None
         quiz_data = None
         if registration and tournament.status in ('active', 'completed', 'renewal'):
@@ -300,13 +424,57 @@ def get_tournament(tournament_id):
                     ],
                 },
             ).order_by('gameweek')
-            fixtures = [_fixture_for_user(fixture, user_id) for fixture in user_fixtures]
+            fixtures = (
+                []
+                if tournament.tournament_type == 'group_knockout'
+                else [_fixture_for_user(fixture, user_id) for fixture in user_fixtures]
+            )
+            if tournament.tournament_type == 'group_knockout':
+                group_fixtures = list(TournamentFixture.objects(
+                    tournament_id=tournament.id
+                ).order_by('gameweek', 'group_name', 'bracket_slot'))
+                participant_ids = {
+                    player_id
+                    for fixture in group_fixtures
+                    for player_id in (fixture.player_one_id, fixture.player_two_id)
+                    if player_id
+                }
+                group_fixture_users = {
+                    player.id: player
+                    for player in User.objects(id__in=list(participant_ids))
+                }
+                group_fixture_submissions = {
+                    (submission.gameweek, submission.user_id): submission
+                    for submission in TournamentSubmission.objects(
+                        tournament_id=tournament.id
+                    )
+                }
+                fixtures = [
+                    _fixture_for_group_tournament(
+                        fixture,
+                        group_fixture_users,
+                        group_fixture_submissions,
+                    )
+                    for fixture in group_fixtures
+                ]
             current_fixture = next(
-                (fixture for fixture in fixtures if fixture['gameweek'] == gameweek),
+                (
+                    _fixture_for_user(fixture, user_id)
+                    for fixture in user_fixtures
+                    if fixture.gameweek == gameweek
+                ),
                 None,
             )
 
-            if tournament.status == 'active' and gameweek:
+            has_playable_fixture = (
+                tournament.tournament_type != 'group_knockout'
+                or (
+                    current_fixture is not None
+                    and current_fixture['status'] == 'scheduled'
+                    and current_fixture['opponent'] is not None
+                )
+            )
+            if tournament.status == 'active' and gameweek and has_playable_fixture:
                 quiz = Quiz.objects(
                     destination='tournament',
                     tournament_id=tournament.id,
@@ -339,6 +507,26 @@ def get_tournament(tournament_id):
             (row for row in standings if row['user_id'] == user_id),
             None,
         )
+        groups = (
+            _group_standings_by_name(tournament, standings)
+            if tournament.tournament_type == 'group_knockout'
+            else []
+        )
+        road_to_final = (
+            _road_to_final(
+                tournament,
+                group_fixture_users,
+                group_fixture_submissions,
+            )
+            if tournament.tournament_type == 'group_knockout'
+            else []
+        )
+        final_standings = (
+            calculate_group_knockout_final_standings(tournament)
+            if tournament.tournament_type == 'group_knockout'
+                and tournament.status in ('completed', 'renewal')
+            else []
+        )
         return jsonify(format_success(data={
             'tournament': tournament.to_dict(),
             'registered': registration is not None,
@@ -348,6 +536,9 @@ def get_tournament(tournament_id):
             'fixtures': fixtures,
             'standings': standings,
             'user_standing': user_standing,
+            'groups': groups,
+            'road_to_final': road_to_final,
+            'final_standings': final_standings,
         })), 200
     except Exception as error:
         current_app.logger.exception('Could not load tournament %s', tournament_id)
@@ -368,7 +559,7 @@ def register_for_tournament(tournament_id):
     tournament = Tournament.objects(id=tournament_id).first()
     if not tournament:
         return jsonify(format_error('Tournament not found')), 404
-    if tournament.tournament_type != 'league' or tournament.status != 'registration':
+    if tournament.tournament_type not in ('league', 'group_knockout') or tournament.status != 'registration':
         return jsonify(format_error('This tournament is not open for registration')), 409
 
     now = datetime.utcnow()
@@ -420,6 +611,25 @@ def register_for_tournament(tournament_id):
             User.objects(id=user_id).update_one(inc__footy_coins=tournament.entry_fee)
         current_app.logger.exception('Could not register user for tournament')
         return jsonify(format_error(f'Could not complete tournament registration: {error}')), 500
+
+    if tournament.tournament_type == 'group_knockout':
+        tournament.reload()
+        if tournament.status in ('cancelling', 'cancelled'):
+            try:
+                refund_tournament_registrations(tournament, [registration])
+                deleted = TournamentRegistration.objects(id=registration.id).delete()
+                if deleted:
+                    Tournament.objects(id=tournament.id).update_one(dec__registered_count=1)
+            except Exception as error:
+                current_app.logger.exception(
+                    'Could not roll back registration during tournament cancellation'
+                )
+                return jsonify(format_error(
+                    f'Tournament cancellation is in progress; entry refund could not be confirmed: {error}'
+                )), 500
+            return jsonify(format_error(
+                'Registration closed as the tournament start time arrived. Any entry fee has been refunded.'
+            )), 409
 
     admin_telegram_ids = current_app.config.get('ADMIN_TELEGRAM_IDS', [])
     if admin_telegram_ids:

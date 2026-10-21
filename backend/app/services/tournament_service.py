@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import secrets
 
 from flask import current_app
 
@@ -13,6 +14,15 @@ from app.models import (
     User,
 )
 from app.utils import generate_id
+
+
+GROUP_NAMES = tuple('ABCDEFGH')
+KNOCKOUT_ROUNDS = (
+    ('Round of 16', 7, 8),
+    ('Quarter-finals', 8, 4),
+    ('Semi-finals', 9, 2),
+    ('Final', 10, 1),
+)
 
 
 def build_double_round_robin(participant_ids):
@@ -42,6 +52,344 @@ def build_double_round_robin(participant_ids):
     ]
 
 
+def _save_group_fixture(tournament, gameweek, player_one_id, player_two_id, group_name, leg):
+    scheduled_at = tournament.start_at + timedelta(days=gameweek - 1)
+    TournamentFixture(
+        id=generate_id(),
+        tournament_id=tournament.id,
+        gameweek=gameweek,
+        stage='group',
+        group_name=group_name,
+        round_name='Group stage',
+        leg=leg,
+        player_one_id=player_one_id,
+        player_two_id=player_two_id,
+        scheduled_at=scheduled_at,
+        closes_at=scheduled_at + timedelta(days=1),
+        status='scheduled',
+    ).save()
+
+
+def _start_group_knockout_tournament(tournament, now):
+    registrations = list(
+        TournamentRegistration.objects(tournament_id=tournament.id).order_by('joined_at')
+    )
+    if len(registrations) != 32 or tournament.status == 'cancelling':
+        cancelling = Tournament.objects(
+            id=tournament.id,
+            status='registration',
+            start_at__lte=now,
+        ).modify(
+            new=True,
+            set__status='cancelling',
+            set__registered_count=len(registrations),
+            set__updated_at=now,
+        )
+        if not cancelling and tournament.status != 'cancelling':
+            return
+        registrations = list(
+            TournamentRegistration.objects(tournament_id=tournament.id).order_by('joined_at')
+        )
+        if not cancelling or len(registrations) != 32:
+            Tournament.objects(id=tournament.id, status='cancelling').update_one(
+                set__registered_count=len(registrations),
+            )
+            refund_tournament_registrations(tournament, registrations)
+            cancelled = Tournament.objects(
+                id=tournament.id,
+                status='cancelling',
+            ).modify(
+                new=True,
+                set__status='cancelled',
+                set__updated_at=datetime.utcnow(),
+            )
+            if cancelled:
+                _send_to_users(
+                    [registration.user_id for registration in registrations],
+                    f'{tournament.name} was cancelled because all 32 places were not filled. '
+                    'Your entry fee has been refunded.',
+                )
+            return
+
+        starting = Tournament.objects(
+            id=tournament.id,
+            status='cancelling',
+            start_at__lte=now,
+        ).modify(new=True, set__status='starting', set__updated_at=now)
+    else:
+        starting = Tournament.objects(
+            id=tournament.id,
+            status='registration',
+            start_at__lte=now,
+        ).modify(new=True, set__status='starting', set__updated_at=now)
+    if not starting:
+        return
+
+    try:
+        shuffled_registrations = registrations[:]
+        secrets.SystemRandom().shuffle(shuffled_registrations)
+        groups = {
+            group_name: shuffled_registrations[index * 4:(index + 1) * 4]
+            for index, group_name in enumerate(GROUP_NAMES)
+        }
+
+        TournamentFixture.objects(tournament_id=tournament.id).delete()
+        for group_name, group_registrations in groups.items():
+            for registration in group_registrations:
+                registration.group_name = group_name
+                registration.draw_lot = secrets.randbelow(2**31)
+                registration.save()
+
+            schedule = build_double_round_robin(
+                [registration.user_id for registration in group_registrations]
+            )
+            for gameweek, pairings in enumerate(schedule, start=1):
+                leg = 1 if gameweek <= 3 else 2
+                for player_one_id, player_two_id in pairings:
+                    _save_group_fixture(
+                        tournament,
+                        gameweek,
+                        player_one_id,
+                        player_two_id,
+                        group_name,
+                        leg,
+                    )
+
+        tournament.total_gameweeks = 10
+        tournament.registered_count = 32
+        tournament.status = 'active'
+        tournament.updated_at = now
+        tournament.save()
+    except Exception:
+        TournamentFixture.objects(tournament_id=tournament.id).delete()
+        TournamentRegistration.objects(tournament_id=tournament.id).update(
+            unset__group_name=1,
+            set__draw_lot=0,
+        )
+        Tournament.objects(id=tournament.id, status='starting').update_one(
+            set__status='registration',
+            set__updated_at=datetime.utcnow(),
+        )
+        raise
+    try:
+        _send_to_users(
+            [registration.user_id for registration in registrations],
+            f'{tournament.name} starts now. The group stage features six home-and-away rounds.',
+        )
+    except Exception:
+        current_app.logger.exception(
+            'Could not notify players that group tournament %s started',
+            tournament.id,
+        )
+
+
+def _group_fixture_stats(tournament, group_name):
+    registrations = list(TournamentRegistration.objects(
+        tournament_id=tournament.id,
+        group_name=group_name,
+    ))
+    users = {
+        user.id: user
+        for user in User.objects(id__in=[registration.user_id for registration in registrations])
+    }
+    registration_by_id = {registration.user_id: registration for registration in registrations}
+    stats = {
+        registration.user_id: {
+            'points': 0,
+            'matches_played': 0,
+            'gameweeks_played': 0,
+            'wins': 0,
+            'draws': 0,
+            'losses': 0,
+            'points_for': 0,
+            'points_against': 0,
+            'point_difference': 0,
+        }
+        for registration in registrations
+    }
+    fixtures = list(TournamentFixture.objects(
+        tournament_id=tournament.id,
+        stage='group',
+        group_name=group_name,
+        status='completed',
+    ))
+    for fixture in fixtures:
+        first_stats = stats.get(fixture.player_one_id)
+        second_stats = stats.get(fixture.player_two_id)
+        if not first_stats or not second_stats:
+            continue
+        first_stats['gameweeks_played'] += 1
+        second_stats['gameweeks_played'] += 1
+        if fixture.player_one_submitted or fixture.player_two_submitted:
+            first_stats['matches_played'] += 1
+            second_stats['matches_played'] += 1
+        first_stats['points_for'] += fixture.player_one_score
+        first_stats['points_against'] += fixture.player_two_score
+        second_stats['points_for'] += fixture.player_two_score
+        second_stats['points_against'] += fixture.player_one_score
+        if fixture.result == 'draw':
+            first_stats['points'] += 1
+            second_stats['points'] += 1
+            first_stats['draws'] += 1
+            second_stats['draws'] += 1
+        elif fixture.winner_user_id == fixture.player_one_id:
+            first_stats['points'] += 3
+            first_stats['wins'] += 1
+            second_stats['losses'] += 1
+        elif fixture.winner_user_id == fixture.player_two_id:
+            second_stats['points'] += 3
+            second_stats['wins'] += 1
+            first_stats['losses'] += 1
+
+    rows = []
+    for user_id, record in stats.items():
+        record['point_difference'] = record['points_for'] - record['points_against']
+        user = users.get(user_id)
+        if user:
+            rows.append({
+                'user_id': user_id,
+                'name': ' '.join(filter(None, [user.first_name, user.last_name])),
+                'photo_url': user.photo_url,
+                'group_name': group_name,
+                'draw_lot': registration_by_id[user_id].draw_lot,
+                **record,
+            })
+
+    tied_groups = {}
+    for row in rows:
+        primary_record = (
+            row['points'],
+            row['point_difference'],
+            row['points_for'],
+        )
+        tied_groups.setdefault(primary_record, set()).add(row['user_id'])
+    for row in rows:
+        tied_user_ids = tied_groups[(
+            row['points'],
+            row['point_difference'],
+            row['points_for'],
+        )]
+        head_to_head_points = 0
+        if len(tied_user_ids) > 1:
+            for fixture in fixtures:
+                if fixture.player_one_id != row['user_id'] or fixture.player_two_id not in tied_user_ids:
+                    if fixture.player_two_id != row['user_id'] or fixture.player_one_id not in tied_user_ids:
+                        continue
+                if fixture.result == 'draw':
+                    head_to_head_points += 1
+                elif fixture.winner_user_id == row['user_id']:
+                    head_to_head_points += 3
+        row['head_to_head_points'] = head_to_head_points
+
+    rows.sort(key=lambda row: (
+        -row['points'],
+        -row['point_difference'],
+        -row['points_for'],
+        -row['head_to_head_points'],
+        row['draw_lot'],
+        row['name'].lower(),
+    ))
+    for index, row in enumerate(rows, start=1):
+        row['rank'] = index
+    return rows
+
+
+def _round_of_16_pairings(tournament):
+    groups = {
+        group_name: _group_fixture_stats(tournament, group_name)
+        for group_name in GROUP_NAMES
+    }
+    winners = [rows[0] for rows in groups.values() if len(rows) == 4]
+    runners_up = [rows[1] for rows in groups.values() if len(rows) == 4]
+    if len(winners) != 8 or len(runners_up) != 8:
+        raise ValueError('All eight groups must have four teams before knockout qualification')
+
+    rng = secrets.SystemRandom()
+    winner_order = winners[:]
+    rng.shuffle(winner_order)
+
+    def assign_runners(index, remaining):
+        if index == len(winner_order):
+            return []
+        candidates = [
+            runner for runner in remaining
+            if runner['group_name'] != winner_order[index]['group_name']
+        ]
+        rng.shuffle(candidates)
+        for candidate in candidates:
+            remaining_runners = [
+                runner for runner in remaining
+                if runner['user_id'] != candidate['user_id']
+            ]
+            rest = assign_runners(index + 1, remaining_runners)
+            if rest is not None:
+                return [(winner_order[index], candidate), *rest]
+        return None
+
+    pairings = assign_runners(0, runners_up)
+    if pairings is None:
+        raise ValueError('Could not create valid Round of 16 matchups')
+    return pairings
+
+
+def _create_knockout_round(tournament, round_name, gameweek, entrants):
+    scheduled_at = tournament.start_at + timedelta(days=gameweek - 1)
+    for index in range(0, len(entrants), 2):
+        player_one_id, player_two_id = entrants[index:index + 2]
+        TournamentFixture(
+            id=generate_id(),
+            tournament_id=tournament.id,
+            gameweek=gameweek,
+            stage='knockout',
+            round_name=round_name,
+            bracket_slot=(index // 2) + 1,
+            player_one_id=player_one_id,
+            player_two_id=player_two_id,
+            scheduled_at=scheduled_at,
+            closes_at=scheduled_at + timedelta(days=1),
+            status='scheduled',
+        ).save()
+
+
+def _advance_knockout(tournament):
+    for index, (round_name, gameweek, match_count) in enumerate(KNOCKOUT_ROUNDS):
+        round_fixtures = list(TournamentFixture.objects(
+            tournament_id=tournament.id,
+            stage='knockout',
+            round_name=round_name,
+        ).order_by('bracket_slot'))
+        if not round_fixtures:
+            if index == 0:
+                pairings = _round_of_16_pairings(tournament)
+                entrants = [
+                    user_id
+                    for winner, runner_up in pairings
+                    for user_id in (winner['user_id'], runner_up['user_id'])
+                ]
+                _create_knockout_round(tournament, round_name, gameweek, entrants)
+            else:
+                previous_round_name = KNOCKOUT_ROUNDS[index - 1][0]
+                previous_fixtures = list(TournamentFixture.objects(
+                    tournament_id=tournament.id,
+                    stage='knockout',
+                    round_name=previous_round_name,
+                ).order_by('bracket_slot'))
+                if (
+                    len(previous_fixtures) != KNOCKOUT_ROUNDS[index - 1][2]
+                    or any(fixture.status != 'completed' for fixture in previous_fixtures)
+                ):
+                    return
+                entrants = [fixture.winner_user_id for fixture in previous_fixtures]
+                if any(not entrant for entrant in entrants):
+                    raise ValueError(f'{previous_round_name} has a completed match without an advancing player')
+                _create_knockout_round(tournament, round_name, gameweek, entrants)
+            return
+        if len(round_fixtures) != match_count:
+            raise ValueError(f'{round_name} does not contain {match_count} fixtures')
+        if any(fixture.status != 'completed' for fixture in round_fixtures):
+            return
+
+
 def _send_to_users(user_ids, message):
     from app.services.telegram_service import get_telegram_service
 
@@ -55,29 +403,70 @@ def _send_to_users(user_ids, message):
     return get_telegram_service().send_tournament_message(telegram_ids, message)
 
 
-def _refund_registrations(tournament, registrations):
+def refund_tournament_registrations(tournament, registrations):
     for registration in registrations:
-        user = User.objects(id=registration.user_id).modify(
-            new=True,
-            inc__footy_coins=tournament.entry_fee,
-        )
-        if user and tournament.entry_fee:
-            FootyCoinTransaction(
-                id=generate_id(),
-                user_id=user.id,
-                type='reward',
-                amount=tournament.entry_fee,
-                reason=f'Refund: {tournament.name} did not have enough players',
-            ).save()
+        if not tournament.entry_fee:
+            continue
+        try:
+            database = FootyCoinTransaction._get_db()
+            transactions = FootyCoinTransaction._get_collection()
+            users = User._get_collection()
+            with database.client.start_session() as session:
+                def refund_once(transaction_session):
+                    already_refunded = transactions.find_one(
+                        {
+                            'user_id': registration.user_id,
+                            'type': 'reward',
+                            'reason': (
+                                f'Refund: {tournament.name} ({tournament.id}) '
+                                'did not have enough players'
+                            ),
+                        },
+                        session=transaction_session,
+                    )
+                    if already_refunded:
+                        return
+                    updated = users.update_one(
+                        {'_id': registration.user_id},
+                        {'$inc': {'footy_coins': tournament.entry_fee}},
+                        session=transaction_session,
+                    )
+                    if updated.matched_count != 1:
+                        raise ValueError(
+                            f'Could not refund tournament entry for {registration.user_id}'
+                        )
+                    transactions.insert_one({
+                        '_id': generate_id(),
+                        'user_id': registration.user_id,
+                        'type': 'reward',
+                        'amount': tournament.entry_fee,
+                        'reason': (
+                            f'Refund: {tournament.name} ({tournament.id}) '
+                            'did not have enough players'
+                        ),
+                        'created_at': datetime.utcnow(),
+                    }, session=transaction_session)
+
+                session.with_transaction(refund_once)
+        except Exception:
+            current_app.logger.exception(
+                'Could not refund underfilled tournament entry for user %s',
+                registration.user_id,
+            )
+            raise
 
 
 def start_tournament(tournament, now=None):
     now = now or datetime.utcnow()
+    if tournament.tournament_type == 'group_knockout':
+        _start_group_knockout_tournament(tournament, now)
+        return
+
     registrations = list(
         TournamentRegistration.objects(tournament_id=tournament.id).order_by('joined_at')
     )
     if len(registrations) < 2:
-        _refund_registrations(tournament, registrations)
+        refund_tournament_registrations(tournament, registrations)
         tournament.status = 'cancelled'
         tournament.registered_count = len(registrations)
         tournament.save()
@@ -208,7 +597,26 @@ def _finalize_fixture(tournament, fixture, now):
     fixture.player_two_score = second.points_earned if second else 0
 
     if first and second:
-        if first.points_earned > second.points_earned:
+        if fixture.stage == 'knockout' and first.points_earned == second.points_earned:
+            if first.accuracy_rate > second.accuracy_rate:
+                fixture.winner_user_id = fixture.player_one_id
+                fixture.tiebreak_method = 'accuracy'
+            elif second.accuracy_rate > first.accuracy_rate:
+                fixture.winner_user_id = fixture.player_two_id
+                fixture.tiebreak_method = 'accuracy'
+            elif first.time_taken_seconds < second.time_taken_seconds:
+                fixture.winner_user_id = fixture.player_one_id
+                fixture.tiebreak_method = 'time'
+            elif second.time_taken_seconds < first.time_taken_seconds:
+                fixture.winner_user_id = fixture.player_two_id
+                fixture.tiebreak_method = 'time'
+            else:
+                fixture.winner_user_id = secrets.choice(
+                    [fixture.player_one_id, fixture.player_two_id]
+                )
+                fixture.tiebreak_method = 'draw_lots'
+            fixture.result = 'win'
+        elif first.points_earned > second.points_earned:
             fixture.winner_user_id = fixture.player_one_id
             fixture.result = 'win'
         elif second.points_earned > first.points_earned:
@@ -219,6 +627,12 @@ def _finalize_fixture(tournament, fixture, now):
     elif first or second:
         fixture.winner_user_id = fixture.player_one_id if first else fixture.player_two_id
         fixture.result = 'forfeit'
+    elif fixture.stage == 'knockout':
+        fixture.winner_user_id = secrets.choice(
+            [fixture.player_one_id, fixture.player_two_id]
+        )
+        fixture.result = 'forfeit'
+        fixture.tiebreak_method = 'double_forfeit_draw'
     else:
         fixture.result = None
 
@@ -244,7 +658,22 @@ def _notify_fixture_result(fixture):
 
     first = users[fixture.player_one_id]
     second = users[fixture.player_two_id]
-    if fixture.result == 'draw':
+    if fixture.stage == 'knockout' and fixture.winner_user_id:
+        winner = users[fixture.winner_user_id]
+        if fixture.tiebreak_method == 'draw_lots':
+            outcome = f'{winner.first_name} advances after a draw-lot tiebreak.'
+        elif fixture.tiebreak_method == 'double_forfeit_draw':
+            outcome = f'Neither player submitted; {winner.first_name} advances by draw lot.'
+        elif fixture.tiebreak_method == 'accuracy':
+            outcome = f'{winner.first_name} advances on higher accuracy.'
+        elif fixture.tiebreak_method == 'time':
+            outcome = f'{winner.first_name} advances on faster completion.'
+        elif fixture.result == 'forfeit':
+            outcome = f'{winner.first_name} advances by forfeit.'
+        else:
+            outcome = f'{winner.first_name} advances to the next round.'
+        first_points = second_points = 0
+    elif fixture.result == 'draw':
         first_points = second_points = 1
         outcome = 'The fixture is a draw.'
     elif fixture.winner_user_id:
@@ -262,15 +691,26 @@ def _notify_fixture_result(fixture):
     from app.services.telegram_service import get_telegram_service
 
     service = get_telegram_service()
+    stage_label = fixture.round_name or f'GW{fixture.gameweek}'
+    if fixture.group_name:
+        stage_label = f'Group {fixture.group_name} · {stage_label}'
+    points_note = (
+        ''
+        if fixture.stage == 'knockout'
+        else f' You earned {first_points} league points.'
+    )
     first_message = (
-        f'GW{fixture.gameweek} result: {first.first_name} {fixture.player_one_score} - '
-        f'{fixture.player_two_score} {second.first_name}. {outcome} '
-        f'You earned {first_points} league points.'
+        f'{stage_label} result: {first.first_name} {fixture.player_one_score} - '
+        f'{fixture.player_two_score} {second.first_name}. {outcome}{points_note}'
+    )
+    second_points_note = (
+        ''
+        if fixture.stage == 'knockout'
+        else f' You earned {second_points} league points.'
     )
     second_message = (
-        f'GW{fixture.gameweek} result: {first.first_name} {fixture.player_one_score} - '
-        f'{fixture.player_two_score} {second.first_name}. {outcome} '
-        f'You earned {second_points} league points.'
+        f'{stage_label} result: {first.first_name} {fixture.player_one_score} - '
+        f'{fixture.player_two_score} {second.first_name}. {outcome}{second_points_note}'
     )
     sent = service.send_tournament_message([first.telegram_id], first_message)
     sent = service.send_tournament_message([second.telegram_id], second_message) and sent
@@ -332,6 +772,13 @@ def notify_opponent_score(submission):
 
 
 def calculate_standings(tournament):
+    if tournament.tournament_type == 'group_knockout':
+        return [
+            row
+            for group_name in GROUP_NAMES
+            for row in _group_fixture_stats(tournament, group_name)
+        ]
+
     registrations = list(TournamentRegistration.objects(tournament_id=tournament.id))
     users = {
         user.id: user
@@ -426,6 +873,73 @@ def calculate_standings(tournament):
     return rows
 
 
+def calculate_group_knockout_final_standings(tournament):
+    group_rows = calculate_standings(tournament)
+    rows_by_id = {row['user_id']: row for row in group_rows}
+    placements = {}
+
+    for round_name, first_place, last_place in (
+        ('Final', 1, 2),
+        ('Semi-finals', 3, 4),
+        ('Quarter-finals', 5, 8),
+        ('Round of 16', 9, 16),
+    ):
+        fixtures = list(TournamentFixture.objects(
+            tournament_id=tournament.id,
+            stage='knockout',
+            round_name=round_name,
+            status='completed',
+        ))
+        eliminated = []
+        for fixture in fixtures:
+            if not fixture.winner_user_id:
+                continue
+            if fixture.player_one_id != fixture.winner_user_id:
+                eliminated.append(fixture.player_one_id)
+            elif fixture.player_two_id != fixture.winner_user_id:
+                eliminated.append(fixture.player_two_id)
+            if round_name == 'Final':
+                placements[fixture.winner_user_id] = first_place
+                placements[(
+                    fixture.player_two_id
+                    if fixture.winner_user_id == fixture.player_one_id
+                    else fixture.player_one_id
+                )] = last_place
+
+        if round_name != 'Final':
+            eliminated.sort(key=lambda user_id: (
+                -rows_by_id.get(user_id, {}).get('points', 0),
+                -rows_by_id.get(user_id, {}).get('point_difference', 0),
+                -rows_by_id.get(user_id, {}).get('points_for', 0),
+                rows_by_id.get(user_id, {}).get('draw_lot', 0),
+            ))
+            for index, user_id in enumerate(eliminated):
+                placements[user_id] = first_place + index
+
+    non_qualifiers = [
+        row for row in group_rows
+        if row['rank'] > 2 and row['user_id'] not in placements
+    ]
+    non_qualifiers.sort(key=lambda row: (
+        row['rank'],
+        -row['points'],
+        -row['point_difference'],
+        -row['points_for'],
+        row['draw_lot'],
+    ))
+    next_place = 17
+    for row in non_qualifiers:
+        placements[row['user_id']] = next_place
+        next_place += 1
+
+    final_rows = []
+    for user_id, place in placements.items():
+        if user_id in rows_by_id:
+            final_rows.append({**rows_by_id[user_id], 'rank': place})
+    final_rows.sort(key=lambda row: row['rank'])
+    return final_rows
+
+
 def _award_tournament_places(tournament, standings):
     """Persist placements and coin rewards once for the current tournament season."""
     if not standings:
@@ -509,24 +1023,33 @@ def _award_tournament_places(tournament, standings):
 
 
 def finish_tournament(tournament):
-    standings = calculate_standings(tournament)
+    standings = (
+        calculate_group_knockout_final_standings(tournament)
+        if tournament.tournament_type == 'group_knockout'
+        else calculate_standings(tournament)
+    )
     if standings:
-        highest_rank = standings[0]
-        tournament.winner_user_ids = [
-            row['user_id']
-            for row in standings
-            if (
-                row['points'],
-                row['point_difference'],
-                row['points_for'],
-                row['wins'],
-            ) == (
-                highest_rank['points'],
-                highest_rank['point_difference'],
-                highest_rank['points_for'],
-                highest_rank['wins'],
-            )
-        ]
+        if tournament.tournament_type == 'group_knockout':
+            tournament.winner_user_ids = [
+                row['user_id'] for row in standings if row['rank'] == 1
+            ]
+        else:
+            highest_rank = standings[0]
+            tournament.winner_user_ids = [
+                row['user_id']
+                for row in standings
+                if (
+                    row['points'],
+                    row['point_difference'],
+                    row['points_for'],
+                    row['wins'],
+                ) == (
+                    highest_rank['points'],
+                    highest_rank['point_difference'],
+                    highest_rank['points_for'],
+                    highest_rank['wins'],
+                )
+            ]
     tournament.status = 'completed'
     tournament.save()
     _award_tournament_places(tournament, standings)
@@ -535,7 +1058,11 @@ def finish_tournament(tournament):
 
 def _notify_tournament_completion(tournament, standings=None):
     if not tournament.completion_notification_sent:
-        standings = standings or calculate_standings(tournament)
+        standings = standings or (
+            calculate_group_knockout_final_standings(tournament)
+            if tournament.tournament_type == 'group_knockout'
+            else calculate_standings(tournament)
+        )
         winners = [
             row['name']
             for row in standings
@@ -554,16 +1081,37 @@ def _notify_tournament_completion(tournament, standings=None):
 
 def sync_tournament(tournament, now=None):
     now = now or datetime.utcnow()
+    if (
+        tournament.status == 'starting'
+        and tournament.updated_at
+        and tournament.updated_at <= now - timedelta(minutes=5)
+    ):
+        TournamentFixture.objects(tournament_id=tournament.id).delete()
+        TournamentRegistration.objects(tournament_id=tournament.id).update(
+            unset__group_name=1,
+            set__draw_lot=0,
+        )
+        Tournament.objects(id=tournament.id, status='starting').update_one(
+            set__status='registration',
+            set__updated_at=now,
+        )
+        tournament.reload()
+
     if tournament.status == 'renewal' and tournament.start_at <= now:
         start_scheduled_restart(tournament, now)
         tournament.reload()
 
-    if tournament.status == 'registration' and tournament.start_at <= now:
+    if tournament.status in ('registration', 'cancelling') and tournament.start_at <= now:
         start_tournament(tournament, now)
         tournament.reload()
 
     if tournament.status == 'completed':
-        _award_tournament_places(tournament, calculate_standings(tournament))
+        final_standings = (
+            calculate_group_knockout_final_standings(tournament)
+            if tournament.tournament_type == 'group_knockout'
+            else calculate_standings(tournament)
+        )
+        _award_tournament_places(tournament, final_standings)
         _notify_tournament_completion(tournament)
         return
     if tournament.status != 'active':
@@ -589,6 +1137,16 @@ def sync_tournament(tournament, now=None):
     ):
         _notify_fixture_result(fixture)
 
+    if tournament.tournament_type == 'group_knockout':
+        group_fixtures = list(TournamentFixture.objects(
+            tournament_id=tournament.id,
+            stage='group',
+        ))
+        if len(group_fixtures) == 96 and all(
+            fixture.status == 'completed' for fixture in group_fixtures
+        ):
+            _advance_knockout(tournament)
+
     end_at = tournament.start_at + timedelta(days=tournament.total_gameweeks)
     if now >= end_at and not TournamentFixture.objects(
         tournament_id=tournament.id,
@@ -600,7 +1158,7 @@ def sync_tournament(tournament, now=None):
 def sync_all_tournaments():
     now = datetime.utcnow()
     for tournament in Tournament.objects(
-        status__in=['registration', 'active', 'completed', 'renewal']
+        status__in=['registration', 'starting', 'cancelling', 'active', 'completed', 'renewal']
     ):
         try:
             sync_tournament(tournament, now)
