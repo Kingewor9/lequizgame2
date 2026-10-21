@@ -359,32 +359,31 @@ class TelegramBotService:
             return False
 
     def send_battle_notification(self, user_telegram_id: int, message_text: str) -> bool:
-        """Send a direct 1v1 battle update without delaying the API response."""
+        """Send a direct 1v1 battle update and report Telegram delivery failures."""
         if not self.bot_token:
-            print("[TELEGRAM] Battle notification skipped: bot token is not configured")
+            if has_app_context():
+                current_app.logger.error(
+                    'Battle notification skipped for Telegram user %s: bot token is not configured',
+                    user_telegram_id,
+                )
+            else:
+                print('[TELEGRAM] Battle notification skipped: bot token is not configured')
             return False
         if not user_telegram_id:
-            print("[TELEGRAM] Battle notification skipped: user has no Telegram chat ID")
+            if has_app_context():
+                current_app.logger.error(
+                    'Battle notification skipped: user has no Telegram chat ID'
+                )
+            else:
+                print('[TELEGRAM] Battle notification skipped: user has no Telegram chat ID')
             return False
 
-        try:
-            threading.Thread(
-                target=self._dispatch_battle_notification,
-                args=(user_telegram_id, message_text),
-                daemon=True,
-            ).start()
-            return True
-        except RuntimeError as error:
-            print(f'[TELEGRAM] Could not queue battle notification: {error}')
-            return False
-
-    def _dispatch_battle_notification(self, user_telegram_id: int, message_text: str):
         payload = {'chat_id': user_telegram_id, 'text': message_text}
         if self.miniapp_url:
             payload['reply_markup'] = {
                 'inline_keyboard': [[{
                     'text': 'Open Footy IQ',
-                    'web_app': {'url': self.miniapp_url},
+                    'url': self.miniapp_url,
                 }]]
             }
         try:
@@ -393,16 +392,44 @@ class TelegramBotService:
                 json=payload,
                 timeout=10,
             )
-            if response.status_code != 200:
-                print(
-                    f'[TELEGRAM] Battle notification failed for {user_telegram_id}: '
-                    f'{response.status_code} {response.text}'
-                )
-        except requests.RequestException as error:
-            print(
-                f'[TELEGRAM] Error sending battle notification to '
-                f'{user_telegram_id}: {error}'
+            try:
+                telegram_result = response.json()
+            except ValueError:
+                telegram_result = {}
+            if response.status_code == 200 and telegram_result.get('ok') is True:
+                if has_app_context():
+                    current_app.logger.info(
+                        'Telegram battle notification delivered to user %s',
+                        user_telegram_id,
+                    )
+                return True
+
+            error_description = telegram_result.get(
+                'description',
+                response.text[:500] or 'Telegram returned an unsuccessful response',
             )
+            if has_app_context():
+                current_app.logger.error(
+                    'Telegram battle notification failed for user %s (HTTP %s): %s',
+                    user_telegram_id,
+                    response.status_code,
+                    error_description,
+                )
+            else:
+                print(
+                    f'[TELEGRAM] Battle notification failed for {user_telegram_id} '
+                    f'(HTTP {response.status_code}): {error_description}'
+                )
+            return False
+        except requests.RequestException as error:
+            if has_app_context():
+                current_app.logger.exception(
+                    'Telegram request failed for battle notification to user %s',
+                    user_telegram_id,
+                )
+            else:
+                print(f'[TELEGRAM] Battle notification request failed: {error}')
+            return False
     
     def send_bulk_notifications(self, user_telegram_ids: list, message_text: str, inline_button=None):
         """

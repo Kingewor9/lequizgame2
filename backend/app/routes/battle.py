@@ -162,7 +162,7 @@ def create_battle():
         from app.services.telegram_service import get_telegram_service
 
         challenger = User.objects(id=user_id).only('first_name').first()
-        get_telegram_service().send_battle_notification(
+        notification_sent = get_telegram_service().send_battle_notification(
             opponent.telegram_id,
             (
                 f'⚔️ 1v1 Battle challenge!\n\n'
@@ -170,6 +170,12 @@ def create_battle():
                 'to a 24-hour Footy IQ battle. Open the app to accept or decline.'
             ),
         )
+        if not notification_sent:
+            current_app.logger.warning(
+                'Could not deliver challenge notification for battle %s to user %s',
+                battle.id,
+                opponent.id,
+            )
         return jsonify(format_success(
             data=serialize_battle(battle, user_id),
             message='Challenge sent',
@@ -226,10 +232,17 @@ def respond_to_challenge(battle_id):
                 if action == 'accept'
                 else 'declined your 1v1 battle challenge.'
             )
-            get_telegram_service().send_battle_notification(
+            notification_sent = get_telegram_service().send_battle_notification(
                 challenger.telegram_id,
                 f'⚔️ {responder.first_name if responder else "Your opponent"} {decision_text}',
             )
+            if not notification_sent:
+                current_app.logger.warning(
+                    'Could not deliver %s notification for battle %s to user %s',
+                    action,
+                    battle.id,
+                    challenger.id,
+                )
         return jsonify(format_success(
             data=serialize_battle(battle, user_id),
             message='Challenge accepted' if action == 'accept' else 'Challenge declined',
