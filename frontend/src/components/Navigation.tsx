@@ -25,7 +25,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       <button
         className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}
         onClick={() => onTabChange('home')}
-        aria-label={`Home${homeUnreadCount > 0 ? `, ${homeUnreadCount} unanswered quizzes` : ''}`}
+        aria-label={`Home${homeUnreadCount > 0 ? `, ${homeUnreadCount} unread quizzes or battle notifications` : ''}`}
       >
         <div className="nav-icon-container">
           <Home size={21} strokeWidth={activeTab === 'home' ? 2.4 : 1.8} />

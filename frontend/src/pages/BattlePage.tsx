@@ -79,6 +79,16 @@ export const BattlePage: React.FC<Props> = ({ onBack, initialPlayerId }) => {
 
   useEffect(() => {
     let mounted = true;
+    const markNotificationsRead = async () => {
+      const response = await apiService.post('/battles/notifications/read', {});
+      if (!response.success) {
+        console.error(
+          'Could not mark battle notifications as read:',
+          response.error || 'Unexpected API response'
+        );
+      }
+    };
+    void markNotificationsRead();
     const refresh = async () => {
       try {
         const response = await apiService.get<Battle[]>('/battles');
@@ -179,6 +189,9 @@ export const BattlePage: React.FC<Props> = ({ onBack, initialPlayerId }) => {
     (battle) => battle.status === 'pending' && !battle.can_respond
   );
   const completedBattles = battles.filter((battle) => battle.status === 'completed');
+  const declinedBattles = battles.filter(
+    (battle) => battle.status === 'declined' && battle.is_challenger
+  );
   const otherPlayer = (battle: Battle) => (
     battle.is_challenger ? battle.opponent : battle.challenger
   );
@@ -364,6 +377,24 @@ export const BattlePage: React.FC<Props> = ({ onBack, initialPlayerId }) => {
                     <span>24 hours begin once they accept</span>
                   </div>
                   <span className="battle-pending-tag">PENDING</span>
+                </article>
+              ))}
+            </section>
+          )}
+
+          {declinedBattles.length > 0 && (
+            <section className="battle-list-section">
+              <div className="battle-section-heading">
+                <div><span className="battle-eyebrow">CHALLENGE UPDATE</span><h2>Declined requests</h2></div>
+              </div>
+              {declinedBattles.slice(0, 5).map((battle) => (
+                <article className="battle-pending-card" key={battle.id}>
+                  <PlayerAvatar player={battle.opponent} small />
+                  <div className="battle-player-copy">
+                    <strong>{battle.opponent?.name || battle.opponent?.username || 'Player'}</strong>
+                    <span>Your challenge was declined</span>
+                  </div>
+                  <span className="battle-pending-tag battle-declined-tag">DECLINED</span>
                 </article>
               ))}
             </section>

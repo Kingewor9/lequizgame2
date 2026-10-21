@@ -491,6 +491,10 @@
   letter-spacing: 0.1em;
 }
 
+.battle-declined-tag {
+  color: #fca5a5;
+}
+
 .battle-result-card {
   gap: 9px;
 }

@@ -357,6 +357,52 @@ class TelegramBotService:
         except requests.RequestException as error:
             print(f"[TELEGRAM] Error sending welcome message to {user_telegram_id}: {error}")
             return False
+
+    def send_battle_notification(self, user_telegram_id: int, message_text: str) -> bool:
+        """Send a direct 1v1 battle update without delaying the API response."""
+        if not self.bot_token:
+            print("[TELEGRAM] Battle notification skipped: bot token is not configured")
+            return False
+        if not user_telegram_id:
+            print("[TELEGRAM] Battle notification skipped: user has no Telegram chat ID")
+            return False
+
+        try:
+            threading.Thread(
+                target=self._dispatch_battle_notification,
+                args=(user_telegram_id, message_text),
+                daemon=True,
+            ).start()
+            return True
+        except RuntimeError as error:
+            print(f'[TELEGRAM] Could not queue battle notification: {error}')
+            return False
+
+    def _dispatch_battle_notification(self, user_telegram_id: int, message_text: str):
+        payload = {'chat_id': user_telegram_id, 'text': message_text}
+        if self.miniapp_url:
+            payload['reply_markup'] = {
+                'inline_keyboard': [[{
+                    'text': 'Open Footy IQ',
+                    'web_app': {'url': self.miniapp_url},
+                }]]
+            }
+        try:
+            response = requests.post(
+                f'{self.api_base}/sendMessage',
+                json=payload,
+                timeout=10,
+            )
+            if response.status_code != 200:
+                print(
+                    f'[TELEGRAM] Battle notification failed for {user_telegram_id}: '
+                    f'{response.status_code} {response.text}'
+                )
+        except requests.RequestException as error:
+            print(
+                f'[TELEGRAM] Error sending battle notification to '
+                f'{user_telegram_id}: {error}'
+            )
     
     def send_bulk_notifications(self, user_telegram_ids: list, message_text: str, inline_button=None):
         """

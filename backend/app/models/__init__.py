@@ -439,6 +439,7 @@ class Battle(Document):
     opponent_score = IntField(default=0)
     winner_id = StringField()
     coins_awarded = IntField(default=0)
+    challenger_response_unread = BooleanField(default=False)
     completed_at = DateTimeField(null=True, default=None)
     created_at = DateTimeField(default=datetime.utcnow)
 

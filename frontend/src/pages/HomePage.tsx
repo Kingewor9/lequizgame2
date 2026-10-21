@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronRight, Coins, ListOrdered, Trophy, CheckCircle2, Target, Sparkles, Clock, Volume2, VolumeX, Swords } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { Quiz, QuizResponse } from '../types';
+import { BattleSummary, Quiz, QuizResponse } from '../types';
 import { apiService } from '../services/apiService';
 import { QuizCard } from '../components/QuizCard';
 import { Modal } from '../components/Modal';
@@ -34,6 +34,12 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const [showBattles, setShowBattles] = useState(false);
   const [battleTargetUserId, setBattleTargetUserId] = useState<string | null>(null);
+  const [battleSummary, setBattleSummary] = useState<BattleSummary>({
+    pending_incoming: 0,
+    pending_outgoing: 0,
+    active: 0,
+    unread_count: 0,
+  });
 
   // Quiz state
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -46,6 +52,15 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizResults, setQuizResults] = useState<QuizResponse | null>(null);
   const [isBoosterLoading, setIsBoosterLoading] = useState(false);
+
+  const refreshBattleSummary = useCallback(async () => {
+    const response = await apiService.get<BattleSummary>('/battles/summary');
+    if (response.success && response.data) {
+      setBattleSummary(response.data);
+    } else {
+      console.error('Could not fetch battle notifications:', response.error || 'Unexpected API response');
+    }
+  }, []);
 
   // ── Fetch today's quizzes ────────────────────────────────────────────────────
   useEffect(() => {
@@ -76,8 +91,23 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
   }, []);
 
   useEffect(() => {
-    onUnreadCountChange(quizzes.filter((quiz) => !quiz.already_played).length);
-  }, [quizzes, onUnreadCountChange]);
+    let mounted = true;
+    const fetchSummary = async () => {
+      if (!mounted) return;
+      await refreshBattleSummary();
+    };
+    void fetchSummary();
+    const interval = window.setInterval(() => void fetchSummary(), 15000);
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+    };
+  }, [refreshBattleSummary]);
+
+  useEffect(() => {
+    const unreadQuizzes = quizzes.filter((quiz) => !quiz.already_played).length;
+    onUnreadCountChange(unreadQuizzes + battleSummary.unread_count);
+  }, [quizzes, battleSummary.unread_count, onUnreadCountChange]);
 
   // ── Quiz timer ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -317,6 +347,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
         onBack={() => {
           setShowBattles(false);
           setBattleTargetUserId(null);
+          void refreshBattleSummary();
         }}
         initialPlayerId={battleTargetUserId}
       />
@@ -393,8 +424,21 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
           <span className="home-battle-emblem"><Swords size={23} /></span>
           <span className="home-battle-copy">
             <strong>1v1 Battle</strong>
-            <span>Challenge a player · win 150 Footy Coins</span>
+            <span>
+              {battleSummary.pending_incoming > 0
+                ? `${battleSummary.pending_incoming} challenge${battleSummary.pending_incoming === 1 ? '' : 's'} waiting for your reply`
+                : battleSummary.pending_outgoing > 0
+                  ? `${battleSummary.pending_outgoing} challenge${battleSummary.pending_outgoing === 1 ? '' : 's'} pending acceptance`
+                  : battleSummary.active > 0
+                    ? `${battleSummary.active} live battle${battleSummary.active === 1 ? '' : 's'} · check the scores`
+                    : 'Challenge a player · win 150 Footy Coins'}
+            </span>
           </span>
+          {battleSummary.pending_incoming > 0 && (
+            <span className="home-battle-pending-count" aria-label={`${battleSummary.pending_incoming} challenges need your reply`}>
+              {battleSummary.pending_incoming}
+            </span>
+          )}
           <ChevronRight size={19} />
         </button>
 

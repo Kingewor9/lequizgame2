@@ -162,6 +162,21 @@
   font-size: 0.76rem;
 }
 
+.home-battle-pending-count {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  flex: 0 0 23px;
+  place-items: center;
+  border: 1px solid rgba(240, 68, 94, 0.4);
+  border-radius: 50%;
+  background: rgba(240, 68, 94, 0.18);
+  color: #ff8293;
+  font-size: 0.68rem;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Quizzes Container */
 .quizzes-wrapper {
   display: flex;

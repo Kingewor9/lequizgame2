@@ -73,6 +73,13 @@ export interface Battle {
   can_respond: boolean;
 }
 
+export interface BattleSummary {
+  pending_incoming: number;
+  pending_outgoing: number;
+  active: number;
+  unread_count: number;
+}
+
 export interface TelegramLoginResponse extends User {
   access_token?: string;
   welcome_bonus_awarded: boolean;

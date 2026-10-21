@@ -71,6 +71,59 @@ def list_battles():
         return jsonify(format_error(f'Could not fetch battles: {str(error)}')), 500
 
 
+@battle_bp.route('/summary', methods=['GET'])
+@jwt_required()
+def get_battle_summary():
+    try:
+        user_id = get_jwt_identity()
+        pending_incoming = Battle.objects(
+            opponent_id=user_id,
+            status='pending',
+        ).count()
+        pending_outgoing = Battle.objects(
+            challenger_id=user_id,
+            status='pending',
+        ).count()
+        response_notifications = Battle.objects(
+            challenger_id=user_id,
+            challenger_response_unread=True,
+        ).count()
+        return jsonify(format_success(data={
+            'pending_incoming': pending_incoming,
+            'pending_outgoing': pending_outgoing,
+            'active': Battle.objects(
+                status='active',
+                __raw__={
+                    '$or': [
+                        {'challenger_id': user_id},
+                        {'opponent_id': user_id},
+                    ]
+                },
+            ).count(),
+            'unread_count': pending_incoming + response_notifications,
+        })), 200
+    except Exception as error:
+        current_app.logger.exception('Could not fetch battle summary')
+        return jsonify(format_error(f'Could not fetch battle summary: {str(error)}')), 500
+
+
+@battle_bp.route('/notifications/read', methods=['POST'])
+@jwt_required()
+def mark_battle_notifications_read():
+    try:
+        user_id = get_jwt_identity()
+        Battle.objects(
+            challenger_id=user_id,
+            challenger_response_unread=True,
+        ).update(set__challenger_response_unread=False)
+        return jsonify(format_success(message='Battle notifications marked as read')), 200
+    except Exception as error:
+        current_app.logger.exception('Could not mark battle notifications as read')
+        return jsonify(format_error(
+            f'Could not mark battle notifications as read: {str(error)}'
+        )), 500
+
+
 @battle_bp.route('', methods=['POST'])
 @jwt_required()
 def create_battle():
@@ -106,6 +159,17 @@ def create_battle():
             status='pending',
             challenged_at=datetime.utcnow(),
         ).save()
+        from app.services.telegram_service import get_telegram_service
+
+        challenger = User.objects(id=user_id).only('first_name').first()
+        get_telegram_service().send_battle_notification(
+            opponent.telegram_id,
+            (
+                f'⚔️ 1v1 Battle challenge!\n\n'
+                f'{challenger.first_name if challenger else "A player"} challenged you '
+                'to a 24-hour Footy IQ battle. Open the app to accept or decline.'
+            ),
+        )
         return jsonify(format_success(
             data=serialize_battle(battle, user_id),
             message='Challenge sent',
@@ -135,17 +199,37 @@ def respond_to_challenge(battle_id):
                 set__status='active',
                 set__started_at=now,
                 set__expires_at=now + BATTLE_DURATION,
+                set__challenger_response_unread=True,
             )
         else:
             battle = Battle.objects(
                 id=battle_id,
                 opponent_id=user_id,
                 status='pending',
-            ).modify(new=True, set__status='declined', set__completed_at=datetime.utcnow())
+            ).modify(
+                new=True,
+                set__status='declined',
+                set__completed_at=datetime.utcnow(),
+                set__challenger_response_unread=True,
+            )
         if not battle:
             return jsonify(format_error(
                 'This challenge is no longer available to respond to'
             )), 409
+        from app.services.telegram_service import get_telegram_service
+
+        responder = User.objects(id=user_id).only('first_name').first()
+        challenger = User.objects(id=battle.challenger_id).only('telegram_id').first()
+        if challenger:
+            decision_text = (
+                'accepted your challenge. The 24-hour battle has started!'
+                if action == 'accept'
+                else 'declined your 1v1 battle challenge.'
+            )
+            get_telegram_service().send_battle_notification(
+                challenger.telegram_id,
+                f'⚔️ {responder.first_name if responder else "Your opponent"} {decision_text}',
+            )
         return jsonify(format_success(
             data=serialize_battle(battle, user_id),
             message='Challenge accepted' if action == 'accept' else 'Challenge declined',
@@ -153,4 +237,3 @@ def respond_to_challenge(battle_id):
     except Exception as error:
         current_app.logger.exception('Could not respond to 1v1 challenge')
         return jsonify(format_error(f'Could not respond to challenge: {str(error)}')), 500
-
