@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Check,
+  ChevronRight,
   ChevronLeft,
   Clock3,
   Coins,
@@ -13,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { Modal } from '../components/Modal';
 import { apiService } from '../services/apiService';
 import { Battle, BattlePlayer } from '../types';
 import '../styles/pages/BattlePage.css';
@@ -53,6 +55,7 @@ export const BattlePage: React.FC<Props> = ({ onBack, initialPlayerId }) => {
   const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [selectedBattle, setSelectedBattle] = useState<Battle | null>(null);
   const [now, setNow] = useState(Date.now());
   const initializedChallenge = useRef(false);
   const seenCompletedBattles = useRef(new Set<string>());
@@ -76,6 +79,16 @@ export const BattlePage: React.FC<Props> = ({ onBack, initialPlayerId }) => {
       console.error('Could not refresh Footy Coins after a 1v1 battle:', error);
     });
   }, [battles, refreshUser]);
+
+  useEffect(() => {
+    if (!selectedBattle) return undefined;
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedBattle(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [selectedBattle]);
 
   useEffect(() => {
     let mounted = true;
@@ -195,6 +208,12 @@ export const BattlePage: React.FC<Props> = ({ onBack, initialPlayerId }) => {
   const otherPlayer = (battle: Battle) => (
     battle.is_challenger ? battle.opponent : battle.challenger
   );
+  const rematchSelectedBattle = () => {
+    if (!selectedBattle) return;
+    const rival = otherPlayer(selectedBattle);
+    setSelectedBattle(null);
+    if (rival) void challengePlayer(rival.id);
+  };
 
   return (
     <main className="battle-page animate-fade">
@@ -411,26 +430,32 @@ export const BattlePage: React.FC<Props> = ({ onBack, initialPlayerId }) => {
                 const drawn = !battle.winner_id;
                 const rival = otherPlayer(battle);
                 return (
-                  <article className="battle-result-card" key={battle.id}>
+                  <article
+                    className="battle-result-card"
+                    key={battle.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-haspopup="dialog"
+                    aria-label={`View final result against ${rival?.name || rival?.username || 'player'}`}
+                    onClick={() => setSelectedBattle(battle)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedBattle(battle);
+                      }
+                    }}
+                  >
                     <PlayerAvatar player={rival} small />
                     <div className="battle-player-copy">
                       <strong>{rival?.name || rival?.username || 'Player'}</strong>
-                      <span>{battle.my_score} – {battle.their_score} points · {won ? 'Victory' : drawn ? 'Draw' : 'Defeat'}</span>
+                      <span>
+                        {battle.my_score} – {battle.their_score} points · {won ? 'Victory' : drawn ? 'Draw' : 'Defeat'}
+                      </span>
                     </div>
                     <span className={`battle-result-mark ${won ? 'is-win' : drawn ? 'is-draw' : 'is-loss'}`}>
                       {won ? <Trophy size={17} /> : drawn ? 'D' : 'L'}
                     </span>
-                    {won || drawn ? (
-                      <span className="battle-earned-coins">
-                        <Coins size={13} /> {won ? 150 : 75}
-                      </span>
-                    ) : null}
-                    <button
-                      className="battle-rematch-button"
-                      onClick={() => rival && void challengePlayer(rival.id)}
-                      disabled={!rival || pendingId === rival?.id}
-                      aria-label={`Challenge ${rival?.name || 'player'} again`}
-                    >Rematch</button>
+                    <ChevronRight className="battle-result-chevron" size={18} aria-hidden="true" />
                   </article>
                 );
               })}
@@ -445,6 +470,66 @@ export const BattlePage: React.FC<Props> = ({ onBack, initialPlayerId }) => {
             </div>
           )}
         </>
+      )}
+      {selectedBattle && (
+        <Modal
+          isOpen
+          onClose={() => setSelectedBattle(null)}
+          title="Final whistle"
+        >
+          {(() => {
+            const challengerWon = selectedBattle.winner_id === selectedBattle.challenger?.id;
+            const opponentWon = selectedBattle.winner_id === selectedBattle.opponent?.id;
+            const drew = !selectedBattle.winner_id;
+            const viewerWon = selectedBattle.winner_id === user?.id;
+            const resultLabel = drew ? 'A hard-fought draw' : viewerWon ? 'You took the win' : 'The rival took the win';
+            return (
+              <div className="battle-result-modal">
+                <div className="battle-result-modal-heading">
+                  <span>24-HOUR BATTLE COMPLETE</span>
+                  <h3>{resultLabel}</h3>
+                </div>
+                <div className="battle-final-scoreboard">
+                  <div className={`battle-final-player${challengerWon ? ' is-winner' : ''}`}>
+                    <PlayerAvatar player={selectedBattle.challenger} />
+                    <strong>
+                      {selectedBattle.challenger?.name || selectedBattle.challenger?.username || 'Player 1'}
+                    </strong>
+                    <span className={`battle-final-outcome${drew ? ' is-draw' : ''}`}>
+                      {drew ? 'DRAW' : challengerWon ? 'WINNER' : 'LOSER'}
+                    </span>
+                    <b>{selectedBattle.challenger_score.toLocaleString()}</b>
+                  </div>
+                  <span className="battle-final-versus">VS</span>
+                  <div className={`battle-final-player${opponentWon ? ' is-winner' : ''}`}>
+                    <PlayerAvatar player={selectedBattle.opponent} />
+                    <strong>
+                      {selectedBattle.opponent?.name || selectedBattle.opponent?.username || 'Player 2'}
+                    </strong>
+                    <span className={`battle-final-outcome${drew ? ' is-draw' : ''}`}>
+                      {drew ? 'DRAW' : opponentWon ? 'WINNER' : 'LOSER'}
+                    </span>
+                    <b>{selectedBattle.opponent_score.toLocaleString()}</b>
+                  </div>
+                </div>
+                <div className="battle-result-modal-footer">
+                  <span>
+                    <Coins size={15} />
+                    {drew ? '75 Footy Coins each' : `${selectedBattle.coins_awarded} Footy Coins to the winner`}
+                  </span>
+                  <button
+                    className="battle-modal-rematch-button"
+                    onClick={rematchSelectedBattle}
+                    disabled={!otherPlayer(selectedBattle) || pendingId === otherPlayer(selectedBattle)?.id}
+                  >
+                    <Swords size={17} />
+                    {pendingId === otherPlayer(selectedBattle)?.id ? 'Sending…' : 'Rematch'}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </Modal>
       )}
     </main>
   );

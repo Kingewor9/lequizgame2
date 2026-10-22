@@ -497,6 +497,28 @@
 
 .battle-result-card {
   gap: 9px;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.battle-result-card:hover,
+.battle-result-card:focus-visible {
+  border-color: rgba(223, 255, 0, 0.34);
+  background: rgba(25, 35, 29, 0.96);
+}
+
+.battle-result-card:active {
+  transform: scale(0.99);
+}
+
+.battle-result-card:focus-visible {
+  outline: 2px solid #dfff00;
+  outline-offset: 2px;
+}
+
+.battle-result-chevron {
+  flex: 0 0 auto;
+  color: #849187;
 }
 
 .battle-result-mark {
@@ -537,6 +559,142 @@
 .battle-rematch-button {
   padding: 7px 9px;
   font-size: 0.62rem;
+}
+
+.battle-result-modal {
+  padding: 2px 0;
+}
+
+.battle-result-modal-heading {
+  text-align: center;
+}
+
+.battle-result-modal-heading > span {
+  color: #dfff00;
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.15em;
+}
+
+.battle-result-modal-heading h3 {
+  margin-top: 6px;
+  color: #f2f7f3;
+  font-size: 1.24rem;
+  letter-spacing: -0.04em;
+}
+
+.battle-final-scoreboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 20px 10px;
+  border: 1px solid rgba(223, 255, 0, 0.17);
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(223, 255, 0, 0.1), transparent 60%),
+    #111914;
+}
+
+.battle-final-player {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.battle-final-player .battle-avatar {
+  width: 58px;
+  height: 58px;
+  flex-basis: 58px;
+}
+
+.battle-final-player > strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: #d2dbd4;
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.battle-final-player.is-winner > strong {
+  color: #f3f8f4;
+}
+
+.battle-final-outcome {
+  color: #f79b9b;
+  font-size: 0.53rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.battle-final-player.is-winner .battle-final-outcome {
+  color: #dfff00;
+}
+
+.battle-final-outcome.is-draw {
+  color: #facc15;
+}
+
+.battle-final-player > b {
+  color: #f3f7f3;
+  font-size: 1.55rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.05em;
+}
+
+.battle-final-versus {
+  color: #738077;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.battle-result-modal-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 17px;
+}
+
+.battle-result-modal-footer > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #c4a958;
+  font-size: 0.69rem;
+  font-weight: 750;
+}
+
+.battle-modal-rematch-button {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid rgba(223, 255, 0, 0.45);
+  border-radius: 13px;
+  background: linear-gradient(120deg, #dfff00, #c6e600);
+  box-shadow: 0 8px 24px rgba(190, 219, 0, 0.15);
+  color: #12180e;
+  font-size: 0.83rem;
+  font-weight: 900;
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.battle-modal-rematch-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.battle-modal-rematch-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .battle-empty-state {
@@ -591,5 +749,11 @@
   .battle-rematch-button {
     padding-right: 7px;
     padding-left: 7px;
+  }
+
+  .battle-final-scoreboard {
+    gap: 4px;
+    padding-right: 6px;
+    padding-left: 6px;
   }
 }

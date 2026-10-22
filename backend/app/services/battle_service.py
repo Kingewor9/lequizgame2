@@ -42,6 +42,10 @@ def calculate_battle_scores(battle):
     return totals[battle.challenger_id], totals[battle.opponent_id]
 
 
+def _battle_player_name(player, fallback):
+    return ' '.join(filter(None, [player.first_name, player.last_name])) or fallback
+
+
 def serialize_battle(battle, viewer_id):
     challenger = User.objects(id=battle.challenger_id).only(
         'id', 'first_name', 'last_name', 'username', 'photo_url'
@@ -160,6 +164,130 @@ def _settle_battle(battle, now):
         session.with_transaction(settle_once)
 
 
+def _notify_battle_quiz_score(battle, response):
+    notified_battles = getattr(response, 'battle_notifications_sent', []) or []
+    if (
+        response.points_earned <= 0
+        or battle.id in notified_battles
+        or not battle.started_at
+        or not battle.expires_at
+        or not battle.started_at <= response.completed_at < battle.expires_at
+    ):
+        return
+
+    quiz = Quiz.objects(id=response.quiz_id).only('destination').first()
+    if not quiz or getattr(quiz, 'destination', 'game') == 'tournament':
+        return
+
+    players = {
+        player.id: player
+        for player in User.objects(
+            id__in=[battle.challenger_id, battle.opponent_id]
+        ).only('id', 'first_name', 'last_name', 'telegram_id')
+    }
+    if len(players) != 2:
+        return
+
+    scorer = players.get(response.user_id)
+    if not scorer:
+        return
+
+    challenger_score, opponent_score = calculate_battle_scores(battle)
+    scorer_name = _battle_player_name(scorer, 'Your opponent')
+    challenger_name = _battle_player_name(players[battle.challenger_id], 'Player 1')
+    opponent_name = _battle_player_name(players[battle.opponent_id], 'Player 2')
+    message = (
+        f'⚽ {scorer_name} just played a quiz and scored '
+        f'+{response.points_earned} points!\n\n'
+        f'Current battle score: {challenger_name} {challenger_score} – '
+        f'{opponent_score} {opponent_name}.'
+    )
+
+    from app.services.telegram_service import get_telegram_service
+
+    service = get_telegram_service()
+    sent = True
+    for player in players.values():
+        player_sent = service.send_battle_notification(
+            player.telegram_id,
+            message,
+        )
+        sent = player_sent and sent
+
+    if sent:
+        response.update(add_to_set__battle_notifications_sent=battle.id)
+
+
+def notify_battle_quiz_score(response):
+    if response.points_earned <= 0:
+        return
+
+    battles = Battle.objects(
+        status='active',
+        __raw__={
+            '$or': [
+                {'challenger_id': response.user_id},
+                {'opponent_id': response.user_id},
+            ]
+        },
+    )
+    for battle in battles:
+        _notify_battle_quiz_score(battle, response)
+
+
+def _notify_battle_result(battle):
+    if battle.result_notification_sent:
+        return
+
+    players = {
+        player.id: player
+        for player in User.objects(
+            id__in=[battle.challenger_id, battle.opponent_id]
+        ).only('id', 'first_name', 'last_name', 'telegram_id')
+    }
+    if len(players) != 2:
+        return
+
+    challenger = players[battle.challenger_id]
+    opponent = players[battle.opponent_id]
+    challenger_name = _battle_player_name(challenger, 'Player 1')
+    opponent_name = _battle_player_name(opponent, 'Player 2')
+    score = (
+        f'{challenger_name} {battle.challenger_score} – '
+        f'{battle.opponent_score} {opponent_name}'
+    )
+    if battle.winner_id:
+        winner = players[battle.winner_id]
+        winner_name = _battle_player_name(winner, 'A player')
+        outcome = f'Winner: {winner_name}.'
+        challenger_outcome = (
+            'You won the battle!' if battle.winner_id == challenger.id
+            else f'{winner_name} won the battle.'
+        )
+        opponent_outcome = (
+            'You won the battle!' if battle.winner_id == opponent.id
+            else f'{winner_name} won the battle.'
+        )
+    else:
+        outcome = 'The 24-hour battle ended in a draw.'
+        challenger_outcome = opponent_outcome = 'The battle ended in a draw.'
+
+    from app.services.telegram_service import get_telegram_service
+
+    service = get_telegram_service()
+    challenger_sent = service.send_battle_notification(
+        challenger.telegram_id,
+        f'🏁 1v1 final result\n\n{score}\n{outcome}\n{challenger_outcome}',
+    )
+    opponent_sent = service.send_battle_notification(
+        opponent.telegram_id,
+        f'🏁 1v1 final result\n\n{score}\n{outcome}\n{opponent_outcome}',
+    )
+    if challenger_sent and opponent_sent:
+        battle.result_notification_sent = True
+        battle.save()
+
+
 def sync_battles(now=None):
     now = now or datetime.utcnow()
     pending_cutoff = now - BATTLE_DURATION
@@ -170,8 +298,21 @@ def sync_battles(now=None):
         set__status='expired',
         set__completed_at=now,
     )
+    for battle in Battle.objects(status='active'):
+        responses = QuizResponse.objects(
+            user_id__in=[battle.challenger_id, battle.opponent_id],
+            points_earned__gt=0,
+            completed_at__gte=battle.started_at,
+            completed_at__lt=battle.expires_at,
+        )
+        for response in responses:
+            _notify_battle_quiz_score(battle, response)
+
+        if battle.expires_at <= now - SETTLEMENT_GRACE:
+            _settle_battle(battle, now)
+
     for battle in Battle.objects(
-        status='active',
-        expires_at__lte=now - SETTLEMENT_GRACE,
+        status='completed',
+        result_notification_sent=False,
     ):
-        _settle_battle(battle, now)
+        _notify_battle_result(battle)

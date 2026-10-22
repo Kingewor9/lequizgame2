@@ -467,6 +467,19 @@ def submit_quiz(quiz_id):
         # Batch cached rank updates to avoid one database write per user.
         update_global_rankings()
 
+        if points_earned > 0:
+            try:
+                from app.services.battle_service import (
+                    notify_battle_quiz_score,
+                )
+
+                notify_battle_quiz_score(response)
+            except Exception:
+                current_app.logger.exception(
+                    'Could not send 1v1 battle score notification for quiz response %s',
+                    response.id,
+                )
+
         result_dict = response.to_dict()
         result_dict['leaderboard_booster'] = _leaderboard_booster_status(
             user, quiz, response
