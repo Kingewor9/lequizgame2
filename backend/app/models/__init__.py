@@ -323,6 +323,8 @@ class QuizResponse(Document):
     leaderboard_bonus = IntField(default=0)
     leaderboard_boosted_at = DateTimeField(null=True, default=None)
     battle_notifications_sent = ListField(StringField(), default=list)
+    battle_notification_sent_to = ListField(StringField(), default=list)
+    battle_notification_claimed_until = DateTimeField(null=True, default=None)
 
     answers = ListField(EmbeddedDocumentField(QuizAnswer))
 
@@ -442,6 +444,8 @@ class Battle(Document):
     coins_awarded = IntField(default=0)
     challenger_response_unread = BooleanField(default=False)
     result_notification_sent = BooleanField(default=False)
+    result_notification_sent_to = ListField(StringField(), default=list)
+    result_notification_claimed_until = DateTimeField(null=True, default=None)
     completed_at = DateTimeField(null=True, default=None)
     created_at = DateTimeField(default=datetime.utcnow)
 

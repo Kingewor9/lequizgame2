@@ -10,6 +10,7 @@ from app.models import (
 
 BATTLE_DURATION = timedelta(hours=24)
 SETTLEMENT_GRACE = timedelta(seconds=10)
+NOTIFICATION_CLAIM_DURATION = timedelta(minutes=1)
 WIN_REWARD = 150
 DRAW_REWARD = 75
 
@@ -205,17 +206,48 @@ def _notify_battle_quiz_score(battle, response):
 
     from app.services.telegram_service import get_telegram_service
 
-    service = get_telegram_service()
-    sent = True
-    for player in players.values():
-        player_sent = service.send_battle_notification(
-            player.telegram_id,
-            message,
-        )
-        sent = player_sent and sent
+    now = datetime.utcnow()
+    claim_until = now + NOTIFICATION_CLAIM_DURATION
+    claimed_response = QuizResponse.objects(
+        id=response.id,
+        __raw__={
+            '$or': [
+                {'battle_notification_claimed_until': {'$exists': False}},
+                {'battle_notification_claimed_until': None},
+                {'battle_notification_claimed_until': {'$lte': now}},
+            ]
+        },
+    ).modify(
+        new=True,
+        set__battle_notification_claimed_until=claim_until,
+    )
+    if not claimed_response:
+        return
 
-    if sent:
-        response.update(add_to_set__battle_notifications_sent=battle.id)
+    service = get_telegram_service()
+    sent_to = set(
+        getattr(claimed_response, 'battle_notification_sent_to', []) or []
+    )
+    try:
+        for player in players.values():
+            notification_key = f'{battle.id}:{player.id}'
+            if notification_key in sent_to:
+                continue
+            if service.send_battle_notification(player.telegram_id, message):
+                claimed_response.update(
+                    add_to_set__battle_notification_sent_to=notification_key
+                )
+                sent_to.add(notification_key)
+
+        if all(f'{battle.id}:{player.id}' in sent_to for player in players.values()):
+            claimed_response.update(
+                add_to_set__battle_notifications_sent=battle.id
+            )
+    finally:
+        QuizResponse.objects(
+            id=response.id,
+            battle_notification_claimed_until=claim_until,
+        ).update(unset__battle_notification_claimed_until=1)
 
 
 def notify_battle_quiz_score(response):
@@ -239,6 +271,26 @@ def _notify_battle_result(battle):
     if battle.result_notification_sent:
         return
 
+    now = datetime.utcnow()
+    claim_until = now + NOTIFICATION_CLAIM_DURATION
+    claimed_battle = Battle.objects(
+        id=battle.id,
+        status='completed',
+        result_notification_sent=False,
+        __raw__={
+            '$or': [
+                {'result_notification_claimed_until': {'$exists': False}},
+                {'result_notification_claimed_until': None},
+                {'result_notification_claimed_until': {'$lte': now}},
+            ]
+        },
+    ).modify(
+        new=True,
+        set__result_notification_claimed_until=claim_until,
+    )
+    if not claimed_battle:
+        return
+
     players = {
         player.id: player
         for player in User.objects(
@@ -246,6 +298,10 @@ def _notify_battle_result(battle):
         ).only('id', 'first_name', 'last_name', 'telegram_id')
     }
     if len(players) != 2:
+        Battle.objects(
+            id=battle.id,
+            result_notification_claimed_until=claim_until,
+        ).update(unset__result_notification_claimed_until=1)
         return
 
     challenger = players[battle.challenger_id]
@@ -275,17 +331,33 @@ def _notify_battle_result(battle):
     from app.services.telegram_service import get_telegram_service
 
     service = get_telegram_service()
-    challenger_sent = service.send_battle_notification(
-        challenger.telegram_id,
-        f'🏁 1v1 final result\n\n{score}\n{outcome}\n{challenger_outcome}',
+    messages = {
+        challenger.id: f'🏁 1v1 final result\n\n{score}\n{outcome}\n{challenger_outcome}',
+        opponent.id: f'🏁 1v1 final result\n\n{score}\n{outcome}\n{opponent_outcome}',
+    }
+    sent_to = set(
+        getattr(claimed_battle, 'result_notification_sent_to', []) or []
     )
-    opponent_sent = service.send_battle_notification(
-        opponent.telegram_id,
-        f'🏁 1v1 final result\n\n{score}\n{outcome}\n{opponent_outcome}',
-    )
-    if challenger_sent and opponent_sent:
-        battle.result_notification_sent = True
-        battle.save()
+    try:
+        for player_id, player in players.items():
+            if player_id in sent_to:
+                continue
+            if service.send_battle_notification(
+                player.telegram_id,
+                messages[player_id],
+            ):
+                claimed_battle.update(
+                    add_to_set__result_notification_sent_to=player_id
+                )
+                sent_to.add(player_id)
+
+        if len(sent_to) == len(players):
+            claimed_battle.update(set__result_notification_sent=True)
+    finally:
+        Battle.objects(
+            id=battle.id,
+            result_notification_claimed_until=claim_until,
+        ).update(unset__result_notification_claimed_until=1)
 
 
 def sync_battles(now=None):
