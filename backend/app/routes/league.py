@@ -155,7 +155,12 @@ def get_public_leagues():
     """Get top N public leagues. GET /api/leagues/public?limit=3"""
     try:
         limit = request.args.get('limit', 3, type=int)
-        leagues = League.objects(is_private=False).order_by('-total_members').limit(limit)
+        now = datetime.utcnow()
+        leagues = League.objects(
+            is_private=False,
+            start_date__gt=now,
+            end_date__gt=now,
+        ).order_by('-total_members').limit(limit)
         return jsonify(format_success(data=[l.to_dict() for l in leagues])), 200
 
     except Exception as e:
@@ -172,8 +177,11 @@ def search_leagues():
         if not q:
             return jsonify(format_success(data=[])), 200
 
+        now = datetime.utcnow()
         leagues = League.objects(
             is_private=False,
+            start_date__gt=now,
+            end_date__gt=now,
             __raw__={
                 '$or': [
                     {'name': {'$regex': q, '$options': 'i'}},
