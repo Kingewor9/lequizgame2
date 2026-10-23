@@ -15,18 +15,32 @@ WIN_REWARD = 150
 DRAW_REWARD = 75
 
 
+def _quiz_released_after_battle_start(quiz, battle):
+    if not battle.started_at:
+        return False
+    released_at = (
+        getattr(quiz, 'scheduled_for', None)
+        or getattr(quiz, 'created_at', None)
+    )
+    return released_at is not None and released_at > battle.started_at
+
+
 def calculate_battle_scores(battle):
-    if battle.status not in ('active', 'completed'):
+    if battle.status not in ('active', 'completed') or not battle.started_at:
         return 0, 0
 
     end_at = battle.expires_at or datetime.utcnow()
-    quiz_ids = Quiz.objects(__raw__={
+    quizzes = Quiz.objects(__raw__={
         '$or': [
             {'destination': 'game'},
             {'destination': {'$exists': False}},
             {'destination': None},
         ]
-    }).distinct('id')
+    }).only('id', 'created_at', 'scheduled_for')
+    quiz_ids = [
+        quiz.id for quiz in quizzes
+        if _quiz_released_after_battle_start(quiz, battle)
+    ]
     if not quiz_ids:
         return 0, 0
 
@@ -176,8 +190,14 @@ def _notify_battle_quiz_score(battle, response):
     ):
         return
 
-    quiz = Quiz.objects(id=response.quiz_id).only('destination').first()
-    if not quiz or getattr(quiz, 'destination', 'game') == 'tournament':
+    quiz = Quiz.objects(id=response.quiz_id).only(
+        'destination', 'created_at', 'scheduled_for'
+    ).first()
+    if (
+        not quiz
+        or getattr(quiz, 'destination', 'game') == 'tournament'
+        or not _quiz_released_after_battle_start(quiz, battle)
+    ):
         return
 
     players = {
