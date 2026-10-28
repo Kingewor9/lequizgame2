@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronRight, Coins, ListOrdered, Trophy, CheckCircle2, Target, Sparkles, Clock, Volume2, VolumeX, Swords } from 'lucide-react';
+import { ChevronRight, Coins, ListOrdered, Trophy, CheckCircle2, Target, Sparkles, Clock, Volume2, VolumeX, Swords, Camera } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BattleSummary, Quiz, QuizResponse } from '../types';
 import { apiService } from '../services/apiService';
@@ -14,14 +14,24 @@ import { ProfilePage } from './ProfilePage';
 import { BattlePage } from './BattlePage';
 import { formatQuizTimer } from '../services/utilService';
 import { useGameSound } from '../context/GameSoundContext';
+import { generateQuizResultCardImage } from '../utils/quizCardGenerator';
+import { ChallengeShareModal } from '../components/ChallengeShareModal';
+import { StoryShareModal } from '../components/StoryShareModal';
 import '../styles/pages/HomePage.css';
 
 interface HomePageProps {
   onCoinsClick: () => void;
   onUnreadCountChange: (count: number) => void;
+  initialBattleTargetUserId?: string | null;
+  initialShowBattles?: boolean;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountChange }) => {
+export const HomePage: React.FC<HomePageProps> = ({
+  onCoinsClick,
+  onUnreadCountChange,
+  initialBattleTargetUserId = null,
+  initialShowBattles = false,
+}) => {
   const { user, telegramUser, refreshUser } = useAuth();
   const { isSoundEnabled, toggleSound, playSound } = useGameSound();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -52,6 +62,20 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizResults, setQuizResults] = useState<QuizResponse | null>(null);
   const [isBoosterLoading, setIsBoosterLoading] = useState(false);
+
+  // Share Card state
+  const [showChallengeShareModal, setShowChallengeShareModal] = useState(false);
+  const [showStoryShareModal, setShowStoryShareModal] = useState(false);
+  const [challengeCardDataUrl, setChallengeCardDataUrl] = useState<string | null>(null);
+  const [challengeCardBlob, setChallengeCardBlob] = useState<Blob | null>(null);
+  const [storyCardDataUrl, setStoryCardDataUrl] = useState<string | null>(null);
+  const [storyCardBlob, setStoryCardBlob] = useState<Blob | null>(null);
+  const [isGeneratingCard, setIsGeneratingCard] = useState(false);
+
+  useEffect(() => {
+    if (initialShowBattles) setShowBattles(true);
+    if (initialBattleTargetUserId) setBattleTargetUserId(initialBattleTargetUserId);
+  }, [initialShowBattles, initialBattleTargetUserId]);
 
   const refreshBattleSummary = useCallback(async () => {
     const response = await apiService.get<BattleSummary>('/battles/summary');
@@ -338,6 +362,74 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
     setSelectedAnswer(null);
     setIsAnswered(false);
     setQuizResults(null);
+    setShowChallengeShareModal(false);
+    setShowStoryShareModal(false);
+    setChallengeCardDataUrl(null);
+    setStoryCardDataUrl(null);
+  };
+
+  const handleOpenChallengeModal = async () => {
+    if (!quizResults) return;
+    setIsGeneratingCard(true);
+    try {
+      const displayName = telegramUser?.first_name || user?.first_name || user?.username || 'Footy Contender';
+      const points = quizResults.points_earned + (quizResults.leaderboard_bonus || 0);
+
+      const generated = await generateQuizResultCardImage({
+        mode: 'challenge',
+        playerName: displayName,
+        playerUsername: telegramUser?.username || user?.username,
+        playerPhotoUrl: telegramUser?.photo_url || user?.photo_url,
+        correctAnswers: quizResults.correct_answers,
+        totalQuestions: quizResults.total_questions,
+        accuracy: quizResults.accuracy_rate,
+        pointsEarned: points,
+        timeTakenSeconds: quizResults.time_taken_seconds,
+        isBoosterApplied: (quizResults.leaderboard_bonus || 0) > 0,
+        botUsername: 'footyiqgamebot',
+      });
+
+      setChallengeCardDataUrl(generated.dataUrl);
+      setChallengeCardBlob(generated.blob);
+      setShowChallengeShareModal(true);
+    } catch (err) {
+      console.error('Error generating challenge card:', err);
+      setAlert({ message: 'Could not generate challenge card. Please try again.', type: 'error' });
+    } finally {
+      setIsGeneratingCard(false);
+    }
+  };
+
+  const handleOpenStoryModal = async () => {
+    if (!quizResults) return;
+    setIsGeneratingCard(true);
+    try {
+      const displayName = telegramUser?.first_name || user?.first_name || user?.username || 'Footy Contender';
+      const points = quizResults.points_earned + (quizResults.leaderboard_bonus || 0);
+
+      const generated = await generateQuizResultCardImage({
+        mode: 'story',
+        playerName: displayName,
+        playerUsername: telegramUser?.username || user?.username,
+        playerPhotoUrl: telegramUser?.photo_url || user?.photo_url,
+        correctAnswers: quizResults.correct_answers,
+        totalQuestions: quizResults.total_questions,
+        accuracy: quizResults.accuracy_rate,
+        pointsEarned: points,
+        timeTakenSeconds: quizResults.time_taken_seconds,
+        isBoosterApplied: (quizResults.leaderboard_bonus || 0) > 0,
+        botUsername: 'footyiqgamebot',
+      });
+
+      setStoryCardDataUrl(generated.dataUrl);
+      setStoryCardBlob(generated.blob);
+      setShowStoryShareModal(true);
+    } catch (err) {
+      console.error('Error generating story card:', err);
+      setAlert({ message: 'Could not generate story card. Please try again.', type: 'error' });
+    } finally {
+      setIsGeneratingCard(false);
+    }
   };
 
   if (quizLoading) return <Loading message="Loading today's quiz..." />;
@@ -610,12 +702,59 @@ export const HomePage: React.FC<HomePageProps> = ({ onCoinsClick, onUnreadCountC
                 </div>
               )}
 
+            {/* ── Challenge a Friend & Share to Telegram Story ────────────── */}
+            <div className="results-share-actions">
+              <button
+                type="button"
+                className="btn-results-action btn-results-challenge"
+                onClick={handleOpenChallengeModal}
+                disabled={isGeneratingCard}
+              >
+                <Swords size={20} aria-hidden="true" />
+                <span>{isGeneratingCard ? 'Generating Scorecard...' : 'Challenge a Friend'}</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn-results-action btn-results-story"
+                onClick={handleOpenStoryModal}
+                disabled={isGeneratingCard}
+              >
+                <Camera size={20} aria-hidden="true" />
+                <span>Share to Telegram Story</span>
+              </button>
+            </div>
+
             <button className="btn-primary results-done-btn" onClick={handleCloseQuizModal}>
               Back to Hub
             </button>
           </div>
         )}
       </Modal>
+
+      {quizResults && (
+        <>
+          <ChallengeShareModal
+            isOpen={showChallengeShareModal}
+            onClose={() => setShowChallengeShareModal(false)}
+            cardDataUrl={challengeCardDataUrl}
+            cardBlob={challengeCardBlob}
+            points={quizResults.points_earned + (quizResults.leaderboard_bonus || 0)}
+            referralCode={user?.referral_code || user?.id || ''}
+            userName={telegramUser?.first_name || user?.first_name || user?.username || 'A Friend'}
+            botUsername="footyiqgamebot"
+          />
+
+          <StoryShareModal
+            isOpen={showStoryShareModal}
+            onClose={() => setShowStoryShareModal(false)}
+            cardDataUrl={storyCardDataUrl}
+            cardBlob={storyCardBlob}
+            points={quizResults.points_earned + (quizResults.leaderboard_bonus || 0)}
+            botUsername="footyiqgamebot"
+          />
+        </>
+      )}
     </div>
   );
 };

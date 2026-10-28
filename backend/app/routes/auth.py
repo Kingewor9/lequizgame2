@@ -12,18 +12,28 @@ from urllib.parse import parse_qsl
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 REFERRAL_REWARD = 10
+CHALLENGE_REFERRAL_REWARD = 25
 WELCOME_BONUS = 250
 
 
 def _get_verified_referral_code(init_data, telegram_id):
-    """Return a referral code only when Telegram signed the Mini App launch data."""
+    """Return (referral_code, source) only when Telegram signed the Mini App launch data."""
     if not init_data:
-        return None
+        return None, 'referral'
 
     fields = dict(parse_qsl(init_data, keep_blank_values=True))
     start_param = fields.get('start_param', '')
-    if not start_param.startswith('ref_'):
-        return None
+    source = 'referral'
+    raw_code = ''
+
+    if start_param.startswith('ref_'):
+        raw_code = start_param[4:]
+        source = 'referral'
+    elif start_param.startswith('chl_'):
+        raw_code = start_param[4:]
+        source = 'challenge'
+    else:
+        return None, 'referral'
 
     bot_token = current_app.config.get('TELEGRAM_BOT_TOKEN', '')
     if not verify_telegram_auth(init_data, bot_token):
@@ -37,10 +47,10 @@ def _get_verified_referral_code(init_data, telegram_id):
     if str(signed_user.get('id')) != str(telegram_id):
         raise ValueError('Could not verify the Telegram referral link.')
 
-    referral_code = start_param[4:]
+    referral_code = raw_code.split('_')[0] if raw_code else ''
     if not referral_code or len(referral_code) > 64:
-        return None
-    return referral_code
+        return None, source
+    return referral_code, source
 
 
 def _is_verified_telegram_launch(init_data, telegram_id):
@@ -67,12 +77,21 @@ def _complete_referral_reward(user):
     if not referrer:
         return
 
+    is_challenge = getattr(user, 'referral_source', 'referral') == 'challenge'
+    reward_amount = CHALLENGE_REFERRAL_REWARD if is_challenge else REFERRAL_REWARD
+    reason = 'Challenge invite: New player joined' if is_challenge else 'Successful referral'
+    notification_msg = (
+        f'🎉 Someone accepted your quiz challenge invite and joined Footy IQ! {reward_amount} Footy Coins have been added to your balance.'
+        if is_challenge
+        else f'🎉 Your invite just joined Footy IQ! {reward_amount} Footy Coins have been added to your balance.'
+    )
+
     rewarded = User.objects(
         id=referrer_id,
         referred_user_ids__ne=user.id,
     ).update_one(
         add_to_set__referred_user_ids=user.id,
-        inc__footy_coins=REFERRAL_REWARD,
+        inc__footy_coins=reward_amount,
         set__updated_at=datetime.utcnow(),
     )
     if not rewarded:
@@ -83,15 +102,15 @@ def _complete_referral_reward(user):
             id=f'referral_{user.id}',
             user_id=referrer_id,
             type='earned',
-            amount=REFERRAL_REWARD,
-            reason='Successful referral',
+            amount=reward_amount,
+            reason=reason,
         ).save()
     except Exception:
         current_app.logger.exception('Could not record referral coin transaction')
 
     get_telegram_service().send_bulk_notifications(
         [referrer.telegram_id],
-        f'🎉 Your invite just joined Footy IQ! {REFERRAL_REWARD} Footy Coins have been added to your balance.',
+        notification_msg,
     )
 
 
@@ -140,12 +159,13 @@ def telegram_login():
         last_name = data.get('last_name')
         username = data.get('username')
         photo_url = data.get('photo_url')
-        referral_code = _get_verified_referral_code(
+        referral_code, referral_source = _get_verified_referral_code(
             data.get('init_data'), telegram_id
         )
         
         # Check if user exists
         user = User.objects(telegram_id=telegram_id).first()
+        is_new_user = user is None
         
         if not user:
             # Create new user
@@ -161,6 +181,7 @@ def telegram_login():
                 global_rank=0,
                 global_total_players=0,
                 referral_code=secrets.token_urlsafe(9),
+                referral_source=referral_source,
             )
             user.save()
         else:
@@ -182,10 +203,14 @@ def telegram_login():
                 User.objects(
                     id=user.id,
                     referred_by_id__in=[None, ''],
-                ).update_one(set__referred_by_id=referrer.id)
+                ).update_one(
+                    set__referred_by_id=referrer.id,
+                    set__referral_source=referral_source,
+                )
                 user.reload()
 
-        _complete_referral_reward(user)
+        if is_new_user:
+            _complete_referral_reward(user)
 
         launch_id = data.get('launch_id')
         if launch_id and _is_verified_telegram_launch(data.get('init_data'), telegram_id):

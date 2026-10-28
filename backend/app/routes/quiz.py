@@ -1,4 +1,8 @@
-from flask import Blueprint, request, jsonify, current_app, current_app
+import base64
+import os
+import re
+from datetime import datetime
+from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from pymongo import UpdateOne
 from app.models import (
@@ -19,7 +23,6 @@ from app.utils import (
     format_error,
     calculate_quiz_accuracy,
 )
-from datetime import datetime
 
 quiz_bp = Blueprint('quiz', __name__, url_prefix='/api/quizzes')
 
@@ -661,3 +664,59 @@ def use_leaderboard_booster(quiz_id):
     except Exception as e:
         current_app.logger.exception('Error applying leaderboard booster for quiz %s', quiz_id)
         return jsonify(format_error(f'Error applying leaderboard booster: {str(e)}')), 500
+
+
+@quiz_bp.route('/share-card', methods=['POST'])
+def upload_share_card():
+    """Upload base64 quiz card image and return permanent public URL."""
+    try:
+        data = request.get_json(silent=True) or {}
+        image_data = data.get('image_data', '')
+        if not image_data:
+            return jsonify(format_error('image_data is required')), 400
+
+        # Remove header if present: data:image/png;base64,...
+        if ',' in image_data:
+            image_data = image_data.split(',', 1)[1]
+
+        binary_data = base64.b64decode(image_data)
+        card_id = generate_id()
+
+        static_dir = os.path.join(current_app.root_path, 'static', 'share_cards')
+        os.makedirs(static_dir, exist_ok=True)
+        file_path = os.path.join(static_dir, f'{card_id}.png')
+
+        with open(file_path, 'wb') as f:
+            f.write(binary_data)
+
+        # Build public URL
+        proto = request.headers.get('X-Forwarded-Proto', request.scheme)
+        host = request.host
+        image_url = f"{proto}://{host}/api/quizzes/share-card/{card_id}.png"
+
+        return jsonify(format_success(data={
+            'card_id': card_id,
+            'image_url': image_url,
+        })), 201
+    except Exception as error:
+        current_app.logger.exception('Could not upload share card')
+        return jsonify(format_error(f'Could not upload share card: {str(error)}')), 500
+
+
+@quiz_bp.route('/share-card/<card_id>.png', methods=['GET'])
+def get_share_card_image(card_id):
+    """Serve public quiz card image."""
+    try:
+        if not re.match(r'^[a-zA-Z0-9_-]+$', card_id):
+            return jsonify(format_error('Invalid card ID')), 400
+
+        static_dir = os.path.join(current_app.root_path, 'static', 'share_cards')
+        return send_from_directory(
+            static_dir,
+            f'{card_id}.png',
+            mimetype='image/png',
+            max_age=86400,
+        )
+    except Exception:
+        return jsonify(format_error('Image not found')), 404
+

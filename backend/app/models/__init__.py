@@ -32,6 +32,7 @@ class User(Document):
     referral_code = StringField(unique=True, sparse=True)
     referred_by_id = StringField()
     referred_user_ids = ListField(StringField(), default=list)
+    referral_source = StringField(default='referral')
     last_welcome_launch_id = StringField()
 
     created_at = DateTimeField(default=datetime.utcnow)
@@ -50,6 +51,7 @@ class User(Document):
             'prev_global_rank': getattr(self, 'prev_global_rank', 0),
             'global_total_players': self.global_total_players,
             'footy_coins': self.footy_coins,
+            'referral_code': self.referral_code,
             'created_at': self.created_at.isoformat() + 'Z',
             'updated_at': self.updated_at.isoformat() + 'Z',
         }

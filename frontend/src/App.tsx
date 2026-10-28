@@ -11,6 +11,7 @@ import { LeagueWinModal } from './components/LeagueWinModal';
 import { MilestoneModal } from './components/MilestoneModal';
 import { TournamentRenewalModal } from './components/TournamentRenewalModal';
 import { WelcomeBonusModal } from './components/WelcomeBonusModal';
+import { ChallengeInviteModal, ChallengeInviteData } from './components/ChallengeInviteModal';
 import { GameSoundProvider, useGameSound } from './context/GameSoundContext';
 import { apiService } from './services/apiService';
 import { ApiResponse, LeagueWinNotification, TournamentRenewal } from './types';
@@ -37,6 +38,11 @@ const AppContent: React.FC = () => {
   const [openLeagueId, setOpenLeagueId] = useState<string | null>(null);
   const [tournamentRenewals, setTournamentRenewals] = useState<TournamentRenewal[]>([]);
   const [renewalPromptDismissed, setRenewalPromptDismissed] = useState(false);
+  const [challengeInvite, setChallengeInvite] = useState<ChallengeInviteData | null>(null);
+  const [isAcceptingChallenge, setIsAcceptingChallenge] = useState(false);
+  const [battleTargetUserId, setBattleTargetUserId] = useState<string | null>(null);
+  const [showBattlesDirectly, setShowBattlesDirectly] = useState(false);
+  const challengeChecked = useRef(false);
   const initialLeagueWinRequest = useRef<
     Promise<ApiResponse<{ win: LeagueWinNotification | null }>> | null
   >(null);
@@ -100,6 +106,33 @@ const AppContent: React.FC = () => {
   }, [isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated || challengeChecked.current) return;
+    challengeChecked.current = true;
+
+    const tg = (window as Window & {
+      Telegram?: {
+        WebApp?: {
+          initDataUnsafe?: { start_param?: string };
+        };
+      };
+    }).Telegram?.WebApp;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const startParam = tg?.initDataUnsafe?.start_param || urlParams.get('startapp') || urlParams.get('tgWebAppStartParam');
+
+    if (startParam && startParam.startsWith('chl_')) {
+      const inviteCode = startParam.slice(4);
+      void apiService.get<ChallengeInviteData & { is_self?: boolean }>(
+        `/battles/challenge-invite/${inviteCode}`
+      ).then((res) => {
+        if (res.success && res.data && !res.data.is_self) {
+          setChallengeInvite(res.data);
+        }
+      });
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
     if (!isAuthenticated || activeTab === 'coins') return;
     setRenewalPromptDismissed(false);
     void loadTournamentRenewals();
@@ -136,6 +169,22 @@ const AppContent: React.FC = () => {
     setOpenLeagueId(leagueWin.league_id);
     setActiveTab('league');
     setLeagueWin(null);
+  };
+
+  const handleAcceptChallengeInvite = async () => {
+    if (!challengeInvite) return;
+    setIsAcceptingChallenge(true);
+    try {
+      await apiService.post('/battles', { opponent_id: challengeInvite.challenger.id });
+    } catch (err) {
+      console.error('Could not send battle challenge:', err);
+    } finally {
+      setBattleTargetUserId(challengeInvite.challenger.id);
+      setShowBattlesDirectly(true);
+      setActiveTab('home');
+      setChallengeInvite(null);
+      setIsAcceptingChallenge(false);
+    }
   };
 
   const handleUiClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -178,6 +227,8 @@ const AppContent: React.FC = () => {
           <HomePage
             onCoinsClick={() => setActiveTab('coins')}
             onUnreadCountChange={updateHomeUnreadCount}
+            initialBattleTargetUserId={battleTargetUserId}
+            initialShowBattles={showBattlesDirectly}
           />
         );
       case 'league':
@@ -196,6 +247,8 @@ const AppContent: React.FC = () => {
           <HomePage
             onCoinsClick={() => setActiveTab('coins')}
             onUnreadCountChange={updateHomeUnreadCount}
+            initialBattleTargetUserId={battleTargetUserId}
+            initialShowBattles={showBattlesDirectly}
           />
         );
       default:
@@ -203,6 +256,8 @@ const AppContent: React.FC = () => {
           <HomePage
             onCoinsClick={() => setActiveTab('coins')}
             onUnreadCountChange={updateHomeUnreadCount}
+            initialBattleTargetUserId={battleTargetUserId}
+            initialShowBattles={showBattlesDirectly}
           />
         );
     }
@@ -248,6 +303,15 @@ const AppContent: React.FC = () => {
           }}
         />
       ) : null}
+      {challengeInvite && (
+        <ChallengeInviteModal
+          isOpen={!!challengeInvite}
+          invite={challengeInvite}
+          onAccept={handleAcceptChallengeInvite}
+          onDismiss={() => setChallengeInvite(null)}
+          isLoading={isAcceptingChallenge}
+        />
+      )}
     </div>
   );
 };

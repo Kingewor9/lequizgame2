@@ -250,3 +250,46 @@ def respond_to_challenge(battle_id):
     except Exception as error:
         current_app.logger.exception('Could not respond to 1v1 challenge')
         return jsonify(format_error(f'Could not respond to challenge: {str(error)}')), 500
+
+
+@battle_bp.route('/challenge-invite/<invite_code>', methods=['GET'])
+def get_challenge_invite(invite_code):
+    """Retrieve challenger profile details from a challenge invite link."""
+    try:
+        parts = invite_code.strip().split('_')
+        code = parts[0]
+        score = None
+        if len(parts) > 1 and parts[1].isdigit():
+            score = int(parts[1])
+
+        challenger = User.objects(referral_code=code).first()
+        if not challenger:
+            challenger = User.objects(id=code).first()
+
+        if not challenger:
+            return jsonify(format_error('Challenger not found')), 404
+
+        current_user_id = None
+        try:
+            from flask_jwt_extended import verify_jwt_in_request
+            verify_jwt_in_request(optional=True)
+            current_user_id = get_jwt_identity()
+        except Exception:
+            pass
+
+        return jsonify(format_success(data={
+            'challenger': {
+                'id': challenger.id,
+                'first_name': challenger.first_name,
+                'last_name': challenger.last_name,
+                'name': ' '.join(filter(None, [challenger.first_name, challenger.last_name])),
+                'username': challenger.username,
+                'photo_url': challenger.photo_url,
+                'overall_score': challenger.overall_score,
+            },
+            'quiz_score': score,
+            'is_self': bool(current_user_id and current_user_id == challenger.id),
+        })), 200
+    except Exception as error:
+        current_app.logger.exception('Could not fetch challenge invite info')
+        return jsonify(format_error(f'Could not fetch challenge invite info: {str(error)}')), 500
