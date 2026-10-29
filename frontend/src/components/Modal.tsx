@@ -8,6 +8,7 @@ interface ModalProps {
   children: React.ReactNode;
   closeButton?: boolean;
   maxHeight?: string;
+  className?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -17,6 +18,7 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   closeButton = true,
   maxHeight = '80vh',
+  className = '',
 }) => {
   const titleId = React.useId();
 
@@ -25,7 +27,7 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
-        className="modal-content"
+        className={`modal-content ${className}`.trim()}
         style={{ maxHeight }}
         role="dialog"
         aria-modal="true"

@@ -11,6 +11,12 @@ from app.models import (
 BATTLE_DURATION = timedelta(hours=24)
 SETTLEMENT_GRACE = timedelta(seconds=10)
 NOTIFICATION_CLAIM_DURATION = timedelta(minutes=1)
+BATTLE_REMINDERS = (
+    (timedelta(hours=1), '1 hour'),
+    (timedelta(minutes=30), '30 minutes'),
+    (timedelta(minutes=15), '15 minutes'),
+    (timedelta(minutes=5), '5 minutes'),
+)
 WIN_REWARD = 150
 DRAW_REWARD = 75
 
@@ -287,6 +293,91 @@ def notify_battle_quiz_score(response):
         _notify_battle_quiz_score(battle, response)
 
 
+def _notify_battle_reminder(battle, remaining, reminder_label, now=None):
+    now = now or datetime.utcnow()
+    if (
+        battle.status != 'active'
+        or not battle.expires_at
+        or now < battle.expires_at - remaining
+        or now >= battle.expires_at
+    ):
+        return
+
+    reminder_key = str(int(remaining.total_seconds()))
+    sent_to = set(
+        getattr(battle, 'reminder_notification_sent_to', []) or []
+    )
+    if all(
+        f'{reminder_key}:{player_id}' in sent_to
+        for player_id in (battle.challenger_id, battle.opponent_id)
+    ):
+        return
+
+    players = {
+        player.id: player
+        for player in User.objects(
+            id__in=[battle.challenger_id, battle.opponent_id]
+        ).only('id', 'first_name', 'last_name', 'telegram_id')
+    }
+    if len(players) != 2:
+        return
+
+    claim_until = now + NOTIFICATION_CLAIM_DURATION
+    claimed_battle = Battle.objects(
+        id=battle.id,
+        status='active',
+        __raw__={
+            '$or': [
+                {'reminder_notification_claimed_until': {'$exists': False}},
+                {'reminder_notification_claimed_until': None},
+                {'reminder_notification_claimed_until': {'$lte': now}},
+            ]
+        },
+    ).modify(
+        new=True,
+        set__reminder_notification_claimed_until=claim_until,
+    )
+    if not claimed_battle:
+        return
+
+    from app.services.telegram_service import get_telegram_service
+
+    service = get_telegram_service()
+    sent_to = set(
+        getattr(claimed_battle, 'reminder_notification_sent_to', []) or []
+    )
+    try:
+        for player_id, player in players.items():
+            notification_key = f'{reminder_key}:{player_id}'
+            if notification_key in sent_to:
+                continue
+
+            opponent_id = (
+                battle.opponent_id
+                if player_id == battle.challenger_id
+                else battle.challenger_id
+            )
+            opponent = players[opponent_id]
+            opponent_name = _battle_player_name(opponent, 'your opponent')
+            message = (
+                f'⏳ 1v1 battle reminder\n\n'
+                f'Your battle with {opponent_name} has {reminder_label} left. '
+                'Play quizzes before time runs out!'
+            )
+            if service.send_battle_notification(player.telegram_id, message):
+                claimed_battle.update(
+                    add_to_set__reminder_notification_sent_to=notification_key
+                )
+                sent_to.add(notification_key)
+    finally:
+        Battle.objects(
+            id=battle.id,
+            reminder_notification_claimed_until=claim_until,
+        ).update(
+            unset__reminder_notification_claimed_until=1,
+        )
+
+
 def _notify_battle_result(battle):
     if battle.result_notification_sent:
         return
@@ -399,6 +490,15 @@ def sync_battles(now=None):
         )
         for response in responses:
             _notify_battle_quiz_score(battle, response)
+
+        for remaining, reminder_label in BATTLE_REMINDERS:
+            if now >= battle.expires_at - remaining:
+                _notify_battle_reminder(
+                    battle,
+                    remaining,
+                    reminder_label,
+                    now,
+                )
 
         if battle.expires_at <= now - SETTLEMENT_GRACE:
             _settle_battle(battle, now)

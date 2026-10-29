@@ -1013,6 +1013,8 @@ export const TournamentPage: React.FC<TournamentPageProps> = ({ onUnreadCountCha
         }}
         title={quizResults ? 'Duel submitted' : activeQuiz?.name || 'Tournament quiz'}
         closeButton={(!quizStarted && !quizSubmitting) || !!quizResults}
+        className="quiz-modal"
+        maxHeight="calc(100dvh - 24px)"
       >
         {!quizResults && quizStarted && activeQuiz?.questions?.[currentQuestionIndex] && (
           <div className="tournament-quiz-modal">

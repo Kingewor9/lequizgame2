@@ -445,6 +445,8 @@ class Battle(Document):
     winner_id = StringField()
     coins_awarded = IntField(default=0)
     challenger_response_unread = BooleanField(default=False)
+    reminder_notification_sent_to = ListField(StringField(), default=list)
+    reminder_notification_claimed_until = DateTimeField(null=True, default=None)
     result_notification_sent = BooleanField(default=False)
     result_notification_sent_to = ListField(StringField(), default=list)
     result_notification_claimed_until = DateTimeField(null=True, default=None)

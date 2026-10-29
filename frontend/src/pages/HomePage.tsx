@@ -601,6 +601,8 @@ export const HomePage: React.FC<HomePageProps> = ({
         onClose={handleCloseQuizModal}
         title={quizResults ? 'Quiz Results' : currentQuiz?.name || 'Daily Quiz'}
         closeButton={!quizStarted || !!quizResults}
+        className="quiz-modal"
+        maxHeight="calc(100dvh - 24px)"
       >
         {!quizResults && quizStarted && currentQuiz?.questions && (
           <div className="quiz-container">
