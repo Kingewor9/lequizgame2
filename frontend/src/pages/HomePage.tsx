@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronRight, Coins, ListOrdered, Trophy, CheckCircle2, Target, Sparkles, Clock, Volume2, VolumeX, Swords, Camera } from 'lucide-react';
+import { ChevronRight, Coins, ListOrdered, Trophy, CheckCircle2, Target, Sparkles, Clock, Volume2, VolumeX, Swords, Camera, Zap, Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { BattleSummary, Quiz, QuizResponse } from '../types';
 import { apiService } from '../services/apiService';
@@ -62,6 +62,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizResults, setQuizResults] = useState<QuizResponse | null>(null);
   const [isBoosterLoading, setIsBoosterLoading] = useState(false);
+  const [isBuyingBooster, setIsBuyingBooster] = useState(false);
+  const [showBoosterBuyModal, setShowBoosterBuyModal] = useState(false);
 
   // Share Card state
   const [showChallengeShareModal, setShowChallengeShareModal] = useState(false);
@@ -340,8 +342,128 @@ export const HomePage: React.FC<HomePageProps> = ({
         leaderboard_booster: response.data!.leaderboard_booster,
       } : current);
       await refreshUser();
+
+      // If user just used their last free booster and extra boosters can be purchased, open the modal
+      if (response.data.leaderboard_booster.can_buy_extra) {
+        setShowBoosterBuyModal(true);
+      }
     } finally {
       setIsBoosterLoading(false);
+    }
+  };
+
+  const handleBuyExtraBoosters = async () => {
+    const telegram = (window as unknown as {
+      Telegram?: {
+        WebApp?: {
+          openInvoice?: (url: string, callback: (status: string) => void) => void;
+        };
+      };
+    }).Telegram?.WebApp;
+
+    if (!telegram?.openInvoice) {
+      setAlert({
+        message: 'Telegram Stars checkout is only available inside the Telegram app.',
+        type: 'error',
+      });
+      return;
+    }
+
+    setIsBuyingBooster(true);
+    try {
+      const response = await apiService.post<{
+        purchase_id: string;
+        invoice_url: string;
+        amount: number;
+        stars: number;
+        extra_boosters: number;
+      }>('/quizzes/leaderboard-booster/stars-purchase', {});
+
+      if (!response.success || !response.data) {
+        setAlert({
+          message: response.error || 'Could not start booster checkout.',
+          type: 'error',
+        });
+        setIsBuyingBooster(false);
+        return;
+      }
+
+      const { purchase_id: purchaseId, invoice_url: invoiceUrl } = response.data;
+      telegram.openInvoice(invoiceUrl, (status) => {
+        setIsBuyingBooster(false);
+        if (status === 'cancelled') return;
+        if (status !== 'paid') {
+          setAlert({
+            message: 'Telegram could not complete this payment. Please try again.',
+            type: 'error',
+          });
+          return;
+        }
+
+        const confirmPayment = async () => {
+          for (let attempt = 0; attempt < 12; attempt += 1) {
+            const check = await apiService.get<{
+              status: string;
+              amount: number;
+              uses_remaining: number;
+              max_uses_today: number;
+              purchased_today: boolean;
+            }>(`/quizzes/leaderboard-booster/stars-purchases/${purchaseId}`);
+
+            if (check.success && check.data?.status === 'paid') {
+              await refreshUser();
+              playSound('points');
+              setShowBoosterBuyModal(false);
+
+              const extraUses = check.data.uses_remaining ?? 2;
+              const maxUses = check.data.max_uses_today ?? 5;
+              setQuizResults((current) => {
+                if (!current) return current;
+                const bonus = current.leaderboard_bonus || 0;
+                return {
+                  ...current,
+                  leaderboard_booster: {
+                    ...current.leaderboard_booster,
+                    available: current.points_earned > 0 && bonus === 0 && extraUses > 0,
+                    uses_remaining: extraUses,
+                    bonus_points: bonus,
+                    can_buy_extra: false,
+                    purchased_today: true,
+                    max_uses_today: maxUses,
+                  },
+                };
+              });
+
+              setAlert({
+                message: '2 extra x2 boosters unlocked for today!',
+                type: 'success',
+              });
+              return;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+
+          setAlert({
+            message: 'Payment received. Your extra boosters are being activated and will appear shortly.',
+            type: 'info',
+          });
+        };
+
+        void confirmPayment().catch((err: unknown) => {
+          console.error('Error confirming booster purchase:', err);
+          setAlert({
+            message: 'Payment received. Your extra boosters will appear shortly.',
+            type: 'info',
+          });
+        });
+      });
+    } catch (error) {
+      console.error('Error initiating booster purchase:', error);
+      setAlert({
+        message: 'Could not start booster checkout. Please try again.',
+        type: 'error',
+      });
+      setIsBuyingBooster(false);
     }
   };
 
@@ -675,8 +797,8 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
             </div>
 
-            {currentQuiz?.destination !== 'tournament' &&
-              quizResults.leaderboard_booster?.available && (
+            {currentQuiz?.destination !== 'tournament' && (
+              quizResults.leaderboard_booster?.available ? (
                 <div className="leaderboard-booster">
                   <div className="leaderboard-booster-copy">
                     <Sparkles size={20} aria-hidden="true" />
@@ -702,7 +824,44 @@ export const HomePage: React.FC<HomePageProps> = ({
                     Watch ad to apply x2
                   </ShowAdButton>
                 </div>
-              )}
+              ) : quizResults.leaderboard_booster?.can_buy_extra ? (
+                <div className="leaderboard-booster booster-buy-card">
+                  <div className="booster-buy-badge">
+                    <Star size={12} fill="currentColor" aria-hidden="true" />
+                    <span>DAILY LIMIT REACHED</span>
+                  </div>
+                  <div className="leaderboard-booster-copy booster-buy-copy">
+                    <div className="booster-buy-icon-wrap">
+                      <Zap size={20} className="booster-buy-zap" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <strong>Unlock 2 Extra x2 Boosters</strong>
+                      <span>
+                        You've used all 3 daily boosters! Get 2 extra x2 boosters today for 175 Stars.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="leaderboard-booster-button booster-buy-button"
+                    disabled={isBuyingBooster}
+                    onClick={handleBuyExtraBoosters}
+                  >
+                    {isBuyingBooster ? (
+                      <span className="booster-button-content">
+                        <span className="booster-spinner" />
+                        <span>Processing checkout...</span>
+                      </span>
+                    ) : (
+                      <span className="booster-button-content">
+                        <Star size={16} fill="currentColor" aria-hidden="true" />
+                        <span>Buy 2 Boosters • 175 Stars</span>
+                      </span>
+                    )}
+                  </button>
+                </div>
+              ) : null
+            )}
 
             {/* ── Challenge a Friend & Share to Telegram Story ────────────── */}
             <div className="results-share-actions">
@@ -755,6 +914,59 @@ export const HomePage: React.FC<HomePageProps> = ({
             points={quizResults.points_earned + (quizResults.leaderboard_bonus || 0)}
             botUsername="footyiqgamebot"
           />
+
+          {showBoosterBuyModal && (
+            <Modal
+              isOpen={showBoosterBuyModal}
+              onClose={() => setShowBoosterBuyModal(false)}
+              title="Daily Boosters Exhausted"
+            >
+              <div className="booster-modal-content">
+                <div className="booster-modal-icon-badge">
+                  <Zap size={36} className="booster-modal-zap" aria-hidden="true" />
+                </div>
+                <h3 className="booster-modal-title">Get 2 Extra x2 Boosters</h3>
+                <p className="booster-modal-text">
+                  You've used all 3 of your free x2 boosters for today.
+                  Unlock <strong>2 extra boosters</strong> now to double your leaderboard points on more quizzes!
+                </p>
+                <div className="booster-modal-price-pill">
+                  <Star size={18} fill="currentColor" aria-hidden="true" />
+                  <span>175 Telegram Stars</span>
+                </div>
+                <p className="booster-modal-limit-note">
+                  This upgrade is available once per day.
+                </p>
+                <div className="booster-modal-actions">
+                  <button
+                    type="button"
+                    className="leaderboard-booster-button booster-buy-button"
+                    disabled={isBuyingBooster}
+                    onClick={handleBuyExtraBoosters}
+                  >
+                    {isBuyingBooster ? (
+                      <span className="booster-button-content">
+                        <span className="booster-spinner" />
+                        <span>Processing checkout...</span>
+                      </span>
+                    ) : (
+                      <span className="booster-button-content">
+                        <Star size={16} fill="currentColor" aria-hidden="true" />
+                        <span>Buy 2 Boosters for 175 Stars</span>
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="booster-modal-cancel-btn"
+                    onClick={() => setShowBoosterBuyModal(false)}
+                  >
+                    Maybe Later
+                  </button>
+                </div>
+              </div>
+            </Modal>
+          )}
         </>
       )}
     </div>

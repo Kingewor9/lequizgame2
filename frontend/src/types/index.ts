@@ -231,6 +231,12 @@ export interface QuizResponse {
     available: boolean;
     uses_remaining: number;
     bonus_points: number;
+    can_buy_extra?: boolean;
+    extra_boosters_count?: number;
+    extra_boosters_price?: number;
+    purchased_today?: boolean;
+    uses_today?: number;
+    max_uses_today?: number;
   };
   accuracy_rate: number;
   completed_at: string;

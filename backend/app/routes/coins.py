@@ -236,25 +236,36 @@ def telegram_payment_webhook():
                 return
             if purchase['status'] != 'pending':
                 raise ValueError('Stars invoice is not payable')
-
-            balance_update = user_collection.update_one(
-                {'_id': purchase['user_id'], 'telegram_id': payer_id},
-                {'$inc': {'footy_coins': purchase['amount']}},
-                session=session,
-            )
-            if balance_update.matched_count != 1:
-                raise ValueError('The player for this Stars invoice was not found')
-
+            item_type = purchase.get('item_type', 'coins')
             now = datetime.utcnow()
-            transaction_collection.insert_one({
-                '_id': generate_id(),
-                'user_id': purchase['user_id'],
-                'type': 'purchased',
-                'amount': purchase['amount'],
-                'reason': f"Telegram Stars purchase ({charge_id})",
-                'telegram_payment_charge_id': charge_id,
-                'created_at': now,
-            }, session=session)
+
+            if item_type == 'booster':
+                today = now.date().isoformat()
+                user_update = user_collection.update_one(
+                    {'_id': purchase['user_id'], 'telegram_id': payer_id},
+                    {'$set': {'leaderboard_booster_purchased_day': today}},
+                    session=session,
+                )
+                if user_update.matched_count != 1:
+                    raise ValueError('The player for this Stars invoice was not found')
+            else:
+                balance_update = user_collection.update_one(
+                    {'_id': purchase['user_id'], 'telegram_id': payer_id},
+                    {'$inc': {'footy_coins': purchase['amount']}},
+                    session=session,
+                )
+                if balance_update.matched_count != 1:
+                    raise ValueError('The player for this Stars invoice was not found')
+
+                transaction_collection.insert_one({
+                    '_id': generate_id(),
+                    'user_id': purchase['user_id'],
+                    'type': 'purchased',
+                    'amount': purchase['amount'],
+                    'reason': f"Telegram Stars purchase ({charge_id})",
+                    'telegram_payment_charge_id': charge_id,
+                    'created_at': now,
+                }, session=session)
             purchase_collection.update_one(
                 {'_id': purchase['_id'], 'status': 'pending'},
                 {'$set': {

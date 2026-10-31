@@ -16,6 +16,7 @@ from app.models import (
     TournamentFixture,
     TournamentRegistration,
     TournamentSubmission,
+    StarsCoinPurchase,
 )
 from app.utils import (
     generate_id,
@@ -109,6 +110,11 @@ def update_global_rankings():
         current_app.logger.exception('Could not update global quiz rankings')
 
 
+BOOSTER_FREE_DAILY_LIMIT = 3
+BOOSTER_EXTRA_COUNT = 2
+BOOSTER_STARS_PRICE = 175
+
+
 def _leaderboard_booster_status(user, quiz, response, now=None):
     now = now or datetime.utcnow()
     today = now.date().isoformat()
@@ -118,15 +124,37 @@ def _leaderboard_booster_status(user, quiz, response, now=None):
         else 0
     )
     bonus = getattr(response, 'leaderboard_bonus', 0) or 0
+    purchased_today = getattr(user, 'leaderboard_booster_purchased_day', '') == today
+    max_uses_today = (
+        BOOSTER_FREE_DAILY_LIMIT + BOOSTER_EXTRA_COUNT
+        if purchased_today
+        else BOOSTER_FREE_DAILY_LIMIT
+    )
+    uses_remaining = max(0, max_uses_today - uses_today)
+    is_tournament = getattr(quiz, 'destination', 'game') == 'tournament'
+
+    # Can only buy extra after exhausting the 3 free daily boosters, and only once per day
+    can_buy_extra = (
+        not is_tournament
+        and uses_today >= BOOSTER_FREE_DAILY_LIMIT
+        and not purchased_today
+    )
+
     return {
         'available': (
-            getattr(quiz, 'destination', 'game') != 'tournament'
+            not is_tournament
             and response.points_earned > 0
             and bonus == 0
-            and uses_today < 3
+            and uses_remaining > 0
         ),
-        'uses_remaining': max(0, 3 - uses_today),
+        'uses_remaining': uses_remaining,
         'bonus_points': bonus,
+        'can_buy_extra': can_buy_extra,
+        'extra_boosters_count': BOOSTER_EXTRA_COUNT,
+        'extra_boosters_price': BOOSTER_STARS_PRICE,
+        'purchased_today': purchased_today,
+        'uses_today': uses_today,
+        'max_uses_today': max_uses_today,
     }
 
 
@@ -550,7 +578,18 @@ def use_leaderboard_booster(quiz_id):
                                         '$ifNull': ['$leaderboard_booster_quiz_ids', []]
                                     }
                                 },
-                                3,
+                                {
+                                    '$cond': [
+                                        {
+                                            '$eq': [
+                                                {'$ifNull': ['$leaderboard_booster_purchased_day', '']},
+                                                today,
+                                            ]
+                                        },
+                                        BOOSTER_FREE_DAILY_LIMIT + BOOSTER_EXTRA_COUNT,
+                                        BOOSTER_FREE_DAILY_LIMIT,
+                                    ]
+                                },
                             ]
                         },
                     },
@@ -583,7 +622,7 @@ def use_leaderboard_booster(quiz_id):
             ],
         )
         if reservation.modified_count != 1:
-            return jsonify(format_error('You have used all 3 leaderboard boosters for today')), 429
+            return jsonify(format_error('You have used all leaderboard boosters for today')), 429
 
         bonus = response.points_earned
         response_updated = False
@@ -664,6 +703,149 @@ def use_leaderboard_booster(quiz_id):
     except Exception as e:
         current_app.logger.exception('Error applying leaderboard booster for quiz %s', quiz_id)
         return jsonify(format_error(f'Error applying leaderboard booster: {str(e)}')), 500
+
+
+@quiz_bp.route('/leaderboard-booster/stars-purchase', methods=['POST'])
+@jwt_required()
+def create_booster_stars_purchase():
+    """Create a Telegram Stars invoice to buy 2 extra leaderboard boosters for 175 Stars."""
+    try:
+        user_id = get_jwt_identity()
+        user = User.objects(id=user_id).first()
+        if not user:
+            return jsonify(format_error('User not found')), 404
+
+        now = datetime.utcnow()
+        today = now.date().isoformat()
+
+        uses_today = (
+            len(getattr(user, 'leaderboard_booster_quiz_ids', []) or [])
+            if getattr(user, 'leaderboard_booster_day', '') == today
+            else 0
+        )
+        if uses_today < BOOSTER_FREE_DAILY_LIMIT:
+            return jsonify(format_error(
+                f'You must use all {BOOSTER_FREE_DAILY_LIMIT} daily boosters before buying extra boosters'
+            )), 400
+
+        if getattr(user, 'leaderboard_booster_purchased_day', '') == today:
+            return jsonify(format_error('You have already purchased extra boosters for today')), 400
+
+        purchase_id = generate_id()
+        invoice_payload = generate_id()
+        purchase = StarsCoinPurchase(
+            id=purchase_id,
+            user_id=user.id,
+            telegram_id=user.telegram_id,
+            invoice_payload=invoice_payload,
+            amount=BOOSTER_STARS_PRICE,
+            item_type='booster',
+        )
+        purchase.save()
+
+        invoice_url = ''
+        try:
+            from app.routes.coins import telegram_bot_api
+            invoice_result = telegram_bot_api('createInvoiceLink', {
+                'title': f'{BOOSTER_EXTRA_COUNT} Extra x2 Boosters',
+                'description': f'Unlock {BOOSTER_EXTRA_COUNT} extra x2 leaderboard boosters for today in Footy IQ.',
+                'payload': invoice_payload,
+                'currency': 'XTR',
+                'prices': [{'label': f'{BOOSTER_EXTRA_COUNT} Extra Boosters', 'amount': BOOSTER_STARS_PRICE}],
+            })
+            invoice_url = invoice_result['result']
+        except Exception as e:
+            if current_app.config.get('DEBUG'):
+                current_app.logger.warning('Telegram invoice failed in DEBUG mode, using fallback: %s', e)
+                invoice_url = f'https://t.me/$invoice_dev_{invoice_payload}'
+            else:
+                purchase.delete()
+                raise
+
+        return jsonify(format_success(data={
+            'purchase_id': purchase_id,
+            'invoice_url': invoice_url,
+            'amount': BOOSTER_STARS_PRICE,
+            'stars': BOOSTER_STARS_PRICE,
+            'extra_boosters': BOOSTER_EXTRA_COUNT,
+        })), 201
+
+    except Exception as e:
+        current_app.logger.exception('Error creating Telegram Stars invoice for booster')
+        return jsonify(format_error(f'Could not create Stars invoice: {str(e)}')), 502
+
+
+@quiz_bp.route('/leaderboard-booster/stars-purchases/<purchase_id>', methods=['GET'])
+@jwt_required()
+def get_booster_stars_purchase(purchase_id):
+    """Return payment status for a booster stars purchase and current booster state."""
+    user_id = get_jwt_identity()
+    purchase = StarsCoinPurchase.objects(
+        id=purchase_id,
+        user_id=user_id,
+        item_type='booster',
+    ).first()
+    if not purchase:
+        return jsonify(format_error('Purchase not found')), 404
+
+    user = User.objects(id=user_id).first()
+    now = datetime.utcnow()
+    today = now.date().isoformat()
+    purchased_today = getattr(user, 'leaderboard_booster_purchased_day', '') == today if user else False
+    uses_today = (
+        len(getattr(user, 'leaderboard_booster_quiz_ids', []) or [])
+        if user and getattr(user, 'leaderboard_booster_day', '') == today
+        else 0
+    )
+    max_uses_today = (
+        BOOSTER_FREE_DAILY_LIMIT + BOOSTER_EXTRA_COUNT
+        if purchased_today
+        else BOOSTER_FREE_DAILY_LIMIT
+    )
+    uses_remaining = max(0, max_uses_today - uses_today)
+
+    return jsonify(format_success(data={
+        'status': purchase.status,
+        'amount': purchase.amount,
+        'item_type': purchase.item_type,
+        'uses_remaining': uses_remaining,
+        'max_uses_today': max_uses_today,
+        'purchased_today': purchased_today,
+    })), 200
+
+
+@quiz_bp.route('/leaderboard-booster/stars-purchases/<purchase_id>/simulate-pay', methods=['POST'])
+@jwt_required()
+def simulate_booster_stars_payment(purchase_id):
+    """Development testing endpoint to simulate a successful Stars payment."""
+    if not current_app.config.get('DEBUG'):
+        return jsonify(format_error('Simulate payment is only available in debug mode')), 403
+
+    user_id = get_jwt_identity()
+    purchase = StarsCoinPurchase.objects(
+        id=purchase_id,
+        user_id=user_id,
+        item_type='booster',
+    ).first()
+    if not purchase:
+        return jsonify(format_error('Purchase not found')), 404
+
+    now = datetime.utcnow()
+    today = now.date().isoformat()
+
+    User.objects(id=user_id).update_one(
+        set__leaderboard_booster_purchased_day=today
+    )
+    purchase.status = 'paid'
+    purchase.paid_at = now
+    purchase.telegram_payment_charge_id = f'dev_sim_{generate_id()}'
+    purchase.save()
+
+    return jsonify(format_success(data={
+        'status': 'paid',
+        'uses_remaining': BOOSTER_EXTRA_COUNT,
+        'purchased_today': True,
+    })), 200
 
 
 @quiz_bp.route('/share-card', methods=['POST'])

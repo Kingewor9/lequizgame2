@@ -563,6 +563,194 @@
   box-shadow: 0 8px 24px rgba(223, 255, 0, 0.16);
 }
 
+/* ── Extra Booster Purchase (Telegram Stars) ────────────────────────────── */
+.booster-buy-card {
+  border-color: rgba(245, 158, 11, 0.45);
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(245, 158, 11, 0.2), transparent 60%),
+    radial-gradient(ellipse at 0% 100%, rgba(251, 191, 36, 0.08), transparent 50%),
+    rgba(24, 20, 15, 0.65);
+  box-shadow: 0 4px 24px rgba(245, 158, 11, 0.1);
+  animation: booster-fade-in 0.35s ease-out;
+}
+
+@keyframes booster-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.booster-buy-badge {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.booster-buy-copy {
+  color: #fbbf24;
+}
+
+.booster-buy-icon-wrap {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.12));
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.22);
+}
+
+.booster-buy-zap {
+  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.5));
+}
+
+.booster-buy-button {
+  border: 1px solid #fbbf24;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #0b0e14;
+  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.25);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.booster-buy-button:hover:not(:disabled) {
+  border-color: #fde68a;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  box-shadow: 0 6px 24px rgba(245, 158, 11, 0.4);
+  transform: translateY(-1px);
+}
+
+.booster-button-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.booster-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(11, 14, 20, 0.35);
+  border-top-color: #0b0e14;
+  border-radius: 50%;
+  animation: booster-spin 0.75s linear infinite;
+}
+
+@keyframes booster-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Booster Exhausted Prompt Modal ─────────────────────────────────────── */
+.booster-modal-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 12px 6px 6px;
+  gap: 15px;
+}
+
+.booster-modal-icon-badge {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.12));
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  box-shadow: 0 0 24px rgba(245, 158, 11, 0.25);
+}
+
+.booster-modal-zap {
+  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.6));
+}
+
+.booster-modal-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #f8fafc;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.booster-modal-text {
+  font-size: 0.88rem;
+  color: #94a3b8;
+  line-height: 1.55;
+  margin: 0;
+  max-width: 320px;
+}
+
+.booster-modal-text strong {
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.booster-modal-price-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.booster-modal-limit-note {
+  font-size: 0.74rem;
+  color: #64748b;
+  margin: -4px 0 0;
+}
+
+.booster-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.booster-modal-cancel-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.booster-modal-cancel-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .results-share-actions {
   display: flex;
   flex-direction: column;

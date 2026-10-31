@@ -27,6 +27,7 @@ class User(Document):
     global_total_players = IntField(default=0)
     leaderboard_booster_day = StringField(default='')
     leaderboard_booster_quiz_ids = ListField(StringField(), default=list)
+    leaderboard_booster_purchased_day = StringField(default='')
     footy_coins = IntField(default=0)
     welcome_bonus_claimed = BooleanField(default=False)
     referral_code = StringField(unique=True, sparse=True)
@@ -52,6 +53,7 @@ class User(Document):
             'global_total_players': self.global_total_players,
             'footy_coins': self.footy_coins,
             'referral_code': self.referral_code,
+            'leaderboard_booster_purchased_day': getattr(self, 'leaderboard_booster_purchased_day', ''),
             'created_at': self.created_at.isoformat() + 'Z',
             'updated_at': self.updated_at.isoformat() + 'Z',
         }
@@ -614,6 +616,7 @@ class StarsCoinPurchase(Document):
     telegram_id = IntField(required=True)
     invoice_payload = StringField(required=True)
     amount = IntField(required=True)
+    item_type = StringField(default='coins', choices=('coins', 'booster'))
     status = StringField(default='pending', choices=('pending', 'paid'))
     telegram_payment_charge_id = StringField()
     created_at = DateTimeField(default=datetime.utcnow)
