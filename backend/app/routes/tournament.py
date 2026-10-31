@@ -399,8 +399,9 @@ def get_tournament(tournament_id):
             user_id=user_id,
         ).first()
         gameweek = 0
+        now = datetime.utcnow()
         if tournament.status == 'active':
-            elapsed = datetime.utcnow() - tournament.start_at
+            elapsed = now - tournament.start_at
             gameweek = min(
                 max(1, int(elapsed.total_seconds() // 86400) + 1),
                 tournament.total_gameweeks,
@@ -475,12 +476,19 @@ def get_tournament(tournament_id):
                 )
             )
             if tournament.status == 'active' and gameweek and has_playable_fixture:
-                quiz = Quiz.objects(
+                quizzes = list(Quiz.objects(
                     destination='tournament',
                     tournament_id=tournament.id,
                     tournament_gameweek=gameweek,
                     is_active=True,
-                ).first()
+                ).order_by('-created_at'))
+                quiz = next(
+                    (
+                        candidate for candidate in quizzes
+                        if not candidate.scheduled_for or candidate.scheduled_for <= now
+                    ),
+                    quizzes[0] if quizzes else None,
+                )
                 if quiz:
                     already_played = TournamentSubmission.objects(
                         user_id=user_id,

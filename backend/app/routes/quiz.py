@@ -171,6 +171,7 @@ def get_today_quiz():
             quiz for quiz in Quiz.objects(expires_at__gt=now, is_active=True).order_by('-created_at')
             if getattr(quiz, 'destination', 'game') != 'tournament'
         ]
+        quizzes.sort(key=lambda quiz: bool(quiz.scheduled_for and quiz.scheduled_for > now))
         
         if not quizzes:
             return jsonify(format_success(data=[], message='No quizzes available')), 200
@@ -901,4 +902,3 @@ def get_share_card_image(card_id):
         )
     except Exception:
         return jsonify(format_error('Image not found')), 404
-
