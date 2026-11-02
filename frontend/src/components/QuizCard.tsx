@@ -59,7 +59,12 @@ export const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStartClick, isLoadin
             )}
           </h3>
         </div>
-        {quiz.cost_in_footy_coins > 0 && (
+        {quiz.cost_currency === 'stars' ? (
+          <div className="quiz-cost-pill">
+            <Star size={13} />
+            <span>{quiz.cost_in_stars ?? 0} Stars</span>
+          </div>
+        ) : quiz.cost_in_footy_coins > 0 && (
           <div className="quiz-cost-pill">
             <Coins size={13} />
             <span>{quiz.cost_in_footy_coins}</span>
@@ -111,7 +116,13 @@ export const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStartClick, isLoadin
           disabled={isLoading}
         >
           <ChevronRight size={18} strokeWidth={2.5} />
-          <span>{isLoading ? 'Starting Quiz...' : 'Start Quiz'}</span>
+          <span>
+            {isLoading
+              ? 'Starting Quiz...'
+              : quiz.cost_currency === 'stars' && !quiz.stars_entry_paid
+                ? `Pay ${quiz.cost_in_stars ?? 0} Stars & Play`
+                : 'Start Quiz'}
+          </span>
         </button>
       )}
     </div>

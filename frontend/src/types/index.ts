@@ -100,6 +100,9 @@ export interface Quiz {
   points_per_question: number;
   total_points: number;
   cost_in_footy_coins: number;
+  cost_currency?: 'footy_coins' | 'stars';
+  cost_in_stars?: number;
+  stars_entry_paid?: boolean;
   expires_at: string;
   scheduled_for?: string;
   destination?: 'game' | 'tournament';

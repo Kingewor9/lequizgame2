@@ -160,7 +160,14 @@ export const HomePage: React.FC<HomePageProps> = ({
       return;
     }
 
-    if (user.footy_coins < selectedQuiz.cost_in_footy_coins) {
+    const starsCost = selectedQuiz.cost_in_stars ?? 0;
+    const isStarsQuiz = selectedQuiz.cost_currency === 'stars';
+    if (isStarsQuiz && starsCost < 1) {
+      setAlert({ message: 'This quiz has an invalid Telegram Stars price.', type: 'error' });
+      return;
+    }
+
+    if (!isStarsQuiz && user.footy_coins < selectedQuiz.cost_in_footy_coins) {
       setAlert({
         message: `You need ${selectedQuiz.cost_in_footy_coins} Footy Coins to play this quiz. Earn more in the Coins tab!`,
         type: 'error',
@@ -171,14 +178,89 @@ export const HomePage: React.FC<HomePageProps> = ({
     try {
       setIsQuizLoading(true);
 
-      const deductResponse = await apiService.post('/users/spend-coins', {
-        amount: selectedQuiz.cost_in_footy_coins,
-        reason: `Quiz: ${selectedQuiz.name}`,
-      });
+      if (isStarsQuiz && !selectedQuiz.stars_entry_paid) {
+        const telegram = (window as unknown as {
+          Telegram?: {
+            WebApp?: {
+              openInvoice?: (url: string, callback: (status: string) => void) => void;
+            };
+          };
+        }).Telegram?.WebApp;
 
-      if (!deductResponse.success) {
-        setAlert({ message: deductResponse.error || 'Failed to start quiz', type: 'error' });
-        return;
+        if (!telegram?.openInvoice) {
+          setAlert({
+            message: 'Telegram Stars checkout is only available inside the Telegram app.',
+            type: 'error',
+          });
+          return;
+        }
+
+        const invoiceResponse = await apiService.post<{
+          purchase_id?: string;
+          invoice_url?: string;
+          already_paid?: boolean;
+        }>(`/quizzes/${selectedQuiz.id}/stars-purchase`, {});
+        if (!invoiceResponse.success || !invoiceResponse.data) {
+          setAlert({
+            message: invoiceResponse.error || 'Could not start Stars checkout.',
+            type: 'error',
+          });
+          return;
+        }
+
+        if (!invoiceResponse.data.already_paid) {
+          const invoiceUrl = invoiceResponse.data.invoice_url;
+          const purchaseId = invoiceResponse.data.purchase_id;
+          if (!invoiceUrl || !purchaseId) {
+            setAlert({ message: 'Stars checkout returned an invalid invoice.', type: 'error' });
+            return;
+          }
+
+          const invoiceStatus = await new Promise<string>((resolve) => {
+            telegram.openInvoice?.(invoiceUrl, resolve);
+          });
+          if (invoiceStatus === 'cancelled') return;
+          if (invoiceStatus !== 'paid') {
+            setAlert({
+              message: 'Telegram could not complete this payment. Please try again.',
+              type: 'error',
+            });
+            return;
+          }
+
+          let paymentConfirmed = false;
+          for (let attempt = 0; attempt < 15; attempt += 1) {
+            if (attempt > 0) await new Promise((resolve) => window.setTimeout(resolve, 800));
+            const statusResponse = await apiService.get<{ status: string }>(
+              `/footy-coins/stars/purchases/${purchaseId}`
+            );
+            if (statusResponse.success && statusResponse.data?.status === 'paid') {
+              paymentConfirmed = true;
+              break;
+            }
+          }
+          if (!paymentConfirmed) {
+            setAlert({
+              message: 'Payment is still being confirmed. Please try starting the quiz again in a moment.',
+              type: 'warning',
+            });
+            return;
+          }
+        }
+
+        setQuizzes((current) => current.map((quiz) => (
+          quiz.id === selectedQuiz.id ? { ...quiz, stars_entry_paid: true } : quiz
+        )));
+      } else if (selectedQuiz.cost_in_footy_coins > 0) {
+        const deductResponse = await apiService.post('/users/spend-coins', {
+          amount: selectedQuiz.cost_in_footy_coins,
+          reason: `Quiz: ${selectedQuiz.name}`,
+        });
+
+        if (!deductResponse.success) {
+          setAlert({ message: deductResponse.error || 'Failed to start quiz', type: 'error' });
+          return;
+        }
       }
 
       const quizResponse = await apiService.get(`/quizzes/${selectedQuiz.id}`);

@@ -130,6 +130,8 @@ class Quiz(Document):
     points_per_question = IntField(default=10)
     total_points = IntField(required=True)
     cost_in_footy_coins = IntField(default=0)
+    cost_currency = StringField(default='footy_coins', choices=('footy_coins', 'stars'))
+    cost_in_stars = IntField(default=0, min_value=0)
     destination = StringField(default='game', choices=('game', 'tournament'))
     tournament_id = StringField()
     tournament_gameweek = IntField()
@@ -152,6 +154,8 @@ class Quiz(Document):
             'points_per_question': self.points_per_question,
             'total_points': self.total_points,
             'cost_in_footy_coins': self.cost_in_footy_coins,
+            'cost_currency': getattr(self, 'cost_currency', 'footy_coins') or 'footy_coins',
+            'cost_in_stars': getattr(self, 'cost_in_stars', 0) or 0,
             'destination': getattr(self, 'destination', 'game') or 'game',
             'tournament_id': getattr(self, 'tournament_id', None),
             'tournament_gameweek': getattr(self, 'tournament_gameweek', None),
@@ -608,6 +612,7 @@ class StarsCoinPurchase(Document):
             {'fields': ['invoice_payload'], 'unique': True},
             {'fields': ['telegram_payment_charge_id'], 'unique': True, 'sparse': True},
             ['user_id', 'created_at'],
+            ['user_id', 'quiz_id', 'item_type', 'status'],
         ]
     }
 
@@ -616,7 +621,8 @@ class StarsCoinPurchase(Document):
     telegram_id = IntField(required=True)
     invoice_payload = StringField(required=True)
     amount = IntField(required=True)
-    item_type = StringField(default='coins', choices=('coins', 'booster'))
+    item_type = StringField(default='coins', choices=('coins', 'booster', 'quiz_entry'))
+    quiz_id = StringField()
     status = StringField(default='pending', choices=('pending', 'paid'))
     telegram_payment_charge_id = StringField()
     created_at = DateTimeField(default=datetime.utcnow)

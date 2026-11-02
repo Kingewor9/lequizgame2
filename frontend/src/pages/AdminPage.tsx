@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { apiService } from '../services/apiService';
 import { Loading } from '../components/Loading';
 import { Alert, AlertType } from '../components/Alert';
-import { ArrowLeft, BarChart3, CalendarClock, Coins, Eye, Image as ImageIcon, ListFilter, Megaphone, Pencil, RotateCcw, Save, Send, Trophy, Trash2, Users, X } from 'lucide-react';
+import { ArrowLeft, BarChart3, CalendarClock, Coins, Eye, Image as ImageIcon, ListFilter, Megaphone, Pencil, RotateCcw, Save, Send, Star, Trophy, Trash2, Users, X } from 'lucide-react';
 import '../styles/pages/AdminPage.css';
 import { BroadcastPage } from './BroadcastPage';
 import { AnalyticsPage } from './AnalyticsPage';
@@ -68,6 +68,8 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [timeLimit, setTimeLimit] = useState<number>(30);
     const [pointsPerQuestion, setPointsPerQuestion] = useState<number>(10);
     const [costInCoins, setCostInCoins] = useState<number>(0);
+    const [costCurrency, setCostCurrency] = useState<'footy_coins' | 'stars'>('footy_coins');
+    const [costInStars, setCostInStars] = useState<number>(0);
     const [expiresInHours, setExpiresInHours] = useState<number>(24);
     const [quizDestination, setQuizDestination] = useState<'game' | 'tournament'>('game');
     const [tournaments, setTournaments] = useState<AdminTournament[]>([]);
@@ -111,6 +113,8 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         setScheduledFor(localDate);
         setPublishMode('schedule');
         setCostInCoins(0);
+        setCostInStars(0);
+        setCostCurrency('footy_coins');
     }, [quizDestination, selectedTournamentId, tournaments]);
 
     // Dynamic Questions State
@@ -177,8 +181,17 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         if (quizDestination === 'tournament' && !selectedTournamentId) {
             return 'Choose the tournament this quiz belongs to.';
         }
-        if (quizDestination === 'tournament' && costInCoins !== 0) {
+        if (quizDestination === 'tournament'
+            && (costCurrency !== 'footy_coins' || costInCoins !== 0 || costInStars !== 0)) {
             return 'Tournament quizzes are included in the tournament entry fee.';
+        }
+        if (quizDestination === 'game' && costCurrency === 'stars'
+            && (!Number.isSafeInteger(costInStars) || costInStars < 1 || costInStars > 10000000)) {
+            return 'Set a whole-number Telegram Stars cost between 1 and 10,000,000.';
+        }
+        if (quizDestination === 'game' && costCurrency === 'footy_coins'
+            && (!Number.isSafeInteger(costInCoins) || costInCoins < 0 || costInCoins > 1000000000)) {
+            return 'Set a whole-number Footy Coin cost between 0 and 1,000,000,000.';
         }
 
         for (const [idx, q] of questions.entries()) {
@@ -228,7 +241,9 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 time_limit_seconds: timeLimit,
                 points_per_question: pointsPerQuestion,
                 total_points: pointsPerQuestion * questions.length,
-                cost_in_footy_coins: quizDestination === 'tournament' ? 0 : costInCoins,
+                cost_currency: quizDestination === 'tournament' ? 'footy_coins' : costCurrency,
+                cost_in_footy_coins: quizDestination === 'tournament' || costCurrency === 'stars' ? 0 : costInCoins,
+                cost_in_stars: quizDestination === 'game' && costCurrency === 'stars' ? costInStars : 0,
                 destination: quizDestination,
                 tournament_id: quizDestination === 'tournament' ? selectedTournamentId : null,
                 expires_at: expires_at_date.toISOString(),
@@ -420,14 +435,36 @@ const AdminQuizPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         </div>
                         {quizDestination === 'game' ? (
                             <div className="input-group">
-                                <label>Coin Cost (To play)</label>
-                                <input
-                                    type="number"
-                                    value={costInCoins}
-                                    onChange={(e) => setCostInCoins(Number(e.target.value))}
+                                <label htmlFor="quiz-payment-method">Payment Method</label>
+                                <select
+                                    id="quiz-payment-method"
+                                    value={costCurrency}
+                                    onChange={(event) => setCostCurrency(event.target.value as 'footy_coins' | 'stars')}
                                     className="cyber-input"
-                                    min="0"
-                                />
+                                >
+                                    <option value="footy_coins">Footy Coins</option>
+                                    <option value="stars">Telegram Stars</option>
+                                </select>
+                                <label htmlFor="quiz-entry-cost">
+                                    {costCurrency === 'stars' ? 'Stars Cost (To play)' : 'Footy Coin Cost (To play)'}
+                                </label>
+                                <div className="admin-quiz-cost-input">
+                                    {costCurrency === 'stars' ? <Star size={17} /> : <Coins size={17} />}
+                                    <input
+                                        id="quiz-entry-cost"
+                                        type="number"
+                                        value={costCurrency === 'stars' ? costInStars : costInCoins}
+                                        onChange={(event) => {
+                                            const amount = Number(event.target.value);
+                                            if (costCurrency === 'stars') setCostInStars(amount);
+                                            else setCostInCoins(amount);
+                                        }}
+                                        className="cyber-input"
+                                        min={costCurrency === 'stars' ? 1 : 0}
+                                        max={costCurrency === 'stars' ? 10000000 : 1000000000}
+                                        step="1"
+                                    />
+                                </div>
                             </div>
                         ) : (
                             <div className="input-group">

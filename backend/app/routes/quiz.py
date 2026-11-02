@@ -79,6 +79,15 @@ def _tournament_quiz_available(quiz, user_id):
     return tournament, fixture, None
 
 
+def _has_paid_stars_entry(user_id, quiz_id):
+    return StarsCoinPurchase.objects(
+        user_id=user_id,
+        quiz_id=quiz_id,
+        item_type='quiz_entry',
+        status='paid',
+    ).first() is not None
+
+
 def update_global_rankings():
     """Refresh all cached player ranks using a single batched database write."""
     try:
@@ -190,6 +199,13 @@ def get_today_quiz():
                 'points_per_question': quiz.points_per_question,
                 'total_points': quiz.total_points,
                 'cost_in_footy_coins': quiz.cost_in_footy_coins,
+                'cost_currency': getattr(quiz, 'cost_currency', 'footy_coins') or 'footy_coins',
+                'cost_in_stars': getattr(quiz, 'cost_in_stars', 0) or 0,
+                'stars_entry_paid': (
+                    _has_paid_stars_entry(user_id, quiz.id)
+                    if getattr(quiz, 'cost_currency', 'footy_coins') == 'stars'
+                    else False
+                ),
                 'destination': 'game',
                 'quiz_type': getattr(quiz, 'quiz_type', 'multiple_choice') or 'multiple_choice',
                 'expires_at': quiz.expires_at.isoformat() + 'Z',
@@ -202,6 +218,72 @@ def get_today_quiz():
     
     except Exception as e:
         return jsonify(format_error(f'Error fetching quiz: {str(e)}')), 500
+
+
+@quiz_bp.route('/<quiz_id>/stars-purchase', methods=['POST'])
+@jwt_required()
+def create_quiz_stars_purchase(quiz_id):
+    """Create a Telegram Stars invoice for a paid quiz entry."""
+    try:
+        user = User.objects(id=get_jwt_identity()).first()
+        if not user:
+            return jsonify(format_error('User not found')), 404
+
+        quiz = Quiz.objects(id=quiz_id, is_active=True).first()
+        now = datetime.utcnow()
+        if not quiz or quiz.expires_at <= now or (quiz.scheduled_for and quiz.scheduled_for > now):
+            return jsonify(format_error('Quiz is not currently available')), 404
+        if getattr(quiz, 'destination', 'game') == 'tournament':
+            return jsonify(format_error('Tournament quizzes do not have a separate entry fee')), 400
+        if getattr(quiz, 'cost_currency', 'footy_coins') != 'stars':
+            return jsonify(format_error('This quiz is not priced in Telegram Stars')), 400
+
+        amount = getattr(quiz, 'cost_in_stars', 0) or 0
+        if amount < 1:
+            current_app.logger.error('Quiz %s has an invalid Telegram Stars price: %s', quiz.id, amount)
+            return jsonify(format_error('This quiz has an invalid Stars price')), 500
+        if _has_paid_stars_entry(user.id, quiz.id):
+            return jsonify(format_success(data={
+                'already_paid': True,
+                'amount': amount,
+            })), 200
+
+        purchase_id = generate_id()
+        invoice_payload = generate_id()
+        purchase = StarsCoinPurchase(
+            id=purchase_id,
+            user_id=user.id,
+            telegram_id=user.telegram_id,
+            invoice_payload=invoice_payload,
+            amount=amount,
+            item_type='quiz_entry',
+            quiz_id=quiz.id,
+        )
+        purchase.save()
+
+        try:
+            from app.routes.coins import telegram_bot_api
+
+            invoice_result = telegram_bot_api('createInvoiceLink', {
+                'title': f'Quiz: {quiz.name[:26]}',
+                'description': f'Unlock the {quiz.name[:210]} quiz in Footy IQ.',
+                'payload': invoice_payload,
+                'currency': 'XTR',
+                'prices': [{'label': 'Quiz entry', 'amount': amount}],
+            })
+        except Exception:
+            purchase.delete()
+            raise
+
+        return jsonify(format_success(data={
+            'purchase_id': purchase_id,
+            'invoice_url': invoice_result['result'],
+            'amount': amount,
+            'stars': amount,
+        })), 201
+    except Exception as error:
+        current_app.logger.exception('Could not create Telegram Stars invoice for quiz %s', quiz_id)
+        return jsonify(format_error(f'Could not create Stars checkout: {str(error)}')), 502
 
 
 @quiz_bp.route('/<quiz_id>', methods=['GET'])
@@ -221,6 +303,11 @@ def get_quiz(quiz_id):
             )
             if error:
                 return jsonify(format_error(error)), 403
+        elif (
+            getattr(quiz, 'cost_currency', 'footy_coins') == 'stars'
+            and not _has_paid_stars_entry(get_jwt_identity(), quiz_id)
+        ):
+            return jsonify(format_error('Pay the quiz entry fee with Telegram Stars to access its questions')), 402
         
         return jsonify(format_success(data=quiz.to_dict())), 200
     
@@ -250,6 +337,11 @@ def start_quiz(quiz_id):
                 user_id=user_id,
                 quiz_id=quiz_id,
             ).first()
+        elif (
+            getattr(quiz, 'cost_currency', 'footy_coins') == 'stars'
+            and not _has_paid_stars_entry(user_id, quiz_id)
+        ):
+            return jsonify(format_error('Pay the quiz entry fee with Telegram Stars before starting')), 402
         else:
             already_played = QuizResponse.objects(user_id=user_id, quiz_id=quiz_id).first()
         if already_played:
@@ -297,6 +389,13 @@ def submit_quiz(quiz_id):
                 data=result,
                 message='Quiz submitted successfully',
             )), 200
+
+        if (
+            getattr(quiz, 'destination', 'game') != 'tournament'
+            and getattr(quiz, 'cost_currency', 'footy_coins') == 'stars'
+            and not _has_paid_stars_entry(user_id, quiz_id)
+        ):
+            return jsonify(format_error('Pay the quiz entry fee with Telegram Stars before submitting answers')), 402
 
         tournament = None
         fixture = None

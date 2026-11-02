@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models import (
     FootyCoinTask,
     FootyCoinTransaction,
+    Quiz,
     StarsCoinPurchase,
     User,
     UserFootyCoinTask,
@@ -189,6 +190,19 @@ def telegram_payment_webhook():
             status='pending',
         ).first()
         allowed = bool(purchase and pre_checkout.get('currency') == 'XTR')
+        if allowed and purchase.item_type == 'quiz_entry':
+            quiz = Quiz.objects(
+                id=purchase.quiz_id,
+                is_active=True,
+                cost_currency='stars',
+                cost_in_stars=purchase.amount,
+            ).first()
+            allowed = bool(
+                quiz
+                and getattr(quiz, 'destination', 'game') != 'tournament'
+                and quiz.expires_at > datetime.utcnow()
+                and (not quiz.scheduled_for or quiz.scheduled_for <= datetime.utcnow())
+            )
         answer = {
             'pre_checkout_query_id': pre_checkout['id'],
             'ok': allowed,
@@ -248,7 +262,7 @@ def telegram_payment_webhook():
                 )
                 if user_update.matched_count != 1:
                     raise ValueError('The player for this Stars invoice was not found')
-            else:
+            elif item_type == 'coins':
                 balance_update = user_collection.update_one(
                     {'_id': purchase['user_id'], 'telegram_id': payer_id},
                     {'$inc': {'footy_coins': purchase['amount']}},
@@ -266,6 +280,24 @@ def telegram_payment_webhook():
                     'telegram_payment_charge_id': charge_id,
                     'created_at': now,
                 }, session=session)
+            elif item_type == 'quiz_entry':
+                if not purchase.get('quiz_id'):
+                    raise ValueError('The quiz for this Stars invoice was not found')
+                quiz_exists = Quiz._get_collection().find_one(
+                    {'_id': purchase['quiz_id']},
+                    session=session,
+                )
+                if not quiz_exists:
+                    raise ValueError('The quiz for this Stars invoice no longer exists')
+                user_exists = user_collection.find_one(
+                    {'_id': purchase['user_id'], 'telegram_id': payer_id},
+                    {'_id': 1},
+                    session=session,
+                )
+                if not user_exists:
+                    raise ValueError('The player for this Stars invoice was not found')
+            else:
+                raise ValueError('Unknown Telegram Stars purchase type')
             purchase_collection.update_one(
                 {'_id': purchase['_id'], 'status': 'pending'},
                 {'$set': {

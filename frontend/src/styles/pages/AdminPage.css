@@ -611,6 +611,22 @@
     color: var(--color-sky);
 }
 
+.admin-quiz-cost-input {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.admin-quiz-cost-input > svg {
+    flex-shrink: 0;
+    color: var(--color-sky);
+}
+
+.admin-quiz-cost-input .cyber-input {
+    flex: 1;
+    min-width: 0;
+}
+
 .tournament-rewards-section {
     border: 1px solid rgba(251, 191, 36, 0.18);
     background:

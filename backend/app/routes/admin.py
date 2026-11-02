@@ -98,6 +98,39 @@ def _quiz_destination(data, scheduled_for):
         return None, None, f'A tournament quiz is already scheduled for gameweek {gameweek}.'
     return 'tournament', (tournament.id, gameweek), None
 
+
+def _quiz_pricing(
+    data,
+    destination,
+    default_currency='footy_coins',
+    default_coin_cost=0,
+    default_stars_cost=0,
+):
+    currency = data.get('cost_currency', default_currency)
+    coin_cost = data.get('cost_in_footy_coins', default_coin_cost)
+    stars_cost = data.get('cost_in_stars', default_stars_cost)
+
+    if currency not in ('footy_coins', 'stars'):
+        return None, None, None, 'Choose Footy Coins or Telegram Stars as the quiz payment method.'
+    for label, amount in (
+        ('Footy Coin cost', coin_cost),
+        ('Telegram Stars cost', stars_cost),
+    ):
+        if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0:
+            return None, None, None, f'{label} must be a non-negative whole number.'
+    if coin_cost > 1_000_000_000 or stars_cost > 10_000_000:
+        return None, None, None, 'Quiz cost exceeds the maximum allowed amount.'
+    if destination == 'tournament':
+        if currency != 'footy_coins' or coin_cost != 0 or stars_cost != 0:
+            return None, None, None, 'Tournament quizzes are included in the tournament entry fee.'
+        return 'footy_coins', 0, 0, None
+    if currency == 'stars':
+        if stars_cost < 1:
+            return None, None, None, 'Set a Telegram Stars cost of at least 1 Star.'
+        return currency, 0, stars_cost, None
+    return currency, coin_cost, 0, None
+
+
 def admin_required(fn):
     @wraps(fn)
     @jwt_required()
@@ -464,8 +497,9 @@ def create_quiz():
         )
         if destination_error:
             return jsonify(format_error(destination_error)), 400
-        if destination == 'tournament' and data.get('cost_in_footy_coins', 0) != 0:
-            return jsonify(format_error('Tournament quizzes are included in the tournament entry fee')), 400
+        currency, coin_cost, stars_cost, pricing_error = _quiz_pricing(data, destination)
+        if pricing_error:
+            return jsonify(format_error(pricing_error)), 400
         tournament_id, tournament_gameweek = (
             tournament_assignment if tournament_assignment else (None, None)
         )
@@ -478,7 +512,9 @@ def create_quiz():
             time_limit_seconds=data['time_limit_seconds'],
             points_per_question=data.get('points_per_question', 10),
             total_points=data['total_points'],
-            cost_in_footy_coins=data.get('cost_in_footy_coins', 0),
+            cost_in_footy_coins=coin_cost,
+            cost_currency=currency,
+            cost_in_stars=stars_cost,
             destination=destination,
             tournament_id=tournament_id,
             tournament_gameweek=tournament_gameweek,
@@ -528,8 +564,9 @@ def create_quiz_bulk():
         )
         if destination_error:
             return jsonify(format_error(destination_error)), 400
-        if destination == 'tournament' and data.get('cost_in_footy_coins', 0) != 0:
-            return jsonify(format_error('Tournament quizzes are included in the tournament entry fee')), 400
+        currency, coin_cost, stars_cost, pricing_error = _quiz_pricing(data, destination)
+        if pricing_error:
+            return jsonify(format_error(pricing_error)), 400
 
         tournament_id, tournament_gameweek = (
             tournament_assignment if tournament_assignment else (None, None)
@@ -544,7 +581,9 @@ def create_quiz_bulk():
             time_limit_seconds=data['time_limit_seconds'],
             points_per_question=data.get('points_per_question', 10),
             total_points=data['total_points'],
-            cost_in_footy_coins=data.get('cost_in_footy_coins', 0),
+            cost_in_footy_coins=coin_cost,
+            cost_currency=currency,
+            cost_in_stars=stars_cost,
             destination=destination,
             tournament_id=tournament_id,
             tournament_gameweek=tournament_gameweek,
@@ -711,14 +750,28 @@ def update_quiz(quiz_id):
         if not quiz:
             return jsonify(format_error('Quiz not found')), 404
         
-        data = request.get_json()
-        
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify(format_error('A JSON request body is required')), 400
+
+        if any(field in data for field in ('cost_currency', 'cost_in_footy_coins', 'cost_in_stars')):
+            currency, coin_cost, stars_cost, pricing_error = _quiz_pricing(
+                data,
+                getattr(quiz, 'destination', 'game'),
+                getattr(quiz, 'cost_currency', 'footy_coins') or 'footy_coins',
+                quiz.cost_in_footy_coins,
+                getattr(quiz, 'cost_in_stars', 0) or 0,
+            )
+            if pricing_error:
+                return jsonify(format_error(pricing_error)), 400
+            quiz.cost_currency = currency
+            quiz.cost_in_footy_coins = coin_cost
+            quiz.cost_in_stars = stars_cost
+
         if 'name' in data:
             quiz.name = data['name']
         if 'description' in data:
             quiz.description = data['description']
-        if 'cost_in_footy_coins' in data:
-            quiz.cost_in_footy_coins = data['cost_in_footy_coins']
         if 'is_active' in data:
             quiz.is_active = data['is_active']
         if 'expires_at' in data:
